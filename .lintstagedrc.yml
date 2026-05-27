@@ -2,7 +2,7 @@
   - npm exec prettier -- --write
   - npm exec eslint -- --fix --no-warn-ignored --max-warnings 0
 ./**/*.js: npm exec prettier -- --write
-./src/prisma/schema.prisma:
+./prisma/schema.prisma:
   - npm run prisma:validate
   - npm run prisma:format
 ./**/*: npm exec cspell -- --dot --no-must-find-files
