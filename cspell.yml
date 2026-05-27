@@ -22,7 +22,7 @@ ignorePaths:
   - .history/**
   - dist/**
   - src/generated/**
-  - src/prisma/migrations/**
+  - prisma/migrations/**
   - supabase/**
   - .env
   - cspell.yml

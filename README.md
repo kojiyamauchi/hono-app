@@ -30,11 +30,11 @@ src/
     index.ts           # top-level routes
   libs/
     prisma.ts          # Prisma Client setup
-  prisma/
-    schema.prisma      # Prisma schema
-    migrations/        # Prisma migrations
   generated/
     prisma/            # generated Prisma Client
+prisma/
+  schema.prisma        # Prisma schema
+  migrations/          # Prisma migrations
 supabase/
   config.toml          # local Supabase config
   seed.sql             # local seed file
