@@ -1,0 +1,1 @@
+-- Local Supabase seed file.

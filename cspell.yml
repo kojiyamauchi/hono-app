@@ -1,0 +1,30 @@
+version: 0.2
+language: en
+words:
+  - autoincrement
+  - datasource
+  - dotenv
+  - dtos
+  - hono
+  - Hono
+  - mappers
+  - postgresql
+  - Prisma
+  - Supabase
+  - supabase
+  - tsx
+flagWords:
+  - null
+ignorePaths:
+  - ./**/node_modules/**
+  - .git/**
+  - .husky/**
+  - .history/**
+  - dist/**
+  - src/generated/**
+  - src/prisma/migrations/**
+  - supabase/**
+  - .env
+  - cspell.yml
+  - package-lock.json
+  - tsconfig.tsbuildinfo

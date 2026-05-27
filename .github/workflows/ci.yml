@@ -1,0 +1,74 @@
+name: Pull Request CI
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: 24.11.0
+  DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+
+jobs:
+  checks:
+    name: ${{ matrix.job_name }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - job_name: Spell Check
+            script: spellcheck
+          - job_name: ESLint
+            script: lint
+          - job_name: Type Check
+            script: typecheck
+          - job_name: Jest
+            script: jest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Execution Environment for Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npm run prisma:generate
+
+      - name: Do ${{ matrix.job_name }}
+        run: npm run ${{ matrix.script }}
+
+  build:
+    name: Build Test
+    needs:
+      - checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Execution Environment for Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npm run prisma:generate
+
+      - name: Do Build
+        run: npm run build
