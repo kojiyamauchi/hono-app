@@ -147,6 +147,11 @@ import { prisma } from '../libs/prisma'
 - `remove: 不要なコードの削除`
 - `refactor: コードの整理`
 
+AIエージェントがコミットする場合は、誰が作業したか分かるようにコミットメッセージ本文の末尾に以下のトレーラーを付与すること:
+
+- Claude がコミットする場合: `Co-authored-by: Claude <claude@anthropic.com>`
+- Codex がコミットする場合: `Co-authored-by: Codex <codex@openai.com>`
+
 ### 変数名と関数名
 
 - 英語のキャメルケースまたはパスカルケースを使用
