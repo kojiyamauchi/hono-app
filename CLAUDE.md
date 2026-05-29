@@ -152,6 +152,22 @@ AIエージェントがコミットする場合は、誰が作業したか分か
 - Claude がコミットする場合: `Co-authored-by: Claude <claude@anthropic.com>`
 - Codex がコミットする場合: `Co-authored-by: Codex <codex@openai.com>`
 
+### GitHubへのpush
+
+ユーザーの通常のpush方法を変えないため、`origin` のURLはSSHのまま維持すること:
+
+```txt
+git@github.com:kojiyamauchi/hono-app.git
+```
+
+AIエージェントがpushする場合は、`origin` のURLをHTTPSへ変更せず、HTTPS URLを直接指定してpushすること:
+
+```bash
+git push https://github.com/kojiyamauchi/hono-app.git main
+```
+
+これにより、ユーザーが `git push origin main` を実行する場合は引き続きSSHを使用し、AIエージェントがpushする場合だけHTTPS認証を使用する。
+
 ### 変数名と関数名
 
 - 英語のキャメルケースまたはパスカルケースを使用
