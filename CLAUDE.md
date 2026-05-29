@@ -168,6 +168,18 @@ git push https://github.com/kojiyamauchi/hono-app.git main
 
 これにより、ユーザーが `git push origin main` を実行する場合は引き続きSSHを使用し、AIエージェントがpushする場合だけHTTPS認証を使用する。
 
+#### push後はリモート追跡参照を更新すること
+
+HTTPS URLを直接指定したpushは、名前付きリモート `origin` を経由しないため、ローカルのリモート追跡参照（`refs/remotes/origin/main`）が自動更新されない。その結果、push済みにもかかわらず `git log` や `git status` 上でローカルとリモートのHEADがズレて見える。
+
+これを防ぐため、AIエージェントはpush直後に以下のfetchを実行し、リモート追跡参照を明示的に更新すること:
+
+```bash
+git fetch https://github.com/kojiyamauchi/hono-app.git main:refs/remotes/origin/main
+```
+
+これにより `git log --oneline --decorate` で `(HEAD -> main, origin/main, origin/HEAD)` が揃った状態になる。なお、この手順はユーザーやSSH経由のpush（`git push origin main`）では不要（追跡参照が自動更新されるため）。
+
 ### AIエージェント間レビュー
 
 - AIエージェントが実装した変更は、原則としてPRでレビューすること
