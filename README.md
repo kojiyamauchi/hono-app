@@ -1,5 +1,7 @@
 # hono-app
 
+<!-- cspell:ignore lintstagedrc -->
+
 Hono を使ったバックエンド API の実装用プロジェクトです。
 
 薄い Web フレームワークである Hono をベースに、実務で使いやすいバックエンド構成を試せるようにしています。現在はルーティング、ヘルスチェック、Prisma、ローカル Supabase、Lint / Format / Spell Check / CI の土台を入れています。
@@ -23,21 +25,59 @@ Hono を使ったバックエンド API の実装用プロジェクトです。
 ## Project Structure
 
 ```txt
-src/
-  app.ts               # Hono app instance
-  server.ts            # local server entrypoint
-  routes/
-    index.ts           # top-level routes
-  libs/
-    prisma.ts          # Prisma Client setup
-  generated/
-    prisma/            # generated Prisma Client
-prisma/
-  schema.prisma        # Prisma schema
-  migrations/          # Prisma migrations
-supabase/
-  config.toml          # local Supabase config
-  seed.sql             # local seed file
+.
+|-- .claude/                         # Claude Code settings and skills
+|   |-- agents/
+|   |-- hooks/
+|   |-- rules/
+|   `-- skills/
+|       `-- pr-review/
+|           `-- SKILL.md
+|-- .codex/                          # Codex project-local skills
+|   `-- skills/
+|       `-- pr-review/
+|           `-- SKILL.md
+|-- .github/
+|   `-- workflows/
+|       `-- ci.yml                   # GitHub Actions CI
+|-- .husky/
+|   `-- pre-commit                   # pre-commit hook
+|-- prisma/
+|   |-- schema.prisma                # Prisma schema
+|   `-- migrations/                  # Prisma migrations
+|-- src/
+|   |-- app.ts                       # Hono app instance
+|   |-- server.ts                    # local server entrypoint
+|   |-- routes/
+|   |   `-- index.ts                 # top-level routes
+|   |-- libs/
+|   |   `-- prisma.ts                # Prisma Client setup
+|   |-- features/
+|   |   `-- users/
+|   |       |-- controllers/
+|   |       |-- dtos/
+|   |       |-- entities/
+|   |       |-- mappers/
+|   |       |-- repositories/
+|   |       |-- schemas/
+|   |       `-- services/
+|   |-- middlewares/
+|   |-- types/
+|   `-- utils/
+|-- supabase/
+|   |-- config.toml                  # local Supabase config
+|   |-- seed.sql                     # local seed file
+|   `-- snippets/
+|-- .env.example                     # environment variable example
+|-- .lintstagedrc.yml                # lint-staged config
+|-- .prettierrc.yml                  # Prettier config
+|-- CLAUDE.md                        # AI agent operating rules
+|-- cspell.yml                       # spell check config
+|-- eslint.config.mjs                # ESLint config
+|-- jest.config.mjs                  # Jest config
+|-- package.json                     # npm scripts and dependencies
+|-- prisma.config.ts                 # Prisma CLI config
+`-- tsconfig.json                    # TypeScript config
 ```
 
 ## Getting Started
