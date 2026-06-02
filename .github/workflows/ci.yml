@@ -26,7 +26,7 @@ jobs:
             script: lint
           - job_name: Type Check
             script: typecheck
-          - job_name: Test
+          - job_name: Unit Test
             script: test
     steps:
       - name: Checkout
