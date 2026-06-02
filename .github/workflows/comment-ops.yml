@@ -1,0 +1,33 @@
+name: Comment Ops
+
+# PRコメントをトリガーに動作するChatOpsワークフロー
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  approve-and-merge:
+    # 以下を全て満たす場合のみ実行する:
+    #  - PRへのコメントであること（Issueへのコメントを除外）
+    #  - コメント投稿者が本人（kojiyamauchi）であること
+    #  - コメント本文が「/approve」で始まること
+    if: >-
+      ${{
+        github.event.issue.pull_request &&
+        github.event.comment.user.login == 'kojiyamauchi' &&
+        startsWith(github.event.comment.body, '/approve')
+      }}
+    runs-on: ubuntu-latest
+    steps:
+      # botアカウントの権限（PAT）でPRを承認する
+      # 作者(kojiyamauchi) != 承認者(bot) となり、自己承認の制約を回避する
+      - name: Approve PR as bot
+        env:
+          GH_TOKEN: ${{ secrets.BOT_TOKEN }}
+        run: gh pr review "${{ github.event.issue.number }}" --approve -R "${{ github.repository }}"
+
+      # auto-mergeを予約する（CI通過後にマージコミット方式で自動マージ）
+      - name: Enable auto-merge
+        env:
+          GH_TOKEN: ${{ secrets.BOT_TOKEN }}
+        run: gh pr merge "${{ github.event.issue.number }}" --auto --merge -R "${{ github.repository }}"
