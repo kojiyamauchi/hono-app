@@ -22,7 +22,7 @@ const typeScriptESLintConfigRecommended = typeScriptESLint.configs.recommended.f
 const eslintConfig = [
   esLintConfigPrettier,
   {
-    ignores: ['node_modules/**', 'dist/**', 'src/generated/**', '.git/**', '.husky/**', '.history/**', '**/.DS_Store', 'package-lock.json'],
+    ignores: ['node_modules/**', 'dist/**', 'src/generated/**', '.git/**', '.husky/**', '.history/**', '**/.DS_Store', 'bun.lock'],
   },
   {
     name: 'for typescript',

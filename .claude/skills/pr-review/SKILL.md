@@ -96,8 +96,11 @@ gh pr review <PR番号> --comment -b "レビューコメント内容"
 ```
 
 - 重大な問題がある場合: `--request-changes`
-- 承認する場合: `--approve`
+- 問題がない場合: レビュー結果を投稿した後、別途`--comment -b "Approve by Claude <claude@anthropic.com> :octocat:"`
 - コメントのみ: `--comment`（デフォルト）
+- 再レビュー時は、前回指摘への対応状況、新規差分、残る任意提案、結論をレビュー結果に記載する
+- 初回レビュー、再レビュー、修正後レビューを問わず、問題がない場合はレビュー結果とは別の通常コメントとして`Approve by Claude <claude@anthropic.com> :octocat:`を投稿する
+- 修正コミット追加後は、過去の承認に依存せず最新HEADを確認して再レビューする
 
 ## 注意事項
 

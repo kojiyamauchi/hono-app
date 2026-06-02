@@ -1,8 +1,8 @@
 ./**/*.{ts,mjs}:
-  - npm exec prettier -- --write
-  - npm exec eslint -- --fix --no-warn-ignored --max-warnings 0
-./**/*.js: npm exec prettier -- --write
+  - bunx prettier --write
+  - bunx eslint --fix --no-warn-ignored --max-warnings 0
+./**/*.js: bunx prettier --write
 ./prisma/schema.prisma:
-  - npm run prisma:validate
-  - npm run prisma:format
-./**/*: npm exec cspell -- --dot --no-must-find-files
+  - bun run prisma:validate
+  - bun run prisma:format
+./**/*: bunx cspell --dot --no-must-find-files
