@@ -22,7 +22,7 @@ description: Use when reviewing a GitHub Pull Request for this repository, espec
 4. 差分を読み、バグ、設計リスク、テスト不足、セキュリティ、運用上の問題を優先して確認する。
 5. 必要に応じて `CLAUDE.md` の規約、CI設定、package scripts、Prisma/Supabase設定も確認する。
 6. レビュー結果は問題点を先に出し、重大度順に並べる。
-7. ユーザーがGitHub上への投稿を求めた場合だけ、レビューコメントまたはPR reviewとして投稿する。
+7. 最新HEADに対するレビュー結果を、GitHub上へPR reviewとして投稿する。
 
 ## Review Priorities
 
@@ -55,11 +55,13 @@ path/to/file.ts:123
 
 ## Posting To GitHub
 
-GitHubへ投稿する場合は、ユーザーの明示依頼があるときだけ行う。
+PRレビューを依頼された場合は、初回レビュー、再レビュー、修正後レビューを問わず、最新HEADに対するレビュー結果をGitHubへ投稿する。
 
 - コメントのみ: `COMMENT`
 - 修正必須: `REQUEST_CHANGES`
 - 問題なし: `APPROVE`
+- 修正コミット追加後は、過去の承認に依存せず最新HEADを確認して再レビューする。
+- 問題がない場合は、レビュー回数にかかわらず`APPROVE`を投稿する。
 
 投稿前に、対象PR番号と投稿種別を確認する。
 
