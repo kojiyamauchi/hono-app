@@ -5,6 +5,9 @@ words:
   - datasource
   - dotenv
   - dtos
+  - bun
+  - Bun
+  - bunx
   - hono
   - Hono
   - kojiyamauchi
@@ -14,7 +17,6 @@ words:
   - Prisma
   - Supabase
   - supabase
-  - tsx
 flagWords:
   - null
 ignorePaths:
@@ -28,5 +30,5 @@ ignorePaths:
   - supabase/**
   - .env
   - cspell.yml
-  - package-lock.json
+  - bun.lock
   - tsconfig.tsbuildinfo

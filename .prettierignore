@@ -4,4 +4,4 @@ src/generated
 .husky
 .history
 .DS_Store
-package-lock.json
+bun.lock
