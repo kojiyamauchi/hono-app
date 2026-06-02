@@ -10,7 +10,7 @@ Hono を使ったバックエンド API の実装用プロジェクトです。
 
 - Hono
 - TypeScript
-- Node.js
+- Bun
 - Prisma
 - PostgreSQL
 - Supabase CLI
@@ -19,7 +19,7 @@ Hono を使ったバックエンド API の実装用プロジェクトです。
 - cspell
 - Husky
 - lint-staged
-- Jest
+- Bun Test
 - GitHub Actions
 
 ## Project Structure
@@ -42,6 +42,7 @@ Hono を使ったバックエンド API の実装用プロジェクトです。
 |       `-- ci.yml                   # GitHub Actions CI
 |-- .husky/
 |   `-- pre-commit                   # pre-commit hook
+|-- Dockerfile                       # Bun runtime container for deployment
 |-- prisma/
 |   |-- schema.prisma                # Prisma schema
 |   `-- migrations/                  # Prisma migrations
@@ -74,8 +75,7 @@ Hono を使ったバックエンド API の実装用プロジェクトです。
 |-- CLAUDE.md                        # AI agent operating rules
 |-- cspell.yml                       # spell check config
 |-- eslint.config.mjs                # ESLint config
-|-- jest.config.mjs                  # Jest config
-|-- package.json                     # npm scripts and dependencies
+|-- package.json                     # Bun scripts and dependencies
 |-- prisma.config.ts                 # Prisma CLI config
 `-- tsconfig.json                    # TypeScript config
 ```
@@ -85,7 +85,7 @@ Hono を使ったバックエンド API の実装用プロジェクトです。
 Install dependencies.
 
 ```bash
-npm install
+bun install
 ```
 
 Create `.env`.
@@ -97,19 +97,19 @@ cp .env.example .env
 Start local Supabase.
 
 ```bash
-npm run db:start
+bun run db:start
 ```
 
 Apply Prisma migrations.
 
 ```bash
-npm run prisma:migrate:dev
+bun run prisma:migrate:dev
 ```
 
 Start the development server.
 
 ```bash
-npm run dev
+bun run dev
 ```
 
 The API runs on:
@@ -138,34 +138,34 @@ Database URL:    postgresql://postgres:postgres@127.0.0.1:54322/postgres
 Check local Supabase status.
 
 ```bash
-npm run db:status
+bun run db:status
 ```
 
 Stop local Supabase.
 
 ```bash
-npm run db:stop
+bun run db:stop
 ```
 
 Open Prisma Studio.
 
 ```bash
-npm run prisma:studio
+bun run prisma:studio
 ```
 
 ## Scripts
 
 ```bash
-npm run dev              # start dev server with watch mode
-npm run start            # start server
-npm run build            # type-check build
-npm run typecheck        # run TypeScript type check
-npm run lint             # run ESLint with auto-fix
-npm run format           # run Prettier
-npm run spellcheck       # run cspell
-npm run jest             # run Jest
-npm run prisma:generate  # generate Prisma Client
-npm run prisma:validate  # validate Prisma schema
+bun run dev              # start dev server with hot reload
+bun run start            # start server
+bun run build            # type-check build
+bun run typecheck        # run TypeScript type check
+bun run lint             # run ESLint with auto-fix
+bun run format           # run Prettier
+bun run spellcheck       # run cspell
+bun test                 # run Bun Test
+bun run prisma:generate  # generate Prisma Client
+bun run prisma:validate  # validate Prisma schema
 ```
 
 ## Environment
