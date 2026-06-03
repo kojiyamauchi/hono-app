@@ -41,13 +41,18 @@ description: Use when reviewing a GitHub Pull Request for this repository, espec
 
 レビュー結果は次の順で書く。
 
-1. Findings
-2. Open Questions
-3. Summary
+1. Review by Codex
+2. Findings
+3. Open Questions
+4. Summary
 
 Findingsでは、可能な限りファイルパスと行番号を示す。
 
 ```txt
+## Review by Codex
+
+## Findings
+
 [P1] 問題の短い説明
 path/to/file.ts:123
 理由と影響。必要なら修正方針。
