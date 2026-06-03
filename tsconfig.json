@@ -9,9 +9,8 @@
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
     "types": ["bun", "node"],
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["./src/*"]
     }
   },
   "include": ["src/**/*.ts", "prisma.config.ts"],
