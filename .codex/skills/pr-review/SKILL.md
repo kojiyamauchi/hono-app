@@ -18,11 +18,13 @@ description: Use when reviewing a GitHub Pull Request for this repository, espec
 
 1. PRの対象リポジトリ、PR番号、base/head branchを確認する。
 2. GitHub connectorが使える場合は、PR本文、差分、コメント、レビュー状態をconnectorで取得する。
-3. `gh` が必要な場合は、`gh pr view`, `gh pr diff`, `gh pr checks` を使って補足する。
-4. 差分を読み、バグ、設計リスク、テスト不足、セキュリティ、運用上の問題を優先して確認する。
-5. 必要に応じて `CLAUDE.md` の規約、CI設定、package scripts、Prisma/Supabase設定も確認する。
-6. レビュー結果は問題点を先に出し、重大度順に並べる。
-7. 最新HEADに対するレビュー結果を、GitHub上へPR reviewとして投稿する。
+3. 差分レビューを始める前に、`gh pr checks` やGitHub connectorで対象PRのCIが通っていることを確認する。
+4. CIが未完了または失敗している場合は、その状態をレビュー結果に明記し、問題なしの通常コメントはCI通過後に投稿する。
+5. `gh` が必要な場合は、`gh pr view`, `gh pr diff`, `gh pr checks` を使って補足する。
+6. 差分を読み、バグ、設計リスク、テスト不足、セキュリティ、運用上の問題を優先して確認する。
+7. 必要に応じて `CLAUDE.md` の規約、CI設定、package scripts、Prisma/Supabase設定も確認する。
+8. レビュー結果は問題点を先に出し、重大度順に並べる。
+9. 最新HEADに対するレビュー結果を、GitHub上へPR reviewとして投稿する。
 
 ## Review Priorities
 
