@@ -107,21 +107,21 @@ const eslintConfig = [
       'simple-import-sort/imports': 'error',
       'simple-import-sort/exports': 'error',
       // feature独立の原則: feature間の相互importを禁止する
-      'boundaries/element-types': [
+      'boundaries/dependencies': [
         'error',
         {
           default: 'allow',
           rules: [
             {
               // featureから別featureへのimportを禁止（自分自身のfeatureは許可）
-              from: ['feature'],
-              disallow: [['feature', { feature: '!${from.feature}' }]],
+              from: [{ type: 'feature' }],
+              disallow: [{ to: { type: 'feature', captured: { feature: '!{{ from.captured.feature }}' } } }],
               message: 'feature間のimportは禁止です。共有コードは src/shared に配置してください。',
             },
             {
               // sharedからfeatureへのimportを禁止（依存はfeature→sharedの一方向）
-              from: ['shared'],
-              disallow: ['feature'],
+              from: [{ type: 'shared' }],
+              disallow: [{ to: { type: 'feature' } }],
               message: 'shared から feature への import は禁止です（依存は feature→shared の一方向）。',
             },
           ],
