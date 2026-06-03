@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import esLintJs from '@eslint/js'
 import typeScriptParser from '@typescript-eslint/parser'
 import esLintConfigPrettier from 'eslint-config-prettier'
+import pluginBoundaries from 'eslint-plugin-boundaries'
 import pluginImport from 'eslint-plugin-import'
 import pluginSimpleImportSort from 'eslint-plugin-simple-import-sort'
 import globals from 'globals'
@@ -43,8 +44,21 @@ const eslintConfig = [
     },
     plugins: {
       ...typeScriptESLintConfigBase.plugins,
+      boundaries: pluginBoundaries,
       import: pluginImport,
       'simple-import-sort': pluginSimpleImportSort,
+    },
+    settings: {
+      'import/resolver': {
+        typescript: {
+          alwaysTryTypes: true,
+        },
+      },
+      // feature境界の判定対象（src/shared/* と src/features/* をフォルダ単位で要素化）
+      'boundaries/elements': [
+        { type: 'shared', pattern: 'src/shared/*', mode: 'folder' },
+        { type: 'feature', pattern: 'src/features/*', mode: 'folder', capture: ['feature'] },
+      ],
     },
     rules: {
       ...typeScriptESLintConfigESLintRecommended.rules,
@@ -92,6 +106,27 @@ const eslintConfig = [
       'spaced-comment': ['error', 'always'],
       'simple-import-sort/imports': 'error',
       'simple-import-sort/exports': 'error',
+      // feature独立の原則: feature間の相互importを禁止する
+      'boundaries/element-types': [
+        'error',
+        {
+          default: 'allow',
+          rules: [
+            {
+              // featureから別featureへのimportを禁止（自分自身のfeatureは許可）
+              from: ['feature'],
+              disallow: [['feature', { feature: '!${from.feature}' }]],
+              message: 'feature間のimportは禁止です。共有コードは src/shared に配置してください。',
+            },
+            {
+              // sharedからfeatureへのimportを禁止（依存はfeature→sharedの一方向）
+              from: ['shared'],
+              disallow: ['feature'],
+              message: 'shared から feature への import は禁止です（依存は feature→shared の一方向）。',
+            },
+          ],
+        },
+      ],
     },
   },
   {
