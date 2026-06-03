@@ -151,6 +151,22 @@ AIエージェントがコミットする場合は、誰が作業したか分か
 - Claude がコミットする場合: `Co-authored-by: Claude <claude@anthropic.com>`
 - Codex がコミットする場合: `Co-authored-by: Codex <codex@openai.com>`
 
+### ブランチ命名
+
+ブランチ名は作業種別と関心事が分かるように、以下の形式に従うこと:
+
+- 新規機能・追加機能開発: `feature/作業の関心事`
+- 既存機能や設定の修正・改善: `modify/作業の関心事`
+- 機能や設定の削除: `remove/作業の関心事`
+
+作業の関心事は英語のケバブケースで簡潔に記述すること。例:
+
+- `feature/auth`
+- `feature/users-crud`
+- `modify/branch-rules`
+- `modify/ci-workflow`
+- `remove/legacy-config`
+
 ### GitHubへのpush
 
 ユーザーの通常のpush方法を変えないため、`origin` のURLはSSHのまま維持すること:
