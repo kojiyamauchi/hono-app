@@ -20,6 +20,8 @@ jobs:
     name: ${{ matrix.job_name }}
     runs-on: ubuntu-latest
     strategy:
+      # 1つのジョブが失敗しても他のジョブをキャンセルせず、全ジョブを完走させる
+      fail-fast: false
       matrix:
         include:
           - job_name: Spell Check
