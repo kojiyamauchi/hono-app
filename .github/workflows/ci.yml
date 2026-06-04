@@ -12,12 +12,16 @@ permissions:
 env:
   BUN_VERSION: 1.3.14
   DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+  SUPABASE_URL: http://127.0.0.1:54321
+  SUPABASE_ANON_KEY: ci-placeholder-key
 
 jobs:
   checks:
     name: ${{ matrix.job_name }}
     runs-on: ubuntu-latest
     strategy:
+      # 1つのジョブが失敗しても他のジョブをキャンセルせず、全ジョブを完走させる
+      fail-fast: false
       matrix:
         include:
           - job_name: Spell Check
