@@ -1,4 +1,4 @@
-import type { UserResponse } from '@/shared/user/dtos'
+import type { PublicUserResponse, UserResponse } from '@/shared/user/dtos'
 import type { User } from '@/shared/user/entities'
 
 /**
@@ -12,5 +12,16 @@ export const toUserResponse = (user: User): UserResponse => {
     email: user.email,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
+  }
+}
+
+/**
+ * Userエンティティを公開APIレスポンス用のPublicUserResponseへ変換する。
+ * emailや作成日時など、本人以外へ不要な情報は含めない。
+ */
+export const toPublicUserResponse = (user: User): PublicUserResponse => {
+  return {
+    id: user.id,
+    name: user.name,
   }
 }

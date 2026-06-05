@@ -9,3 +9,12 @@ export type UserResponse = {
   createdAt: Date
   updatedAt: Date
 }
+
+/**
+ * 公開APIレスポンス用のUser表現。
+ * 他ユーザー参照で公開してよい最小限の情報だけを含める。
+ */
+export type PublicUserResponse = {
+  id: number
+  name: string
+}

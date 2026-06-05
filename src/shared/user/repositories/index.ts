@@ -11,6 +11,13 @@ type CreateUserInput = {
 }
 
 /**
+ * Userの更新時に変更可能な入力値。
+ */
+type UpdateUserInput = {
+  name: string
+}
+
+/**
  * Userのデータアクセスを提供するリポジトリ。
  * Prismaへの依存をこの層に閉じ込める。
  */
@@ -34,5 +41,15 @@ export const userRepository = {
    */
   create: async (input: CreateUserInput): Promise<User> => {
     return prisma.user.create({ data: input })
+  },
+
+  /**
+   * IDで指定したユーザーを更新する。
+   */
+  updateById: async (id: number, input: UpdateUserInput): Promise<User> => {
+    return prisma.user.update({
+      where: { id },
+      data: input,
+    })
   },
 }
