@@ -73,6 +73,13 @@ describe('usersService.updateMe', () => {
     await expect(usersService.updateMe(999, { name: 'Updated User' })).rejects.toThrow('ユーザーが見つかりません')
     expect(updateById).not.toHaveBeenCalled()
   })
+
+  test('更新時にユーザーが存在しなくなったら404エラーを投げる', async () => {
+    findById.mockResolvedValue(user)
+    updateById.mockResolvedValue(null)
+
+    await expect(usersService.updateMe(1, { name: 'Updated User' })).rejects.toThrow('ユーザーが見つかりません')
+  })
 })
 
 describe('usersService.getById', () => {

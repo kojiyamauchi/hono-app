@@ -81,6 +81,25 @@ describe('users routes', () => {
     expect(body).not.toHaveProperty('password')
   })
 
+  test('PATCH /users/me は更新時にユーザーが存在しなくなったら404を返す', async () => {
+    findById.mockResolvedValue(user)
+    updateById.mockResolvedValue(null)
+    const token = await createToken(1)
+
+    const response = await app.request('/users/me', {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ name: 'Updated User' }),
+    })
+
+    expect(response.status).toBe(404)
+    const body = (await response.json()) as { error?: { message?: string } }
+    expect(body.error?.message).toBe('ユーザーが見つかりません')
+  })
+
   test('GET /users/:id は指定ユーザーの公開情報だけを返す', async () => {
     findById.mockResolvedValue({ ...user, id: 2, name: 'Public User', email: 'public@example.com' })
     const token = await createToken(1)
