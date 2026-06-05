@@ -50,19 +50,31 @@ Hono を使ったバックエンド API の実装用プロジェクトです。
 |   |-- app.ts                       # Hono app instance
 |   |-- server.ts                    # local server entrypoint
 |   |-- routes/
-|   |   `-- index.ts                 # top-level routes
+|   |   `-- index.ts                 # top-level route registry
 |   |-- libs/
-|   |   `-- prisma.ts                # Prisma Client setup
+|   |   |-- prisma.ts                # Prisma Client setup
+|   |   `-- supabase.ts              # Supabase client setup
 |   |-- features/
-|   |   `-- users/
-|   |       |-- controllers/
+|   |   |-- auth/                    # custom auth feature
+|   |   |   |-- controllers/
+|   |   |   |-- routes/
+|   |   |   |-- schemas/
+|   |   |   `-- services/
+|   |   |-- supabaseAuth/            # Supabase Auth feature
+|   |   |   |-- controllers/
+|   |   |   |-- routes/
+|   |   |   |-- schemas/
+|   |   |   `-- services/
+|   |   `-- users/                   # users feature scaffold
+|   |-- middlewares/
+|   |   |-- auth/
+|   |   `-- supabaseAuth/
+|   |-- shared/
+|   |   `-- user/                    # shared User domain
 |   |       |-- dtos/
 |   |       |-- entities/
 |   |       |-- mappers/
-|   |       |-- repositories/
-|   |       |-- schemas/
-|   |       `-- services/
-|   |-- middlewares/
+|   |       `-- repositories/
 |   |-- types/
 |   `-- utils/
 |-- supabase/
@@ -79,6 +91,27 @@ Hono を使ったバックエンド API の実装用プロジェクトです。
 |-- prisma.config.ts                 # Prisma CLI config
 `-- tsconfig.json                    # TypeScript config
 ```
+
+## Features Architecture
+
+このプロジェクトでは、公開URLのトップレベルroutingを機能境界として扱います。
+
+- `src/routes/` はトップレベルroutingの入口です。
+  - 例: `/auth`、`/supabase-auth`、`/users`
+  - `src/routes/index.ts` は各featureのrouteをHonoアプリへ登録する集約場所です。
+- トップレベルroutingごとに `src/features/` 配下へ対応するfeatureディレクトリを置きます。
+  - 例: `/auth` -> `src/features/auth/`
+  - 例: `/supabase-auth` -> `src/features/supabaseAuth/`
+  - URLはkebab-case、featureディレクトリ名はTypeScriptの命名に合わせてcamelCaseを許容します。
+- サブルートや詳細なルート定義は、対応する `src/features/<feature>/routes/` に閉じます。
+  - `src/routes/` はトップレベルの入口、`src/features/<feature>/routes/` はfeature内部のルート詳細です。
+- features間の相互importは禁止です。
+  - `src/features/auth` から `src/features/supabaseAuth` をimportするような、featureを跨ぐ依存は作りません。
+  - feature間で共有したい処理・型・ドメイン概念は `src/shared/` に切り出します。
+- 複数featuresで使う機能は `src/shared/` 配下に置きます。
+  - 例: 複数featureで使うUserドメイン、DTO、mapper、repositoryなど
+- `src/shared/` から `src/features/` をimportすることは禁止です。
+  - 依存方向は `features -> shared` の一方向に保ちます。
 
 ## Getting Started
 
