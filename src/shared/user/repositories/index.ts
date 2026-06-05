@@ -1,5 +1,6 @@
 import { prisma } from '@/libs/prisma'
 import type { User } from '@/shared/user/entities'
+import { isPrismaNotFoundError } from '@/utils/prisma'
 
 /**
  * Userの新規作成時に必要な入力値。
@@ -44,12 +45,20 @@ export const userRepository = {
   },
 
   /**
-   * IDで指定したユーザーを更新する。
+   * IDで指定したユーザーを更新する。存在しない場合はnullを返す。
    */
-  updateById: async (id: number, input: UpdateUserInput): Promise<User> => {
-    return prisma.user.update({
-      where: { id },
-      data: input,
-    })
+  updateById: async (id: number, input: UpdateUserInput): Promise<User | null> => {
+    try {
+      return await prisma.user.update({
+        where: { id },
+        data: input,
+      })
+    } catch (error) {
+      if (isPrismaNotFoundError(error)) {
+        return null
+      }
+
+      throw error
+    }
   },
 }

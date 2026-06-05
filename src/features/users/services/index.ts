@@ -31,6 +31,10 @@ export const usersService = {
     }
 
     const updatedUser = await userRepository.updateById(user.id, input)
+    if (!updatedUser) {
+      throw new AppError(404, 'ユーザーが見つかりません')
+    }
+
     return toUserResponse(updatedUser)
   },
 
