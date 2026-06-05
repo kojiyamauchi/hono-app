@@ -25,6 +25,11 @@ PRタイトルは「[作業者]: 関心事」の形式にしてください。
 <!-- 実施した確認にチェックを入れてください -->
 
 - [ ] CIが通過していること
+  - `bun run spellcheck`
+  - `bun run lint`
+  - `bun run typecheck`
+  - `bun run test`
+  - `bun run build`
 
 ## 補足 / レビュー観点
 
