@@ -38,8 +38,10 @@ Hono を使ったバックエンド API の実装用プロジェクトです。
 |       `-- pr-review/
 |           `-- SKILL.md
 |-- .github/
+|   |-- pull_request_template.md     # PR template
 |   `-- workflows/
-|       `-- ci.yml                   # GitHub Actions CI
+|       |-- ci.yml                   # GitHub Actions CI
+|       `-- comment-ops.yml          # PR comment operations
 |-- .husky/
 |   `-- pre-commit                   # pre-commit hook
 |-- Dockerfile                       # Bun runtime container for deployment
@@ -57,15 +59,30 @@ Hono を使ったバックエンド API の実装用プロジェクトです。
 |   |-- features/
 |   |   |-- auth/                    # custom auth feature
 |   |   |   |-- controllers/
+|   |   |   |-- dtos/
+|   |   |   |-- entities/
+|   |   |   |-- mappers/
+|   |   |   |-- repositories/
 |   |   |   |-- routes/
 |   |   |   |-- schemas/
 |   |   |   `-- services/
 |   |   |-- supabaseAuth/            # Supabase Auth feature
 |   |   |   |-- controllers/
+|   |   |   |-- dtos/
+|   |   |   |-- entities/
+|   |   |   |-- mappers/
+|   |   |   |-- repositories/
 |   |   |   |-- routes/
 |   |   |   |-- schemas/
 |   |   |   `-- services/
 |   |   `-- users/                   # users feature scaffold
+|   |       |-- controllers/
+|   |       |-- dtos/
+|   |       |-- entities/
+|   |       |-- mappers/
+|   |       |-- repositories/
+|   |       |-- schemas/
+|   |       `-- services/
 |   |-- middlewares/
 |   |   |-- auth/
 |   |   `-- supabaseAuth/
