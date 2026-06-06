@@ -182,6 +182,34 @@ AIエージェントがコミットする場合は、誰が作業したか分か
 - 各コミット時点で `typecheck` が完全に通らなくてもよい（ファイル間の参照のため一時的に通らない瞬間が出るため）。最終的にpush後のCIで全チェックを通すこと
 - 各コミット時点でも、プレコミットフック（lint-staged の prettier / eslint / cspell）は通すこと
 
+#### feature実装時の標準コミット粒度
+
+feature配下にAPIやユースケースを追加する場合は、原則としてレイヤー単位で実装とテストを分けること。1コミット内で複数レイヤーの実装を混ぜないこと。
+
+標準的な順序:
+
+1. DTO追加
+2. mapper追加
+3. mapperテスト追加
+4. repository追加
+5. repositoryテスト追加
+6. schema追加
+7. schemaテスト追加
+8. service追加
+9. serviceテスト追加
+10. controller追加
+11. controllerテスト追加
+12. routes追加
+13. routesテスト追加
+14. top-level route登録
+15. route統合テスト追加
+
+特に `DTO + mapper + repository` や `schema + service + controller + routes` のように、役割の異なる変更を1コミットへまとめないこと。
+
+薄いcontrollerや単純なrepositoryなど、単体テストの効果が低い場合はテストを省略してよい。ただし、省略した場合でもserviceテストまたはroute統合テストで振る舞いを担保すること。
+
+review対応コミットは、指摘ごと、または関心事ごとに分けること。
+
 ### ブランチ命名
 
 ブランチ名は作業種別と関心事が分かるように、以下の形式に従うこと:
