@@ -5,8 +5,15 @@ import { authMiddleware } from '@/middlewares/auth'
 import { organizationMembershipMiddleware } from '@/middlewares/organizationMembership'
 import { onValidationError } from '@/utils/validation'
 
-import { organizationsController } from '../controllers'
-import { createOrganizationSchema, organizationIdParamSchema, updateOrganizationSchema } from '../schemas'
+import { organizationsController,organizationsMembersController } from '../controllers'
+import {
+  addMemberBodySchema,
+  createOrganizationSchema,
+  memberRouteParamSchema,
+  organizationIdParamSchema,
+  updateMemberRoleBodySchema,
+  updateOrganizationSchema,
+} from '../schemas'
 
 /**
  * 組織関連のルート（/organizations配下）。
@@ -30,4 +37,33 @@ export const organizationsRoutes = new Hono()
   )
   .delete('/:id', authMiddleware, zValidator('param', organizationIdParamSchema, onValidationError), organizationMembershipMiddleware, (c) =>
     organizationsController.remove(c, c.req.valid('param').id, c.get('membership').role),
+  )
+  .get('/:id/members', authMiddleware, zValidator('param', organizationIdParamSchema, onValidationError), organizationMembershipMiddleware, (c) =>
+    organizationsMembersController.listMembers(c, c.req.valid('param').id),
+  )
+  .post(
+    '/:id/members',
+    authMiddleware,
+    zValidator('param', organizationIdParamSchema, onValidationError),
+    organizationMembershipMiddleware,
+    zValidator('json', addMemberBodySchema, onValidationError),
+    (c) => organizationsMembersController.addMember(c, c.req.valid('param').id, c.get('membership').role, c.req.valid('json')),
+  )
+  .patch(
+    '/:id/members/:membershipId',
+    authMiddleware,
+    zValidator('param', memberRouteParamSchema, onValidationError),
+    organizationMembershipMiddleware,
+    zValidator('json', updateMemberRoleBodySchema, onValidationError),
+    (c) =>
+      organizationsMembersController.updateMemberRole(
+        c,
+        c.req.valid('param').id,
+        c.req.valid('param').membershipId,
+        c.get('membership').role,
+        c.req.valid('json'),
+      ),
+  )
+  .delete('/:id/members/:membershipId', authMiddleware, zValidator('param', memberRouteParamSchema, onValidationError), organizationMembershipMiddleware, (c) =>
+    organizationsMembersController.removeMember(c, c.req.valid('param').id, c.req.valid('param').membershipId, c.get('membership').role),
   )
