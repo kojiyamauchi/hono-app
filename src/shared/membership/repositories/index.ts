@@ -1,6 +1,6 @@
 import { prisma } from '@/libs/prisma'
 import type { Membership, Role } from '@/shared/membership/entities'
-import { isPrismaNotFoundError } from '@/utils/prisma'
+import { isPrismaNotFoundError, isPrismaUniqueConstraintError } from '@/utils/prisma'
 
 /**
  * Membershipのデータアクセスを提供するリポジトリ。
@@ -34,10 +34,17 @@ export const membershipRepository = {
   },
 
   /**
-   * メンバーシップを新規作成する。
+   * メンバーシップを新規作成する。一意制約違反（同一ユーザーの重複追加競合）の場合はnullを返す。
    */
-  create: async (userId: number, organizationId: number, role: Role): Promise<Membership> => {
-    return prisma.membership.create({ data: { userId, organizationId, role } })
+  create: async (userId: number, organizationId: number, role: Role): Promise<Membership | null> => {
+    try {
+      return await prisma.membership.create({ data: { userId, organizationId, role } })
+    } catch (error) {
+      if (isPrismaUniqueConstraintError(error)) {
+        return null
+      }
+      throw error
+    }
   },
 
   /**

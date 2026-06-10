@@ -229,6 +229,14 @@ describe('organizationsService.addMember', () => {
     await expect(organizationsService.addMember(1, 'OWNER', { email: 'user@example.com', role: 'MEMBER' })).rejects.toThrow('既にこの組織のメンバー')
     expect(membershipCreate).not.toHaveBeenCalled()
   })
+
+  test('createがnullを返した場合（競合）は409エラーを投げる', async () => {
+    findByEmail.mockResolvedValue({ id: 2, name: 'User', email: 'user@example.com', password: 'hash', createdAt: new Date(), updatedAt: new Date() })
+    findByUserAndOrganization.mockResolvedValue(null)
+    membershipCreate.mockResolvedValue(null)
+
+    await expect(organizationsService.addMember(1, 'OWNER', { email: 'user@example.com', role: 'MEMBER' })).rejects.toThrow('既にこの組織のメンバー')
+  })
 })
 
 describe('organizationsService.updateMemberRole', () => {

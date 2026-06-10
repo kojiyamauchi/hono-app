@@ -100,6 +100,9 @@ export const organizationsService = {
       throw new AppError(409, '既にこの組織のメンバーです')
     }
     const membership = await membershipRepository.create(user.id, organizationId, input.role)
+    if (!membership) {
+      throw new AppError(409, '既にこの組織のメンバーです')
+    }
     return toMemberResponse(membership)
   },
 
