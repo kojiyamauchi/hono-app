@@ -132,7 +132,7 @@ Hono を使ったバックエンド API の実装用プロジェクトです。
 
 ## Schema Naming
 
-`src/features/**/schemas/` 配下では、Zod schemaとそこから推論する型の対応が分かる命名に揃えます。
+`src/features/**/schemas/` および `src/shared/**/schemas/` 配下では、Zod schemaとそこから推論する型の対応が分かる命名に揃えます。
 
 - Zod schemaは `***Schema` として定義します。
   - 例: `signupSchema`、`updateMeSchema`、`userIdParamSchema`

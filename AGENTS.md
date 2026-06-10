@@ -158,7 +158,7 @@ import { prisma } from '../libs/prisma'
 
 ### Zod schema と型定義の命名
 
-`src/features/**/schemas/` 配下で定義するZod schemaと、そのschemaからexportする型は以下の命名に揃えること:
+`src/features/**/schemas/` および `src/shared/**/schemas/` 配下で定義するZod schemaと、そのschemaからexportする型は以下の命名に揃えること:
 
 - Zod schemaは `***Schema` として定義すること
   - 例: `signupSchema`、`updateMeSchema`、`userIdParamSchema`
@@ -167,7 +167,7 @@ import { prisma } from '../libs/prisma'
 - param系schemaの型も同じ規則に従い、`***ParamSchemaType` とすること
   - 例: `UserIdParamSchemaType`、`OrganizationIdParamSchemaType`
 - schema由来の型に `***Input` や `***Param` のような別接尾語を使わないこと
-- repository内部など、Zod schema由来ではない入出力型はこの規則の対象外とする
+- repository内部など、`schemas/` 配下のZod schema由来ではない入出力型はこの規則の対象外とする
 
 ### コミットメッセージ
 
