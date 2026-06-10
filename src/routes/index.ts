@@ -2,6 +2,7 @@ import type { Hono } from 'hono'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
 
 import { authRoutes } from '@/features/auth/routes'
+import { organizationsRoutes } from '@/features/organizations/routes'
 import { supabaseAuthRoutes } from '@/features/supabaseAuth/routes'
 import { usersRoutes } from '@/features/users/routes'
 import { AppError } from '@/utils/errors'
@@ -23,6 +24,9 @@ export const registerRoutes = (app: Hono): void => {
 
   // ユーザー関連ルート（/users配下）をマウントする
   app.route('/users', usersRoutes)
+
+  // 組織関連ルート（/organizations配下）をマウントする
+  app.route('/organizations', organizationsRoutes)
 
   // 共通エラーハンドラ。AppErrorはそのstatusCodeで、想定外のエラーは500で統一形式を返す
   app.onError((err, c) => {
