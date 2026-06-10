@@ -24,8 +24,8 @@ export const organizationsRoutes = new Hono()
     '/:id',
     authMiddleware,
     zValidator('param', organizationIdParamSchema, onValidationError),
-    zValidator('json', updateOrganizationSchema, onValidationError),
     organizationMembershipMiddleware,
+    zValidator('json', updateOrganizationSchema, onValidationError),
     (c) => organizationsController.update(c, c.req.valid('param').id, c.req.valid('json'), c.get('membership').role),
   )
   .delete('/:id', authMiddleware, zValidator('param', organizationIdParamSchema, onValidationError), organizationMembershipMiddleware, (c) =>

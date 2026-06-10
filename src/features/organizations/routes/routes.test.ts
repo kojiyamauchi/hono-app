@@ -132,9 +132,23 @@ describe('organizations routes', () => {
     expect(update).not.toHaveBeenCalled()
   })
 
+  test('PATCH /organizations/:id は非メンバーなら（不正bodyでも）404を返す', async () => {
+    findByUserAndOrganization.mockResolvedValue(null)
+    const token = await createToken(1)
+
+    const response = await app.request('/organizations/1', {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: '' }),
+    })
+
+    expect(response.status).toBe(404)
+    expect(update).not.toHaveBeenCalled()
+  })
+
   test('DELETE /organizations/:id はOWNERなら204を返す', async () => {
     findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))
-    deleteById.mockResolvedValue(undefined)
+    deleteById.mockResolvedValue(true)
     const token = await createToken(1)
 
     const response = await app.request('/organizations/1', {
