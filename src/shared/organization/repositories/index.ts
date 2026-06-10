@@ -1,5 +1,6 @@
 import { prisma } from '@/libs/prisma'
 import type { Organization } from '@/shared/organization/entities'
+import { isPrismaNotFoundError } from '@/utils/prisma'
 
 /**
  * Organizationの更新時に変更可能な入力値。
@@ -46,14 +47,32 @@ export const organizationRepository = {
   /**
    * 組織を更新する。
    */
-  update: async (id: number, input: UpdateOrganizationInput): Promise<Organization> => {
-    return prisma.organization.update({ where: { id }, data: input })
+  update: async (id: number, input: UpdateOrganizationInput): Promise<Organization | null> => {
+    try {
+      return await prisma.organization.update({ where: { id }, data: input })
+    } catch (error) {
+      if (isPrismaNotFoundError(error)) {
+        return null
+      }
+
+      throw error
+    }
   },
 
   /**
    * 組織を削除する。関連するメンバーシップも同時に削除する（トランザクション）。
+   * 対象が存在しない場合はfalseを返す。
    */
-  deleteById: async (id: number): Promise<void> => {
-    await prisma.$transaction([prisma.membership.deleteMany({ where: { organizationId: id } }), prisma.organization.delete({ where: { id } })])
+  deleteById: async (id: number): Promise<boolean> => {
+    try {
+      await prisma.$transaction([prisma.membership.deleteMany({ where: { organizationId: id } }), prisma.organization.delete({ where: { id } })])
+      return true
+    } catch (error) {
+      if (isPrismaNotFoundError(error)) {
+        return false
+      }
+
+      throw error
+    }
   },
 }

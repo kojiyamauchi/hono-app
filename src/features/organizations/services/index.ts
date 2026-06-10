@@ -46,6 +46,9 @@ export const organizationsService = {
       throw new AppError(403, 'この操作には管理者以上の権限が必要です')
     }
     const organization = await organizationRepository.update(organizationId, input)
+    if (!organization) {
+      throw new AppError(404, '組織が見つかりません')
+    }
     return toOrganizationResponse(organization)
   },
 
@@ -56,6 +59,9 @@ export const organizationsService = {
     if (role !== 'OWNER') {
       throw new AppError(403, 'この操作にはオーナー権限が必要です')
     }
-    await organizationRepository.deleteById(organizationId)
+    const deleted = await organizationRepository.deleteById(organizationId)
+    if (!deleted) {
+      throw new AppError(404, '組織が見つかりません')
+    }
   },
 }

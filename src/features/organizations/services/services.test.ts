@@ -88,6 +88,12 @@ describe('organizationsService.update', () => {
     await expect(organizationsService.update(1, { name: 'New Name' }, 'MEMBER')).rejects.toThrow('管理者以上')
     expect(update).not.toHaveBeenCalled()
   })
+
+  test('組織が存在しなければ404エラーを投げる', async () => {
+    update.mockResolvedValue(null)
+
+    await expect(organizationsService.update(999, { name: 'New Name' }, 'OWNER')).rejects.toThrow('組織が見つかりません')
+  })
 })
 
 describe('organizationsService.remove', () => {
@@ -96,7 +102,7 @@ describe('organizationsService.remove', () => {
   })
 
   test('OWNERは削除できる', async () => {
-    deleteById.mockResolvedValue(undefined)
+    deleteById.mockResolvedValue(true)
 
     await organizationsService.remove(1, 'OWNER')
 
@@ -111,5 +117,11 @@ describe('organizationsService.remove', () => {
   test('MEMBERは削除できず403エラーを投げる', async () => {
     await expect(organizationsService.remove(1, 'MEMBER')).rejects.toThrow('オーナー')
     expect(deleteById).not.toHaveBeenCalled()
+  })
+
+  test('組織が存在しなければ404エラーを投げる', async () => {
+    deleteById.mockResolvedValue(false)
+
+    await expect(organizationsService.remove(999, 'OWNER')).rejects.toThrow('組織が見つかりません')
   })
 })
