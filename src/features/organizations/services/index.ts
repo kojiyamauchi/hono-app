@@ -154,6 +154,9 @@ export const organizationsService = {
     if (operatorRole === 'ADMIN' && target.role === 'ADMIN') {
       throw new AppError(403, 'ADMINは他のADMINを削除できません')
     }
-    await membershipRepository.deleteById(membershipId)
+    const deleted = await membershipRepository.deleteById(membershipId)
+    if (!deleted) {
+      throw new AppError(404, 'メンバーが見つかりません')
+    }
   },
 }

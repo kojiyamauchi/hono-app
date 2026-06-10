@@ -375,4 +375,11 @@ describe('organizationsService.removeMember', () => {
     await expect(organizationsService.removeMember(1, 10, 'OWNER')).rejects.toThrow('メンバーが見つかりません')
     expect(membershipDeleteById).not.toHaveBeenCalled()
   })
+
+  test('deleteById がfalseを返した場合は404エラーを投げる', async () => {
+    membershipFindById.mockResolvedValue(membership)
+    membershipDeleteById.mockResolvedValue(false)
+
+    await expect(organizationsService.removeMember(1, 10, 'OWNER')).rejects.toThrow('メンバーが見つかりません')
+  })
 })
