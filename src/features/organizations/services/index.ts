@@ -82,6 +82,9 @@ export const organizationsService = {
    * OWNERはMEMBER/ADMINを追加可。ADMINはMEMBERのみ追加可。MEMBERは操作不可。
    */
   addMember: async (organizationId: number, operatorRole: Role, input: AddMemberBodyInput): Promise<MemberResponse> => {
+    if (input.role === 'OWNER') {
+      throw new AppError(422, 'OWNERは追加できません')
+    }
     if (operatorRole === 'MEMBER') {
       throw new AppError(403, 'この操作には管理者以上の権限が必要です')
     }
@@ -106,6 +109,9 @@ export const organizationsService = {
    * 対象がOWNERの場合は操作不可（OWNERは自身に対しても含む）。
    */
   updateMemberRole: async (organizationId: number, membershipId: number, operatorRole: Role, input: UpdateMemberRoleBodyInput): Promise<MemberResponse> => {
+    if (input.role === 'OWNER') {
+      throw new AppError(422, 'OWNERへの変更はできません')
+    }
     if (operatorRole === 'MEMBER') {
       throw new AppError(403, 'この操作には管理者以上の権限が必要です')
     }

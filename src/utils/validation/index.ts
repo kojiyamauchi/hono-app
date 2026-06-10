@@ -21,15 +21,3 @@ export const onValidationError = (result: ValidationResult, c: Context): Respons
   }
   return undefined
 }
-
-/**
- * @hono/zod-validator 用のボディバリデーションフック。
- * 意味的に不正な値（例: OWNERロールの直接指定）に対して422を返す。
- */
-export const onBodyValidationError = (result: ValidationResult, c: Context): Response | undefined => {
-  if (!result.success) {
-    const message = result.error?.issues[0]?.message ?? '入力値が正しくありません'
-    return c.json({ error: { message } }, 422)
-  }
-  return undefined
-}

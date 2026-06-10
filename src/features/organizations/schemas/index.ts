@@ -23,19 +23,19 @@ export const organizationIdParamSchema = z.object({
 
 /**
  * メンバー追加ボディのバリデーションスキーマ。
- * roleはMEMBERまたはADMINのみ指定可（OWNER指定は422）。
+ * 形式チェックはここで行い、OWNERの意味的バリデーション（422）はservice層で行う。
  */
 export const addMemberBodySchema = z.object({
   email: z.string().email('メールアドレスの形式が正しくありません'),
-  role: z.enum(['MEMBER', 'ADMIN'], { message: 'ロールはMEMBERまたはADMINを指定してください' }),
+  role: z.enum(['MEMBER', 'ADMIN', 'OWNER'], { message: 'ロールはMEMBER、ADMIN、OWNERのいずれかを指定してください' }),
 })
 
 /**
  * メンバーロール変更ボディのバリデーションスキーマ。
- * roleはMEMBERまたはADMINのみ指定可（OWNER指定は422）。
+ * 形式チェックはここで行い、OWNERの意味的バリデーション（422）はservice層で行う。
  */
 export const updateMemberRoleBodySchema = z.object({
-  role: z.enum(['MEMBER', 'ADMIN'], { message: 'ロールはMEMBERまたはADMINを指定してください' }),
+  role: z.enum(['MEMBER', 'ADMIN', 'OWNER'], { message: 'ロールはMEMBER、ADMIN、OWNERのいずれかを指定してください' }),
 })
 
 /**

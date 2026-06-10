@@ -57,8 +57,8 @@ describe('addMemberBodySchema', () => {
     expect(addMemberBodySchema.safeParse({ email: 'user@example.com', role: 'ADMIN' }).success).toBe(true)
   })
 
-  test('OWNERロールを拒否する', () => {
-    expect(addMemberBodySchema.safeParse({ email: 'user@example.com', role: 'OWNER' }).success).toBe(false)
+  test('OWNERロールを受け付ける（意味的バリデーションはservice層で行う）', () => {
+    expect(addMemberBodySchema.safeParse({ email: 'user@example.com', role: 'OWNER' }).success).toBe(true)
   })
 
   test('不正なメールアドレスを拒否する', () => {
@@ -83,8 +83,8 @@ describe('updateMemberRoleBodySchema', () => {
     expect(updateMemberRoleBodySchema.safeParse({ role: 'ADMIN' }).success).toBe(true)
   })
 
-  test('OWNERロールを拒否する', () => {
-    expect(updateMemberRoleBodySchema.safeParse({ role: 'OWNER' }).success).toBe(false)
+  test('OWNERロールを受け付ける（意味的バリデーションはservice層で行う）', () => {
+    expect(updateMemberRoleBodySchema.safeParse({ role: 'OWNER' }).success).toBe(true)
   })
 
   test('roleがなければ拒否する', () => {

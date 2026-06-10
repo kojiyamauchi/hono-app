@@ -200,6 +200,11 @@ describe('organizationsService.addMember', () => {
     expect(result.role).toBe('MEMBER')
   })
 
+  test('OWNERロール指定は422エラーを投げる', async () => {
+    await expect(organizationsService.addMember(1, 'OWNER', { email: 'user@example.com', role: 'OWNER' })).rejects.toThrow('OWNERは追加できません')
+    expect(membershipCreate).not.toHaveBeenCalled()
+  })
+
   test('ADMINがADMINを追加しようとすると403エラーを投げる', async () => {
     await expect(organizationsService.addMember(1, 'ADMIN', { email: 'user@example.com', role: 'ADMIN' })).rejects.toThrow('ADMINはMEMBERのみ追加')
     expect(membershipCreate).not.toHaveBeenCalled()
@@ -230,6 +235,11 @@ describe('organizationsService.updateMemberRole', () => {
   beforeEach(() => {
     membershipFindById.mockReset()
     updateRole.mockReset()
+  })
+
+  test('変更先ロールにOWNERを指定すると422エラーを投げる', async () => {
+    await expect(organizationsService.updateMemberRole(1, 10, 'OWNER', { role: 'OWNER' })).rejects.toThrow('OWNERへの変更はできません')
+    expect(updateRole).not.toHaveBeenCalled()
   })
 
   test('OWNERはMEMBERをADMINに昇格できる', async () => {

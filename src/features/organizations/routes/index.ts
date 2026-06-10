@@ -3,7 +3,7 @@ import { Hono } from 'hono'
 
 import { authMiddleware } from '@/middlewares/auth'
 import { organizationMembershipMiddleware } from '@/middlewares/organizationMembership'
-import { onBodyValidationError, onValidationError } from '@/utils/validation'
+import { onValidationError } from '@/utils/validation'
 
 import { organizationsController, organizationsMembersController } from '../controllers'
 import {
@@ -46,7 +46,7 @@ export const organizationsRoutes = new Hono()
     authMiddleware,
     zValidator('param', organizationIdParamSchema, onValidationError),
     organizationMembershipMiddleware,
-    zValidator('json', addMemberBodySchema, onBodyValidationError),
+    zValidator('json', addMemberBodySchema, onValidationError),
     (c) => organizationsMembersController.addMember(c, c.req.valid('param').id, c.get('membership').role, c.req.valid('json')),
   )
   .patch(
@@ -54,7 +54,7 @@ export const organizationsRoutes = new Hono()
     authMiddleware,
     zValidator('param', memberRouteParamSchema, onValidationError),
     organizationMembershipMiddleware,
-    zValidator('json', updateMemberRoleBodySchema, onBodyValidationError),
+    zValidator('json', updateMemberRoleBodySchema, onValidationError),
     (c) =>
       organizationsMembersController.updateMemberRole(
         c,
