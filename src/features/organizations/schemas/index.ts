@@ -46,9 +46,9 @@ export const memberRouteParamSchema = z.object({
   membershipId: z.coerce.number().int('メンバーシップIDは整数で指定してください').positive('メンバーシップIDは1以上で指定してください'),
 })
 
-export type CreateOrganizationInput = z.infer<typeof createOrganizationSchema>
-export type UpdateOrganizationInput = z.infer<typeof updateOrganizationSchema>
-export type OrganizationIdParam = z.infer<typeof organizationIdParamSchema>
-export type AddMemberBodyInput = z.infer<typeof addMemberBodySchema>
-export type UpdateMemberRoleBodyInput = z.infer<typeof updateMemberRoleBodySchema>
-export type MemberRouteParam = z.infer<typeof memberRouteParamSchema>
+export type CreateOrganizationSchemaType = z.infer<typeof createOrganizationSchema>
+export type UpdateOrganizationSchemaType = z.infer<typeof updateOrganizationSchema>
+export type OrganizationIdParamSchemaType = z.infer<typeof organizationIdParamSchema>
+export type AddMemberBodySchemaType = z.infer<typeof addMemberBodySchema>
+export type UpdateMemberRoleBodySchemaType = z.infer<typeof updateMemberRoleBodySchema>
+export type MemberRouteParamSchemaType = z.infer<typeof memberRouteParamSchema>

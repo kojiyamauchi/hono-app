@@ -3,7 +3,7 @@ import { toPublicUserResponse, toUserResponse } from '@/shared/user/mappers'
 import { userRepository } from '@/shared/user/repositories'
 import { AppError } from '@/utils/errors'
 
-import type { UpdateMeInput } from '../schemas'
+import type { UpdateMeSchemaType } from '../schemas'
 
 /**
  * users featureのユースケースを提供するサービス。
@@ -24,7 +24,7 @@ export const usersService = {
   /**
    * 認証済みユーザー自身の情報を更新する。
    */
-  updateMe: async (userId: number, input: UpdateMeInput): Promise<UserResponse> => {
+  updateMe: async (userId: number, input: UpdateMeSchemaType): Promise<UserResponse> => {
     const user = await userRepository.findById(userId)
     if (!user) {
       throw new AppError(404, 'ユーザーが見つかりません')

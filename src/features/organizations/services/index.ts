@@ -8,7 +8,7 @@ import { organizationRepository } from '@/shared/organization/repositories'
 import { userRepository } from '@/shared/user/repositories'
 import { AppError } from '@/utils/errors'
 
-import type { AddMemberBodyInput, CreateOrganizationInput, UpdateMemberRoleBodyInput, UpdateOrganizationInput } from '../schemas'
+import type { AddMemberBodySchemaType, CreateOrganizationSchemaType, UpdateMemberRoleBodySchemaType, UpdateOrganizationSchemaType } from '../schemas'
 
 /**
  * organizations featureのユースケースを提供するサービス。
@@ -18,7 +18,7 @@ export const organizationsService = {
   /**
    * 組織を作成する。作成者はOWNERとして登録される。
    */
-  create: async (userId: number, input: CreateOrganizationInput): Promise<OrganizationResponse> => {
+  create: async (userId: number, input: CreateOrganizationSchemaType): Promise<OrganizationResponse> => {
     const organization = await organizationRepository.createWithOwner(input.name, userId)
     return toOrganizationResponse(organization)
   },
@@ -45,7 +45,7 @@ export const organizationsService = {
   /**
    * 組織を更新する。ADMIN以上のロールが必要。
    */
-  update: async (organizationId: number, input: UpdateOrganizationInput, role: Role): Promise<OrganizationResponse> => {
+  update: async (organizationId: number, input: UpdateOrganizationSchemaType, role: Role): Promise<OrganizationResponse> => {
     if (role !== 'OWNER' && role !== 'ADMIN') {
       throw new AppError(403, 'この操作には管理者以上の権限が必要です')
     }
@@ -81,7 +81,7 @@ export const organizationsService = {
    * メンバーを追加する。
    * OWNERはMEMBER/ADMINを追加可。ADMINはMEMBERのみ追加可。MEMBERは操作不可。
    */
-  addMember: async (organizationId: number, operatorRole: Role, input: AddMemberBodyInput): Promise<MemberResponse> => {
+  addMember: async (organizationId: number, operatorRole: Role, input: AddMemberBodySchemaType): Promise<MemberResponse> => {
     if (input.role === 'OWNER') {
       throw new AppError(422, 'OWNERは追加できません')
     }
@@ -111,7 +111,12 @@ export const organizationsService = {
    * OWNERはADMIN/MEMBERへ変更可。ADMINはMEMBERのみ操作可でADMINへの昇格不可。MEMBERは操作不可。
    * 対象がOWNERの場合は操作不可（OWNERは自身に対しても含む）。
    */
-  updateMemberRole: async (organizationId: number, membershipId: number, operatorRole: Role, input: UpdateMemberRoleBodyInput): Promise<MemberResponse> => {
+  updateMemberRole: async (
+    organizationId: number,
+    membershipId: number,
+    operatorRole: Role,
+    input: UpdateMemberRoleBodySchemaType,
+  ): Promise<MemberResponse> => {
     if (input.role === 'OWNER') {
       throw new AppError(422, 'OWNERへの変更はできません')
     }

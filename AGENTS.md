@@ -156,6 +156,19 @@ import { prisma } from '../libs/prisma'
 - 複雑なロジックには必ずコメントを付けること
 - 関数やクラスにはJSDocコメント（日本語）を記述すること
 
+### Zod schema と型定義の命名
+
+`src/features/**/schemas/` および `src/shared/**/schemas/` 配下で定義するZod schemaと、そのschemaからexportする型は以下の命名に揃えること:
+
+- Zod schemaは `***Schema` として定義すること
+  - 例: `signupSchema`、`updateMeSchema`、`userIdParamSchema`
+- schemaから `z.infer` でexportする型は、対応するschema名に `Type` を付与した `***SchemaType` とすること
+  - 例: `SignupSchemaType`、`UpdateMeSchemaType`
+- param系schemaの型も同じ規則に従い、`***ParamSchemaType` とすること
+  - 例: `UserIdParamSchemaType`、`OrganizationIdParamSchemaType`
+- schema由来の型に `***Input` や `***Param` のような別接尾語を使わないこと
+- repository内部など、`schemas/` 配下のZod schema由来ではない入出力型はこの規則の対象外とする
+
 ### コミットメッセージ
 
 英語の接頭辞と日本語の説明で記述し、以下の形式に従うこと:

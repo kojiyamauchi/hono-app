@@ -130,6 +130,18 @@ Hono を使ったバックエンド API の実装用プロジェクトです。
 - `src/shared/` から `src/features/` をimportすることは禁止です。
   - 依存方向は `features -> shared` の一方向に保ちます。
 
+## Schema Naming
+
+`src/features/**/schemas/` および `src/shared/**/schemas/` 配下では、Zod schemaとそこから推論する型の対応が分かる命名に揃えます。
+
+- Zod schemaは `***Schema` として定義します。
+  - 例: `signupSchema`、`updateMeSchema`、`userIdParamSchema`
+- schemaから `z.infer` でexportする型は、対応するschema名に `Type` を付与した `***SchemaType` とします。
+  - 例: `SignupSchemaType`、`UpdateMeSchemaType`
+- param系schemaの型も同じ規則で `***ParamSchemaType` とします。
+  - 例: `UserIdParamSchemaType`、`OrganizationIdParamSchemaType`
+- schema由来の型には `***Input` や `***Param` のような別接尾語を使いません。
+
 ## Getting Started
 
 Install dependencies.
