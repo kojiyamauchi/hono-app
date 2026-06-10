@@ -21,6 +21,34 @@ export const organizationIdParamSchema = z.object({
   id: z.coerce.number().int('組織IDは整数で指定してください').positive('組織IDは1以上で指定してください'),
 })
 
+/**
+ * メンバー追加ボディのバリデーションスキーマ。
+ * roleはMEMBERまたはADMINのみ指定可（OWNER指定は422）。
+ */
+export const addMemberBodySchema = z.object({
+  email: z.string().email('メールアドレスの形式が正しくありません'),
+  role: z.enum(['MEMBER', 'ADMIN'], { message: 'ロールはMEMBERまたはADMINを指定してください' }),
+})
+
+/**
+ * メンバーロール変更ボディのバリデーションスキーマ。
+ * roleはMEMBERまたはADMINのみ指定可（OWNER指定は422）。
+ */
+export const updateMemberRoleBodySchema = z.object({
+  role: z.enum(['MEMBER', 'ADMIN'], { message: 'ロールはMEMBERまたはADMINを指定してください' }),
+})
+
+/**
+ * 組織IDとメンバーシップIDを含むパスパラメータのバリデーションスキーマ。
+ */
+export const memberRouteParamSchema = z.object({
+  id: z.coerce.number().int('組織IDは整数で指定してください').positive('組織IDは1以上で指定してください'),
+  membershipId: z.coerce.number().int('メンバーシップIDは整数で指定してください').positive('メンバーシップIDは1以上で指定してください'),
+})
+
 export type CreateOrganizationInput = z.infer<typeof createOrganizationSchema>
 export type UpdateOrganizationInput = z.infer<typeof updateOrganizationSchema>
 export type OrganizationIdParam = z.infer<typeof organizationIdParamSchema>
+export type AddMemberBodyInput = z.infer<typeof addMemberBodySchema>
+export type UpdateMemberRoleBodyInput = z.infer<typeof updateMemberRoleBodySchema>
+export type MemberRouteParam = z.infer<typeof memberRouteParamSchema>
