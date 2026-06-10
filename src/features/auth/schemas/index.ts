@@ -17,5 +17,5 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'パスワードは必須です'),
 })
 
-export type SignupInput = z.infer<typeof signupSchema>
-export type LoginInput = z.infer<typeof loginSchema>
+export type SignupSchemaType = z.infer<typeof signupSchema>
+export type LoginSchemaType = z.infer<typeof loginSchema>

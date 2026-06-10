@@ -1,7 +1,7 @@
 import type { User } from '@supabase/supabase-js'
 import type { Context } from 'hono'
 
-import type { LoginInput, SignupInput } from '../schemas'
+import type { LoginSchemaType, SignupSchemaType } from '../schemas'
 import { supabaseAuthService } from '../services'
 
 /**
@@ -11,7 +11,7 @@ export const supabaseAuthController = {
   /**
    * サインアップ。201で作成結果を返す。
    */
-  signup: async (c: Context, input: SignupInput): Promise<Response> => {
+  signup: async (c: Context, input: SignupSchemaType): Promise<Response> => {
     const result = await supabaseAuthService.signup(input)
     return c.json(result, 201)
   },
@@ -19,7 +19,7 @@ export const supabaseAuthController = {
   /**
    * ログイン。200でトークンとユーザー情報を返す。
    */
-  login: async (c: Context, input: LoginInput): Promise<Response> => {
+  login: async (c: Context, input: LoginSchemaType): Promise<Response> => {
     const result = await supabaseAuthService.login(input)
     return c.json(result, 200)
   },

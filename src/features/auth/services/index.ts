@@ -5,7 +5,7 @@ import { toUserResponse } from '@/shared/user/mappers'
 import { userRepository } from '@/shared/user/repositories'
 import { AppError } from '@/utils/errors'
 
-import type { LoginInput, SignupInput } from '../schemas'
+import type { LoginSchemaType, SignupSchemaType } from '../schemas'
 
 /**
  * 認証結果（発行したトークンとユーザー情報）。
@@ -44,7 +44,7 @@ export const authService = {
   /**
    * サインアップ。メール重複を確認し、パスワードをハッシュ化して登録する。
    */
-  signup: async (input: SignupInput): Promise<AuthResult> => {
+  signup: async (input: SignupSchemaType): Promise<AuthResult> => {
     const existing = await userRepository.findByEmail(input.email)
     if (existing) {
       throw new AppError(409, 'このメールアドレスは既に登録されています')
@@ -64,7 +64,7 @@ export const authService = {
   /**
    * ログイン。メールでユーザーを引き、パスワードを検証してトークンを発行する。
    */
-  login: async (input: LoginInput): Promise<AuthResult> => {
+  login: async (input: LoginSchemaType): Promise<AuthResult> => {
     const user = await userRepository.findByEmail(input.email)
     if (!user) {
       throw new AppError(401, 'メールアドレスまたはパスワードが正しくありません')

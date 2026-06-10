@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 
-import type { UpdateMeInput } from '../schemas'
+import type { UpdateMeSchemaType } from '../schemas'
 import { usersService } from '../services'
 
 /**
@@ -18,7 +18,7 @@ export const usersController = {
   /**
    * 認証済みユーザー自身の情報を更新する。
    */
-  updateMe: async (c: Context, userId: number, input: UpdateMeInput): Promise<Response> => {
+  updateMe: async (c: Context, userId: number, input: UpdateMeSchemaType): Promise<Response> => {
     const user = await usersService.updateMe(userId, input)
     return c.json(user, 200)
   },

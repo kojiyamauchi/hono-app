@@ -3,7 +3,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/libs/supabase'
 import { AppError } from '@/utils/errors'
 
-import type { LoginInput, SignupInput } from '../schemas'
+import type { LoginSchemaType, SignupSchemaType } from '../schemas'
 
 /**
  * 認証結果（アクセストークンとユーザー情報）。
@@ -22,7 +22,7 @@ export const supabaseAuthService = {
    * サインアップ。Supabase Auth にユーザーを登録する。
    * メール確認が無効なため、登録と同時にセッション（トークン）が発行される。
    */
-  signup: async (input: SignupInput): Promise<AuthResult> => {
+  signup: async (input: SignupSchemaType): Promise<AuthResult> => {
     const { data, error } = await supabase.auth.signUp({
       email: input.email,
       password: input.password,
@@ -36,7 +36,7 @@ export const supabaseAuthService = {
   /**
    * ログイン。Supabase Auth で認証し、アクセストークンを取得する。
    */
-  login: async (input: LoginInput): Promise<AuthResult> => {
+  login: async (input: LoginSchemaType): Promise<AuthResult> => {
     const { data, error } = await supabase.auth.signInWithPassword({
       email: input.email,
       password: input.password,

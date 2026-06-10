@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 
 import type { Role } from '@/shared/membership/entities'
 
-import type { AddMemberBodyInput, CreateOrganizationInput, UpdateMemberRoleBodyInput, UpdateOrganizationInput } from '../schemas'
+import type { AddMemberBodySchemaType, CreateOrganizationSchemaType, UpdateMemberRoleBodySchemaType, UpdateOrganizationSchemaType } from '../schemas'
 import { organizationsService } from '../services'
 
 /**
@@ -12,7 +12,7 @@ export const organizationsController = {
   /**
    * 組織を作成する。201で作成結果を返す。
    */
-  create: async (c: Context, userId: number, input: CreateOrganizationInput): Promise<Response> => {
+  create: async (c: Context, userId: number, input: CreateOrganizationSchemaType): Promise<Response> => {
     const result = await organizationsService.create(userId, input)
     return c.json(result, 201)
   },
@@ -36,7 +36,7 @@ export const organizationsController = {
   /**
    * 組織を更新する。
    */
-  update: async (c: Context, organizationId: number, input: UpdateOrganizationInput, role: Role): Promise<Response> => {
+  update: async (c: Context, organizationId: number, input: UpdateOrganizationSchemaType, role: Role): Promise<Response> => {
     const result = await organizationsService.update(organizationId, input, role)
     return c.json(result, 200)
   },
@@ -65,7 +65,7 @@ export const organizationsMembersController = {
   /**
    * メンバーを追加する。201で作成結果を返す。
    */
-  addMember: async (c: Context, organizationId: number, operatorRole: Role, input: AddMemberBodyInput): Promise<Response> => {
+  addMember: async (c: Context, organizationId: number, operatorRole: Role, input: AddMemberBodySchemaType): Promise<Response> => {
     const result = await organizationsService.addMember(organizationId, operatorRole, input)
     return c.json(result, 201)
   },
@@ -78,7 +78,7 @@ export const organizationsMembersController = {
     organizationId: number,
     membershipId: number,
     operatorRole: Role,
-    input: UpdateMemberRoleBodyInput,
+    input: UpdateMemberRoleBodySchemaType,
   ): Promise<Response> => {
     const result = await organizationsService.updateMemberRole(organizationId, membershipId, operatorRole, input)
     return c.json(result, 200)
