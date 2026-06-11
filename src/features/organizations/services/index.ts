@@ -1,3 +1,6 @@
+import type { InvitationResponse } from '@/shared/invitation/dtos'
+import { toInvitationResponse } from '@/shared/invitation/mappers'
+import { invitationRepository } from '@/shared/invitation/repositories'
 import type { MemberResponse } from '@/shared/membership/dtos'
 import type { Role } from '@/shared/membership/entities'
 import { toMemberResponse } from '@/shared/membership/mappers'
@@ -8,7 +11,13 @@ import { organizationRepository } from '@/shared/organization/repositories'
 import { userRepository } from '@/shared/user/repositories'
 import { AppError } from '@/utils/errors'
 
-import type { AddMemberBodySchemaType, CreateOrganizationSchemaType, UpdateMemberRoleBodySchemaType, UpdateOrganizationSchemaType } from '../schemas'
+import type {
+  AddMemberBodySchemaType,
+  CreateInvitationBodySchemaType,
+  CreateOrganizationSchemaType,
+  UpdateMemberRoleBodySchemaType,
+  UpdateOrganizationSchemaType,
+} from '../schemas'
 
 /**
  * organizations featureのユースケースを提供するサービス。
@@ -166,5 +175,70 @@ export const organizationsService = {
     if (!deleted) {
       throw new AppError(404, 'メンバーが見つかりません')
     }
+  },
+
+  /**
+   * 招待を作成する。
+   * OWNERはADMIN/MEMBERを招待可。ADMINはMEMBERのみ招待可。MEMBERは操作不可。
+   * 既にPENDINGの招待がある場合、または対象メールが既にメンバーの場合は409。
+   */
+  createInvitation: async (organizationId: number, operatorRole: Role, input: CreateInvitationBodySchemaType): Promise<InvitationResponse> => {
+    if (operatorRole === 'MEMBER') {
+      throw new AppError(403, 'この操作には管理者以上の権限が必要です')
+    }
+    if (input.role === 'OWNER') {
+      throw new AppError(422, 'OWNERは招待できません')
+    }
+    if (operatorRole === 'ADMIN' && input.role === 'ADMIN') {
+      throw new AppError(403, 'ADMINはMEMBERのみ招待できます')
+    }
+    const existingInvitation = await invitationRepository.findPendingByOrgAndEmail(organizationId, input.email)
+    if (existingInvitation) {
+      throw new AppError(409, 'このメールアドレスへの招待は既に送信済みです')
+    }
+    const existingUser = await userRepository.findByEmail(input.email)
+    if (existingUser) {
+      const existingMembership = await membershipRepository.findByUserAndOrganization(existingUser.id, organizationId)
+      if (existingMembership) {
+        throw new AppError(409, 'このユーザーは既に組織のメンバーです')
+      }
+    }
+    const token = crypto.randomUUID()
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    const invitation = await invitationRepository.create(organizationId, input.email, input.role, token, expiresAt)
+    return toInvitationResponse(invitation)
+  },
+
+  /**
+   * 招待一覧を返す。OWNER/ADMINのみ閲覧可。デフォルトはPENDINGのみ。
+   */
+  listInvitations: async (organizationId: number, operatorRole: Role): Promise<InvitationResponse[]> => {
+    if (operatorRole === 'MEMBER') {
+      throw new AppError(403, 'この操作には管理者以上の権限が必要です')
+    }
+    const invitations = await invitationRepository.findAllByOrganization(organizationId)
+    return invitations.map(toInvitationResponse)
+  },
+
+  /**
+   * 招待をキャンセルする。
+   * OWNERはADMIN/MEMBER宛ての招待をキャンセル可。ADMINはMEMBER宛てのみキャンセル可。
+   * PENDING以外の招待はキャンセル不可（409）。
+   */
+  cancelInvitation: async (organizationId: number, invitationId: number, operatorRole: Role): Promise<void> => {
+    if (operatorRole === 'MEMBER') {
+      throw new AppError(403, 'この操作には管理者以上の権限が必要です')
+    }
+    const target = await invitationRepository.findById(invitationId)
+    if (!target || target.organizationId !== organizationId) {
+      throw new AppError(404, '招待が見つかりません')
+    }
+    if (target.status !== 'PENDING') {
+      throw new AppError(409, 'PENDING状態の招待のみキャンセルできます')
+    }
+    if (operatorRole === 'ADMIN' && target.role === 'ADMIN') {
+      throw new AppError(403, 'ADMINはADMIN宛ての招待をキャンセルできません')
+    }
+    await invitationRepository.cancel(invitationId)
   },
 }
