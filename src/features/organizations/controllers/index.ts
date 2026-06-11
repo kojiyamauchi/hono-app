@@ -2,7 +2,13 @@ import type { Context } from 'hono'
 
 import type { Role } from '@/shared/membership/entities'
 
-import type { AddMemberBodySchemaType, CreateOrganizationSchemaType, UpdateMemberRoleBodySchemaType, UpdateOrganizationSchemaType } from '../schemas'
+import type {
+  AddMemberBodySchemaType,
+  CreateInvitationBodySchemaType,
+  CreateOrganizationSchemaType,
+  UpdateMemberRoleBodySchemaType,
+  UpdateOrganizationSchemaType,
+} from '../schemas'
 import { organizationsService } from '../services'
 
 /**
@@ -89,6 +95,35 @@ export const organizationsMembersController = {
    */
   removeMember: async (c: Context, organizationId: number, membershipId: number, operatorRole: Role): Promise<Response> => {
     await organizationsService.removeMember(organizationId, membershipId, operatorRole)
+    return c.body(null, 204)
+  },
+}
+
+/**
+ * organizations/invitations featureのコントローラ。
+ */
+export const organizationsInvitationsController = {
+  /**
+   * 招待を作成する。201で作成結果を返す。
+   */
+  createInvitation: async (c: Context, organizationId: number, operatorRole: Role, input: CreateInvitationBodySchemaType): Promise<Response> => {
+    const result = await organizationsService.createInvitation(organizationId, operatorRole, input)
+    return c.json(result, 201)
+  },
+
+  /**
+   * 招待一覧を返す。デフォルトはPENDINGのみ。
+   */
+  listInvitations: async (c: Context, organizationId: number, operatorRole: Role): Promise<Response> => {
+    const result = await organizationsService.listInvitations(organizationId, operatorRole)
+    return c.json(result, 200)
+  },
+
+  /**
+   * 招待をキャンセルする。204を返す。
+   */
+  cancelInvitation: async (c: Context, organizationId: number, invitationId: number, operatorRole: Role): Promise<Response> => {
+    await organizationsService.cancelInvitation(organizationId, invitationId, operatorRole)
     return c.body(null, 204)
   },
 }
