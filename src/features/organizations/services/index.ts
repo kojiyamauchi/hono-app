@@ -206,6 +206,9 @@ export const organizationsService = {
     const token = crypto.randomUUID()
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     const invitation = await invitationRepository.create(organizationId, input.email, input.role, token, expiresAt)
+    if (!invitation) {
+      throw new AppError(409, 'このメールアドレスへの招待は既に送信済みです')
+    }
     return toInvitationResponse(invitation)
   },
 

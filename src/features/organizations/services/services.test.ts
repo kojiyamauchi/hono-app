@@ -500,6 +500,14 @@ describe('organizationsService.createInvitation', () => {
     expect(result.email).toBe('invite@example.com')
     expect(findByUserAndOrganization).not.toHaveBeenCalled()
   })
+
+  test('createがnullを返した場合（DB制約による並行重複）は409エラーを投げる', async () => {
+    invitationFindPendingByOrgAndEmail.mockResolvedValue(null)
+    findByEmail.mockResolvedValue(null)
+    invitationCreate.mockResolvedValue(null)
+
+    await expect(organizationsService.createInvitation(1, 'OWNER', { email: 'invite@example.com', role: 'MEMBER' })).rejects.toThrow('既に送信済み')
+  })
 })
 
 describe('organizationsService.listInvitations', () => {

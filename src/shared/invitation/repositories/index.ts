@@ -1,16 +1,24 @@
 import { prisma } from '@/libs/prisma'
 import type { Invitation, InvitationStatus } from '@/shared/invitation/entities'
 import type { Role } from '@/shared/membership/entities'
+import { isPrismaUniqueConstraintError } from '@/utils/prisma'
 
 /**
  * Invitationのデータアクセスを提供するリポジトリ。
  */
 export const invitationRepository = {
   /**
-   * 招待を新規作成する。
+   * 招待を新規作成する。PENDING重複（部分ユニーク制約違反）の場合はnullを返す。
    */
-  create: async (organizationId: number, email: string, role: Role, token: string, expiresAt: Date): Promise<Invitation> => {
-    return prisma.invitation.create({ data: { organizationId, email, role, token, expiresAt } })
+  create: async (organizationId: number, email: string, role: Role, token: string, expiresAt: Date): Promise<Invitation | null> => {
+    try {
+      return await prisma.invitation.create({ data: { organizationId, email, role, token, expiresAt } })
+    } catch (error) {
+      if (isPrismaUniqueConstraintError(error)) {
+        return null
+      }
+      throw error
+    }
   },
 
   /**
