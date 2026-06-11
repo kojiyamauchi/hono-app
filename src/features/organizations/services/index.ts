@@ -239,6 +239,9 @@ export const organizationsService = {
     if (operatorRole === 'ADMIN' && target.role === 'ADMIN') {
       throw new AppError(403, 'ADMINはADMIN宛ての招待をキャンセルできません')
     }
-    await invitationRepository.cancel(invitationId)
+    const canceled = await invitationRepository.cancel(invitationId)
+    if (!canceled) {
+      throw new AppError(409, 'PENDING状態の招待のみキャンセルできます')
+    }
   },
 }

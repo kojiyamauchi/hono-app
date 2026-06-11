@@ -538,7 +538,7 @@ describe('organizationsService.cancelInvitation', () => {
 
   test('OWNERはMEMBER宛て招待をキャンセルできる', async () => {
     invitationFindById.mockResolvedValue(invitation)
-    invitationCancel.mockResolvedValue({ ...invitation, status: 'CANCELED' })
+    invitationCancel.mockResolvedValue(true)
 
     await organizationsService.cancelInvitation(1, 20, 'OWNER')
 
@@ -547,7 +547,7 @@ describe('organizationsService.cancelInvitation', () => {
 
   test('OWNERはADMIN宛て招待をキャンセルできる', async () => {
     invitationFindById.mockResolvedValue({ ...invitation, role: 'ADMIN' })
-    invitationCancel.mockResolvedValue({ ...invitation, role: 'ADMIN', status: 'CANCELED' })
+    invitationCancel.mockResolvedValue(true)
 
     await organizationsService.cancelInvitation(1, 20, 'OWNER')
 
@@ -556,11 +556,18 @@ describe('organizationsService.cancelInvitation', () => {
 
   test('ADMINはMEMBER宛て招待をキャンセルできる', async () => {
     invitationFindById.mockResolvedValue(invitation)
-    invitationCancel.mockResolvedValue({ ...invitation, status: 'CANCELED' })
+    invitationCancel.mockResolvedValue(true)
 
     await organizationsService.cancelInvitation(1, 20, 'ADMIN')
 
     expect(invitationCancel).toHaveBeenCalledWith(20)
+  })
+
+  test('cancelがfalseを返した場合（並行更新による競合）は409エラーを投げる', async () => {
+    invitationFindById.mockResolvedValue(invitation)
+    invitationCancel.mockResolvedValue(false)
+
+    await expect(organizationsService.cancelInvitation(1, 20, 'OWNER')).rejects.toThrow('PENDING状態の招待のみ')
   })
 
   test('ADMINがADMIN宛て招待をキャンセルしようとすると403エラーを投げる', async () => {

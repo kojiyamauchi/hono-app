@@ -530,7 +530,7 @@ describe('organizations routes', () => {
   test('DELETE /organizations/:id/invitations/:invitationId はOWNERなら204を返す', async () => {
     findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))
     invitationFindById.mockResolvedValue(invitation)
-    invitationCancel.mockResolvedValue({ ...invitation, status: 'CANCELED' })
+    invitationCancel.mockResolvedValue(true)
     const token = await createToken(1)
 
     const response = await app.request('/organizations/1/invitations/20', {

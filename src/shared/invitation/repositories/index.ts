@@ -1,7 +1,6 @@
 import { prisma } from '@/libs/prisma'
 import type { Invitation, InvitationStatus } from '@/shared/invitation/entities'
 import type { Role } from '@/shared/membership/entities'
-import { isPrismaNotFoundError } from '@/utils/prisma'
 
 /**
  * Invitationのデータアクセスを提供するリポジトリ。
@@ -36,16 +35,11 @@ export const invitationRepository = {
   },
 
   /**
-   * 招待をキャンセル済みに更新する（物理削除ではなくステータス変更）。存在しない場合はnullを返す。
+   * PENDING状態の招待をキャンセル済みに更新する（条件付き更新）。
+   * 対象が存在しないかPENDING以外の場合はfalseを返す。
    */
-  cancel: async (id: number): Promise<Invitation | null> => {
-    try {
-      return await prisma.invitation.update({ where: { id }, data: { status: 'CANCELED' } })
-    } catch (error) {
-      if (isPrismaNotFoundError(error)) {
-        return null
-      }
-      throw error
-    }
+  cancel: async (id: number): Promise<boolean> => {
+    const result = await prisma.invitation.updateMany({ where: { id, status: 'PENDING' }, data: { status: 'CANCELED' } })
+    return result.count > 0
   },
 }
