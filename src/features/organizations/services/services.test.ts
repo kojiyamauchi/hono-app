@@ -18,6 +18,12 @@ const findByUserAndOrganization = mock()
 
 const findByEmail = mock()
 
+const invitationFindPendingByOrgAndEmail = mock()
+const invitationCreate = mock()
+const invitationFindAllByOrganization = mock()
+const invitationFindById = mock()
+const invitationCancel = mock()
+
 await mock.module('@/shared/organization/repositories', () => ({
   organizationRepository: { createWithOwner, findByUserId, findById, update, deleteById },
 }))
@@ -33,6 +39,15 @@ await mock.module('@/shared/membership/repositories', () => ({
 }))
 await mock.module('@/shared/user/repositories', () => ({
   userRepository: { findByEmail },
+}))
+await mock.module('@/shared/invitation/repositories', () => ({
+  invitationRepository: {
+    findPendingByOrgAndEmail: invitationFindPendingByOrgAndEmail,
+    create: invitationCreate,
+    findAllByOrganization: invitationFindAllByOrganization,
+    findById: invitationFindById,
+    cancel: invitationCancel,
+  },
 }))
 
 const { organizationsService } = await import('.')
@@ -389,5 +404,195 @@ describe('organizationsService.removeMember', () => {
     membershipDeleteById.mockResolvedValue(false)
 
     await expect(organizationsService.removeMember(1, 10, 'OWNER')).rejects.toThrow('メンバーが見つかりません')
+  })
+})
+
+import type { Invitation } from '@/shared/invitation/entities'
+
+const invitation: Invitation = {
+  id: 20,
+  organizationId: 1,
+  email: 'invite@example.com',
+  role: 'MEMBER',
+  status: 'PENDING',
+  token: 'uuid-token',
+  expiresAt: new Date('2026-06-18T00:00:00.000Z'),
+  createdAt: new Date('2026-06-11T00:00:00.000Z'),
+}
+
+describe('organizationsService.createInvitation', () => {
+  beforeEach(() => {
+    invitationFindPendingByOrgAndEmail.mockReset()
+    invitationCreate.mockReset()
+    findByEmail.mockReset()
+    findByUserAndOrganization.mockReset()
+  })
+
+  test('OWNERはMEMBER招待を作成できる', async () => {
+    invitationFindPendingByOrgAndEmail.mockResolvedValue(null)
+    findByEmail.mockResolvedValue(null)
+    invitationCreate.mockResolvedValue(invitation)
+
+    const result = await organizationsService.createInvitation(1, 'OWNER', { email: 'invite@example.com', role: 'MEMBER' })
+
+    expect(result.invitationToken).toBe('uuid-token')
+    expect(invitationCreate).toHaveBeenCalledTimes(1)
+  })
+
+  test('OWNERはADMIN招待を作成できる', async () => {
+    invitationFindPendingByOrgAndEmail.mockResolvedValue(null)
+    findByEmail.mockResolvedValue(null)
+    invitationCreate.mockResolvedValue({ ...invitation, role: 'ADMIN' })
+
+    const result = await organizationsService.createInvitation(1, 'OWNER', { email: 'invite@example.com', role: 'ADMIN' })
+
+    expect(result.role).toBe('ADMIN')
+  })
+
+  test('ADMINはMEMBER招待を作成できる', async () => {
+    invitationFindPendingByOrgAndEmail.mockResolvedValue(null)
+    findByEmail.mockResolvedValue(null)
+    invitationCreate.mockResolvedValue(invitation)
+
+    const result = await organizationsService.createInvitation(1, 'ADMIN', { email: 'invite@example.com', role: 'MEMBER' })
+
+    expect(result.role).toBe('MEMBER')
+  })
+
+  test('MEMBERは操作できず403エラーを投げる', async () => {
+    await expect(organizationsService.createInvitation(1, 'MEMBER', { email: 'invite@example.com', role: 'MEMBER' })).rejects.toThrow('管理者以上')
+    expect(invitationCreate).not.toHaveBeenCalled()
+  })
+
+  test('OWNERロール指定は422エラーを投げる', async () => {
+    await expect(organizationsService.createInvitation(1, 'OWNER', { email: 'invite@example.com', role: 'OWNER' })).rejects.toThrow('OWNERは招待できません')
+    expect(invitationCreate).not.toHaveBeenCalled()
+  })
+
+  test('ADMINがADMIN招待を作成しようとすると403エラーを投げる', async () => {
+    await expect(organizationsService.createInvitation(1, 'ADMIN', { email: 'invite@example.com', role: 'ADMIN' })).rejects.toThrow('ADMINはMEMBERのみ招待')
+    expect(invitationCreate).not.toHaveBeenCalled()
+  })
+
+  test('PENDING招待が既に存在する場合は409エラーを投げる', async () => {
+    invitationFindPendingByOrgAndEmail.mockResolvedValue(invitation)
+
+    await expect(organizationsService.createInvitation(1, 'OWNER', { email: 'invite@example.com', role: 'MEMBER' })).rejects.toThrow('既に送信済み')
+    expect(invitationCreate).not.toHaveBeenCalled()
+  })
+
+  test('対象メールが既にメンバーの場合は409エラーを投げる', async () => {
+    invitationFindPendingByOrgAndEmail.mockResolvedValue(null)
+    findByEmail.mockResolvedValue({ id: 2, name: 'User', email: 'invite@example.com', password: 'hash', createdAt: new Date(), updatedAt: new Date() })
+    findByUserAndOrganization.mockResolvedValue(membership)
+
+    await expect(organizationsService.createInvitation(1, 'OWNER', { email: 'invite@example.com', role: 'MEMBER' })).rejects.toThrow('既に組織のメンバー')
+    expect(invitationCreate).not.toHaveBeenCalled()
+  })
+
+  test('ユーザーが存在しない場合でも招待を作成できる（新規ユーザー向け）', async () => {
+    invitationFindPendingByOrgAndEmail.mockResolvedValue(null)
+    findByEmail.mockResolvedValue(null)
+    invitationCreate.mockResolvedValue(invitation)
+
+    const result = await organizationsService.createInvitation(1, 'OWNER', { email: 'newuser@example.com', role: 'MEMBER' })
+
+    expect(result.email).toBe('invite@example.com')
+    expect(findByUserAndOrganization).not.toHaveBeenCalled()
+  })
+})
+
+describe('organizationsService.listInvitations', () => {
+  beforeEach(() => {
+    invitationFindAllByOrganization.mockReset()
+  })
+
+  test('OWNER/ADMINは招待一覧を取得できる', async () => {
+    invitationFindAllByOrganization.mockResolvedValue([invitation])
+
+    const result = await organizationsService.listInvitations(1, 'OWNER')
+
+    expect(result).toHaveLength(1)
+    expect(result[0]?.invitationToken).toBe('uuid-token')
+  })
+
+  test('ADMINも招待一覧を取得できる', async () => {
+    invitationFindAllByOrganization.mockResolvedValue([invitation])
+
+    const result = await organizationsService.listInvitations(1, 'ADMIN')
+
+    expect(result).toHaveLength(1)
+  })
+
+  test('MEMBERは取得できず403エラーを投げる', async () => {
+    await expect(organizationsService.listInvitations(1, 'MEMBER')).rejects.toThrow('管理者以上')
+    expect(invitationFindAllByOrganization).not.toHaveBeenCalled()
+  })
+})
+
+describe('organizationsService.cancelInvitation', () => {
+  beforeEach(() => {
+    invitationFindById.mockReset()
+    invitationCancel.mockReset()
+  })
+
+  test('OWNERはMEMBER宛て招待をキャンセルできる', async () => {
+    invitationFindById.mockResolvedValue(invitation)
+    invitationCancel.mockResolvedValue({ ...invitation, status: 'CANCELED' })
+
+    await organizationsService.cancelInvitation(1, 20, 'OWNER')
+
+    expect(invitationCancel).toHaveBeenCalledWith(20)
+  })
+
+  test('OWNERはADMIN宛て招待をキャンセルできる', async () => {
+    invitationFindById.mockResolvedValue({ ...invitation, role: 'ADMIN' })
+    invitationCancel.mockResolvedValue({ ...invitation, role: 'ADMIN', status: 'CANCELED' })
+
+    await organizationsService.cancelInvitation(1, 20, 'OWNER')
+
+    expect(invitationCancel).toHaveBeenCalledWith(20)
+  })
+
+  test('ADMINはMEMBER宛て招待をキャンセルできる', async () => {
+    invitationFindById.mockResolvedValue(invitation)
+    invitationCancel.mockResolvedValue({ ...invitation, status: 'CANCELED' })
+
+    await organizationsService.cancelInvitation(1, 20, 'ADMIN')
+
+    expect(invitationCancel).toHaveBeenCalledWith(20)
+  })
+
+  test('ADMINがADMIN宛て招待をキャンセルしようとすると403エラーを投げる', async () => {
+    invitationFindById.mockResolvedValue({ ...invitation, role: 'ADMIN' })
+
+    await expect(organizationsService.cancelInvitation(1, 20, 'ADMIN')).rejects.toThrow('ADMINはADMIN宛て')
+    expect(invitationCancel).not.toHaveBeenCalled()
+  })
+
+  test('MEMBERは操作できず403エラーを投げる', async () => {
+    await expect(organizationsService.cancelInvitation(1, 20, 'MEMBER')).rejects.toThrow('管理者以上')
+    expect(invitationCancel).not.toHaveBeenCalled()
+  })
+
+  test('招待が存在しなければ404エラーを投げる', async () => {
+    invitationFindById.mockResolvedValue(null)
+
+    await expect(organizationsService.cancelInvitation(1, 999, 'OWNER')).rejects.toThrow('招待が見つかりません')
+    expect(invitationCancel).not.toHaveBeenCalled()
+  })
+
+  test('異なる組織の招待なら404エラーを投げる', async () => {
+    invitationFindById.mockResolvedValue({ ...invitation, organizationId: 99 })
+
+    await expect(organizationsService.cancelInvitation(1, 20, 'OWNER')).rejects.toThrow('招待が見つかりません')
+    expect(invitationCancel).not.toHaveBeenCalled()
+  })
+
+  test('PENDING以外の招待はキャンセルできず409エラーを投げる', async () => {
+    invitationFindById.mockResolvedValue({ ...invitation, status: 'ACCEPTED' })
+
+    await expect(organizationsService.cancelInvitation(1, 20, 'OWNER')).rejects.toThrow('PENDING状態の招待のみ')
+    expect(invitationCancel).not.toHaveBeenCalled()
   })
 })
