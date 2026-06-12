@@ -26,8 +26,8 @@ export const organizationIdParamSchema = z.object({
  * 形式チェックはここで行い、OWNERの意味的バリデーション（422）はservice層で行う。
  */
 export const addMemberBodySchema = z.object({
-  email: z.string().email('メールアドレスの形式が正しくありません'),
-  role: z.enum(['MEMBER', 'ADMIN', 'OWNER'], { message: 'ロールはMEMBER、ADMIN、OWNERのいずれかを指定してください' }),
+  email: z.email('メールアドレスの形式が正しくありません'),
+  role: z.enum(['MEMBER', 'ADMIN', 'OWNER'], { error: 'ロールはMEMBER、ADMIN、OWNERのいずれかを指定してください' }),
 })
 
 /**
@@ -35,7 +35,7 @@ export const addMemberBodySchema = z.object({
  * 形式チェックはここで行い、OWNERの意味的バリデーション（422）はservice層で行う。
  */
 export const updateMemberRoleBodySchema = z.object({
-  role: z.enum(['MEMBER', 'ADMIN', 'OWNER'], { message: 'ロールはMEMBER、ADMIN、OWNERのいずれかを指定してください' }),
+  role: z.enum(['MEMBER', 'ADMIN', 'OWNER'], { error: 'ロールはMEMBER、ADMIN、OWNERのいずれかを指定してください' }),
 })
 
 /**
@@ -51,8 +51,8 @@ export const memberRouteParamSchema = z.object({
  * roleはMEMBERまたはADMINのみ指定可（OWNER指定は422はservice層で行う）。
  */
 export const createInvitationBodySchema = z.object({
-  email: z.string().email('メールアドレスの形式が正しくありません'),
-  role: z.enum(['MEMBER', 'ADMIN', 'OWNER'], { message: 'ロールはMEMBER、ADMIN、OWNERのいずれかを指定してください' }),
+  email: z.email('メールアドレスの形式が正しくありません'),
+  role: z.enum(['MEMBER', 'ADMIN', 'OWNER'], { error: 'ロールはMEMBER、ADMIN、OWNERのいずれかを指定してください' }),
 })
 
 /**
