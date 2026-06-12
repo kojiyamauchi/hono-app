@@ -5,10 +5,12 @@ import { authMiddleware } from '@/middlewares/auth'
 import { organizationMembershipMiddleware } from '@/middlewares/organizationMembership'
 import { onValidationError } from '@/utils/validation'
 
-import { organizationsController, organizationsMembersController } from '../controllers'
+import { organizationsController, organizationsInvitationsController, organizationsMembersController } from '../controllers'
 import {
   addMemberBodySchema,
+  createInvitationBodySchema,
   createOrganizationSchema,
+  invitationRouteParamSchema,
   memberRouteParamSchema,
   organizationIdParamSchema,
   updateMemberRoleBodySchema,
@@ -66,4 +68,22 @@ export const organizationsRoutes = new Hono()
   )
   .delete('/:id/members/:membershipId', authMiddleware, zValidator('param', memberRouteParamSchema, onValidationError), organizationMembershipMiddleware, (c) =>
     organizationsMembersController.removeMember(c, c.req.valid('param').id, c.req.valid('param').membershipId, c.get('membership').role),
+  )
+  .get('/:id/invitations', authMiddleware, zValidator('param', organizationIdParamSchema, onValidationError), organizationMembershipMiddleware, (c) =>
+    organizationsInvitationsController.listInvitations(c, c.req.valid('param').id, c.get('membership').role),
+  )
+  .post(
+    '/:id/invitations',
+    authMiddleware,
+    zValidator('param', organizationIdParamSchema, onValidationError),
+    organizationMembershipMiddleware,
+    zValidator('json', createInvitationBodySchema, onValidationError),
+    (c) => organizationsInvitationsController.createInvitation(c, c.req.valid('param').id, c.get('membership').role, c.req.valid('json')),
+  )
+  .delete(
+    '/:id/invitations/:invitationId',
+    authMiddleware,
+    zValidator('param', invitationRouteParamSchema, onValidationError),
+    organizationMembershipMiddleware,
+    (c) => organizationsInvitationsController.cancelInvitation(c, c.req.valid('param').id, c.req.valid('param').invitationId, c.get('membership').role),
   )

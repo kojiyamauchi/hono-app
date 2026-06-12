@@ -60,12 +60,16 @@ export const organizationRepository = {
   },
 
   /**
-   * 組織を削除する。関連するメンバーシップも同時に削除する（トランザクション）。
+   * 組織を削除する。関連するメンバーシップと招待も同時に削除する（トランザクション）。
    * 対象が存在しない場合はfalseを返す。
    */
   deleteById: async (id: number): Promise<boolean> => {
     try {
-      await prisma.$transaction([prisma.membership.deleteMany({ where: { organizationId: id } }), prisma.organization.delete({ where: { id } })])
+      await prisma.$transaction([
+        prisma.invitation.deleteMany({ where: { organizationId: id } }),
+        prisma.membership.deleteMany({ where: { organizationId: id } }),
+        prisma.organization.delete({ where: { id } }),
+      ])
       return true
     } catch (error) {
       if (isPrismaNotFoundError(error)) {

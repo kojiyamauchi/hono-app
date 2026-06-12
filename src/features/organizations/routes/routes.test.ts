@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, mock, test } from 'bun:test'
 import { sign } from 'hono/jwt'
 
+import type { Invitation } from '@/shared/invitation/entities'
 import type { Membership, Role } from '@/shared/membership/entities'
 import type { Organization } from '@/shared/organization/entities'
 import type { User } from '@/shared/user/entities'
@@ -22,6 +23,12 @@ const membershipDeleteById = mock()
 
 const findByEmail = mock()
 
+const invitationFindPendingByOrgAndEmail = mock()
+const invitationCreate = mock()
+const invitationFindAllByOrganization = mock()
+const invitationFindById = mock()
+const invitationCancel = mock()
+
 await mock.module('@/shared/organization/repositories', () => ({
   organizationRepository: { createWithOwner, findByUserId, findById, update, deleteById },
 }))
@@ -37,6 +44,15 @@ await mock.module('@/shared/membership/repositories', () => ({
 }))
 await mock.module('@/shared/user/repositories', () => ({
   userRepository: { findByEmail },
+}))
+await mock.module('@/shared/invitation/repositories', () => ({
+  invitationRepository: {
+    findPendingByOrgAndEmail: invitationFindPendingByOrgAndEmail,
+    create: invitationCreate,
+    findAllByOrganization: invitationFindAllByOrganization,
+    findById: invitationFindById,
+    cancel: invitationCancel,
+  },
 }))
 
 const { app } = await import('@/app')
@@ -91,6 +107,11 @@ describe('organizations routes', () => {
     updateRole.mockReset()
     membershipDeleteById.mockReset()
     findByEmail.mockReset()
+    invitationFindPendingByOrgAndEmail.mockReset()
+    invitationCreate.mockReset()
+    invitationFindAllByOrganization.mockReset()
+    invitationFindById.mockReset()
+    invitationCancel.mockReset()
   })
 
   test('POST /organizations は組織を作成する', async () => {
@@ -379,5 +400,200 @@ describe('organizations routes', () => {
 
     expect(response.status).toBe(403)
     expect(membershipDeleteById).not.toHaveBeenCalled()
+  })
+
+  // --- 招待管理ルート ---
+
+  const invitation: Invitation = {
+    id: 20,
+    organizationId: 1,
+    email: 'invite@example.com',
+    role: 'MEMBER',
+    status: 'PENDING',
+    token: 'uuid-token',
+    expiresAt: new Date('2026-06-18T00:00:00.000Z'),
+    createdAt: new Date('2026-06-11T00:00:00.000Z'),
+  }
+
+  test('GET /organizations/:id/invitations はOWNERなら200を返す', async () => {
+    findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))
+    invitationFindAllByOrganization.mockResolvedValue([invitation])
+    const token = await createToken(1)
+
+    const response = await app.request('/organizations/1/invitations', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as unknown[]
+    expect(body).toHaveLength(1)
+  })
+
+  test('GET /organizations/:id/invitations はMEMBERなら403を返す', async () => {
+    findByUserAndOrganization.mockResolvedValue(membershipWithRole('MEMBER'))
+    const token = await createToken(1)
+
+    const response = await app.request('/organizations/1/invitations', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(response.status).toBe(403)
+    expect(invitationFindAllByOrganization).not.toHaveBeenCalled()
+  })
+
+  test('GET /organizations/:id/invitations は非メンバーなら404を返す', async () => {
+    findByUserAndOrganization.mockResolvedValue(null)
+    const token = await createToken(1)
+
+    const response = await app.request('/organizations/1/invitations', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(response.status).toBe(404)
+  })
+
+  test('POST /organizations/:id/invitations はOWNERならMEMBER招待を作成できる', async () => {
+    findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))
+    invitationFindPendingByOrgAndEmail.mockResolvedValue(null)
+    findByEmail.mockResolvedValue(null)
+    invitationCreate.mockResolvedValue(invitation)
+    const token = await createToken(1)
+
+    const response = await app.request('/organizations/1/invitations', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'invite@example.com', role: 'MEMBER' }),
+    })
+
+    expect(response.status).toBe(201)
+    const body = (await response.json()) as { invitationToken?: string }
+    expect(body.invitationToken).toBe('uuid-token')
+  })
+
+  test('POST /organizations/:id/invitations はOWNERロール指定で422を返す', async () => {
+    findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))
+    const token = await createToken(1)
+
+    const response = await app.request('/organizations/1/invitations', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'invite@example.com', role: 'OWNER' }),
+    })
+
+    expect(response.status).toBe(422)
+    expect(invitationCreate).not.toHaveBeenCalled()
+  })
+
+  test('POST /organizations/:id/invitations はADMINがADMIN招待を作成しようとすると403を返す', async () => {
+    findByUserAndOrganization.mockResolvedValue(membershipWithRole('ADMIN'))
+    const token = await createToken(1)
+
+    const response = await app.request('/organizations/1/invitations', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'invite@example.com', role: 'ADMIN' }),
+    })
+
+    expect(response.status).toBe(403)
+    expect(invitationCreate).not.toHaveBeenCalled()
+  })
+
+  test('POST /organizations/:id/invitations はMEMBERなら403を返す', async () => {
+    findByUserAndOrganization.mockResolvedValue(membershipWithRole('MEMBER'))
+    const token = await createToken(1)
+
+    const response = await app.request('/organizations/1/invitations', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'invite@example.com', role: 'MEMBER' }),
+    })
+
+    expect(response.status).toBe(403)
+    expect(invitationCreate).not.toHaveBeenCalled()
+  })
+
+  test('POST /organizations/:id/invitations はPENDING招待が既に存在すると409を返す', async () => {
+    findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))
+    invitationFindPendingByOrgAndEmail.mockResolvedValue(invitation)
+    const token = await createToken(1)
+
+    const response = await app.request('/organizations/1/invitations', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'invite@example.com', role: 'MEMBER' }),
+    })
+
+    expect(response.status).toBe(409)
+    expect(invitationCreate).not.toHaveBeenCalled()
+  })
+
+  test('DELETE /organizations/:id/invitations/:invitationId はOWNERなら204を返す', async () => {
+    findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))
+    invitationFindById.mockResolvedValue(invitation)
+    invitationCancel.mockResolvedValue(true)
+    const token = await createToken(1)
+
+    const response = await app.request('/organizations/1/invitations/20', {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(response.status).toBe(204)
+    expect(invitationCancel).toHaveBeenCalledWith(20)
+  })
+
+  test('DELETE /organizations/:id/invitations/:invitationId は招待が存在しなければ404を返す', async () => {
+    findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))
+    invitationFindById.mockResolvedValue(null)
+    const token = await createToken(1)
+
+    const response = await app.request('/organizations/1/invitations/999', {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(response.status).toBe(404)
+    expect(invitationCancel).not.toHaveBeenCalled()
+  })
+
+  test('DELETE /organizations/:id/invitations/:invitationId はPENDING以外なら409を返す', async () => {
+    findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))
+    invitationFindById.mockResolvedValue({ ...invitation, status: 'ACCEPTED' })
+    const token = await createToken(1)
+
+    const response = await app.request('/organizations/1/invitations/20', {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(response.status).toBe(409)
+    expect(invitationCancel).not.toHaveBeenCalled()
+  })
+
+  test('DELETE /organizations/:id/invitations/:invitationId はADMINがADMIN宛て招待をキャンセルしようとすると403を返す', async () => {
+    findByUserAndOrganization.mockResolvedValue(membershipWithRole('ADMIN'))
+    invitationFindById.mockResolvedValue({ ...invitation, role: 'ADMIN' })
+    const token = await createToken(1)
+
+    const response = await app.request('/organizations/1/invitations/20', {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(response.status).toBe(403)
+    expect(invitationCancel).not.toHaveBeenCalled()
+  })
+
+  test('DELETE /organizations/:id/invitations/:invitationId はMEMBERなら403を返す', async () => {
+    findByUserAndOrganization.mockResolvedValue(membershipWithRole('MEMBER'))
+    const token = await createToken(1)
+
+    const response = await app.request('/organizations/1/invitations/20', {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(response.status).toBe(403)
+    expect(invitationCancel).not.toHaveBeenCalled()
   })
 })
