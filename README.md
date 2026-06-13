@@ -180,12 +180,9 @@ The API runs on:
 http://localhost:3000
 ```
 
-## Routes
+## API
 
-```txt
-GET /        -> Hello Hono Dev Watch
-GET /health  -> { "ok": true }
-```
+公開エンドポイント一覧は [docs/endpoints.md](docs/endpoints.md) を参照してください。
 
 ## Local Database
 
