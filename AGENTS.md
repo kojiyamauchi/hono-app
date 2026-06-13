@@ -136,6 +136,14 @@ bun run lint-staged  # ステージングされたファイルのチェックを
 
 [src/routes/index.ts](src/routes/index.ts)の`registerRoutes`関数を使用してルートを追加します。渡された`app`インスタンスにルートを登録する既存のパターンに従ってください。
 
+### エンドポイント一覧
+
+公開APIの一覧は [docs/endpoints.md](docs/endpoints.md) を正本とすること。
+
+APIの追加・変更・削除を行う場合は、実装と同じPRで `docs/endpoints.md` も更新すること。
+
+READMEには詳細なエンドポイント一覧を重複して記載せず、`docs/endpoints.md` への導線のみを置くこと。
+
 ### データベースアクセス
 
 [src/libs/prisma.ts](src/libs/prisma.ts)からPrismaクライアントをインポート:
