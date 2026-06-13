@@ -42,7 +42,7 @@ APIの追加・変更・削除を行う場合は、実装と同じPRでこのド
 | POST | `/organizations` | 必要 | 組織を作成する |
 | GET | `/organizations` | 必要 | 自分が所属する組織一覧を取得する |
 | GET | `/organizations/:id` | 必要 | 所属している組織の詳細を取得する |
-| PATCH | `/organizations/:id` | 必要 | OWNERのみ、組織情報を更新する |
+| PATCH | `/organizations/:id` | 必要 | OWNERまたはADMINが組織情報を更新する |
 | DELETE | `/organizations/:id` | 必要 | OWNERのみ、組織を削除する |
 
 ## Organization Members
