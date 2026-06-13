@@ -31,7 +31,9 @@ Hono を使ったバックエンド API の実装用プロジェクトです。
 |   |-- hooks/
 |   |-- rules/
 |   `-- skills/
-|       `-- pr-review/
+|       |-- pr-review/
+|       |   `-- SKILL.md
+|       `-- review-response/
 |           `-- SKILL.md
 |-- .codex/                          # Codex project-local skills
 |   `-- skills/
