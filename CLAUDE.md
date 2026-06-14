@@ -343,6 +343,42 @@ git fetch https://github.com/kojiyamauchi/hono-app.git main:refs/remotes/origin/
 - 修正コミット追加後は、過去の承認に依存せず最新HEADを確認して再レビューすること
 - 指摘事項が残っている場合は、重大度に応じて`COMMENT`または`REQUEST_CHANGES`を投稿すること
 
+#### inline suggestion comment の運用
+
+レビューで指摘を行う際、変更内容が明確で、該当箇所へ直接適用できるものについては、可能な範囲で inline suggestion comment を併用すること。
+
+- 変更内容が明確で、その場で置き換え案を提示できる場合は、先に該当箇所へ inline suggestion comment を投稿すること
+- inline suggestion comment では、必要に応じて GitHub の suggestion ブロックで変更案を提示すること
+- inline suggestion comment は対象PRのdiffに含まれる行にのみ投稿できる。差分外の既存行に対する指摘は、suggestionを付けず通常のレビュー本文で行うこと
+- 発行された inline suggestion comment のURLを取得し、レビュー本文の該当指摘に `comment: コメントURL` の形式で記載すること
+- `comment:` が指すのは inline suggestion comment（`#discussion_r...` のレビューコメント）のURLであり、そのコメント本文に含める GitHub の suggestion ブロックとは別物として扱うこと
+- suggestion は、そのまま適用しても意図が崩れない最小単位にすること
+- suggestion を出した場合でも、レビュー本文側には問題の内容・影響・修正方針を残すこと
+- 複数ファイルにまたがる修正、設計判断、テスト追加、責務分離など、単一suggestionで表現しづらい内容は無理に suggestion 化しないこと
+- GitHub APIやツール制約で inline suggestion comment のURL取得が難しい場合は、通常のレビュー本文のみで指摘してよい
+
+Codex が `Findings` に指摘を記載する場合、該当Findingに対して inline suggestion comment がある場合は、以下の形式でリンクを記載すること:
+
+```md
+[P1] 指摘内容
+
+`path/to/file.ts:123`
+
+問題の内容、影響、修正方針を記載する。
+
+comment: https://github.com/owner/repo/pull/xx#discussion_rxxxxxxxx
+```
+
+Claude が `Suggestions` または `Issues` に指摘を記載する場合、該当指摘に対して inline suggestion comment がある場合は、各指摘の本文内に以下の形式でリンクを記載すること:
+
+```md
+### 指摘内容
+
+問題の内容、影響、修正方針を記載する。
+
+comment: https://github.com/owner/repo/pull/xx#discussion_rxxxxxxxx
+```
+
 #### レビュー指摘への対応コミット
 
 レビュー指摘へ対応する追加コミットは、通常のコミットと区別できるように以下の形式で記述すること:
