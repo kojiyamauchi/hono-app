@@ -70,24 +70,28 @@ export const invitationRepository = {
    * 招待を受諾し、メンバーシップを作成する（トランザクション）。
    * 招待を PENDING → ACCEPTED に条件付き更新し、membership を作成する。
    * 更新数が0（競合）またはmembership一意制約違反の場合はnullを返す。
+   *
+   * 一意制約違反（既メンバーとの競合）はトランザクション内で握りつぶさずthrowさせ、
+   * 招待のACCEPTED更新ごとrollbackする。これにより「招待だけACCEPTEDでmembershipが無い」
+   * 不整合状態を防ぐ。P2002はトランザクションの外側でnullに変換する。
    */
   accept: async (invitationId: number, organizationId: number, userId: number, role: Role): Promise<Membership | null> => {
-    return prisma.$transaction(async (tx) => {
-      const result = await tx.invitation.updateMany({
-        where: { id: invitationId, status: 'PENDING' },
-        data: { status: 'ACCEPTED' },
-      })
-      if (result.count === 0) {
-        return null
-      }
-      try {
-        return await tx.membership.create({ data: { userId, organizationId, role } })
-      } catch (error) {
-        if (isPrismaUniqueConstraintError(error)) {
+    try {
+      return await prisma.$transaction(async (tx) => {
+        const result = await tx.invitation.updateMany({
+          where: { id: invitationId, status: 'PENDING' },
+          data: { status: 'ACCEPTED' },
+        })
+        if (result.count === 0) {
           return null
         }
-        throw error
+        return await tx.membership.create({ data: { userId, organizationId, role } })
+      })
+    } catch (error) {
+      if (isPrismaUniqueConstraintError(error)) {
+        return null
       }
-    })
+      throw error
+    }
   },
 }
