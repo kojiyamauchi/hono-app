@@ -75,7 +75,37 @@ gh pr diff <PR番号>
 - テストの必要性
 - 潜在的なバグ
 
-### 5. レビューコメントの作成
+### 5. inline suggestion comment の投稿（必要な場合）
+
+`Suggestions` または `Issues` に指摘を出す場合、変更内容が明確で、該当箇所へ直接適用できるものは、可能な範囲で inline suggestion comment を併用する。
+
+- inline suggestion comment は、レビュー本文を投稿する前に投稿する
+- inline suggestion comment では、必要に応じて GitHub の suggestion ブロックで変更案を提示する
+- inline suggestion comment は対象PRのdiffに含まれる行にのみ投稿できる。差分外の既存行に対する指摘は、suggestionを付けず通常のレビュー本文で行う
+- 投稿後に取得した inline suggestion comment のURLを、該当する `Suggestions` または `Issues` の指摘に `comment: コメントURL` の形式で記載する
+- `comment:` が指すのは inline suggestion comment（`#discussion_r...` のレビューコメント）のURLであり、そのコメント本文に含める GitHub の suggestion ブロックとは別物として扱う
+- suggestion は、そのまま適用しても意図が崩れない最小単位にする
+- 複数ファイルにまたがる修正、設計判断、テスト追加、責務分離など、単一suggestionで表現しづらい内容は無理に suggestion 化しない
+- GitHub APIやツール制約で inline suggestion comment のURL取得が難しい場合は、通常のレビュー本文のみで指摘してよい
+
+`gh api` を使う場合の例:
+
+````bash
+gh api --method POST \
+  repos/{owner}/{repo}/pulls/{pr番号}/comments \
+  -f commit_id="$(gh pr view {pr番号} --json headRefOid --jq .headRefOid)" \
+  -f path="path/to/file.ts" \
+  -F line=123 \
+  -f side="RIGHT" \
+  -f body=$'修正方針を簡潔に書く。\n\n```suggestion\n修正後のコード\n```' \
+  --jq .html_url
+````
+
+- `line` は対象ファイルの新側（RIGHT）の行番号を指定する
+- 複数行に跨る場合は、必要に応じて `start_line` / `line` を使う
+- 出力された `html_url` をレビュー本文の該当指摘に `comment:` として記載する
+
+### 6. レビューコメントの作成
 
 レビューコメントは以下の構成で記述：
 
@@ -89,17 +119,19 @@ gh pr diff <PR番号>
 ### 🔍 Suggestions
 
 - [改善提案を箇条書き]
+- inline suggestion comment がある指摘には `comment: コメントURL` を記載する
 
 ### ⚠️ Issues (あれば)
 
 - [問題点を箇条書き]
+- inline suggestion comment がある指摘には `comment: コメントURL` を記載する
 
 ### 📝 その他
 
 - [その他気づいた点]
 ```
 
-### 6. GitHub上にコメント投稿
+### 7. GitHub上にコメント投稿
 
 ```bash
 gh pr review <PR番号> --comment -b "レビューコメント内容"

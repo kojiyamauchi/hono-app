@@ -23,8 +23,9 @@ description: Use when reviewing a GitHub Pull Request for this repository, espec
 5. `gh` が必要な場合は、`gh pr view`, `gh pr diff`, `gh pr checks` を使って補足する。
 6. 差分を読み、バグ、設計リスク、テスト不足、セキュリティ、運用上の問題を優先して確認する。
 7. 必要に応じて `CLAUDE.md` の規約、CI設定、package scripts、Prisma/Supabase設定も確認する。
-8. レビュー結果は問題点を先に出し、重大度順に並べる。
-9. 最新HEADに対するレビュー結果を、GitHub上へPR reviewとして投稿する。
+8. 変更内容が明確で、該当箇所へ直接適用できる指摘がある場合は、レビュー本文を投稿する前に inline suggestion comment を投稿し、発行されたURLを取得する。
+9. レビュー結果は問題点を先に出し、重大度順に並べる。
+10. 最新HEADに対するレビュー結果を、GitHub上へPR reviewとして投稿する。
 
 ## Review Priorities
 
@@ -47,6 +48,7 @@ description: Use when reviewing a GitHub Pull Request for this repository, espec
 4. Summary
 
 Findingsでは、可能な限りファイルパスと行番号を示す。
+inline suggestion comment を投稿したFindingには、該当コメントへのリンクを `comment: コメントURL` の形式で記載する。
 
 ```txt
 ## Review by Codex
@@ -56,9 +58,41 @@ Findingsでは、可能な限りファイルパスと行番号を示す。
 [P1] 問題の短い説明
 path/to/file.ts:123
 理由と影響。必要なら修正方針。
+
+comment: https://github.com/owner/repo/pull/xx#discussion_rxxxxxxxx
 ```
 
 問題がない場合は、問題が見つからなかったことを明確に書き、残るリスクや未確認事項だけを短く補足する。
+
+## Inline Suggestion Comments
+
+Findingsに指摘を出す場合、変更内容が明確で、該当箇所へ直接適用できるものは、可能な範囲で inline suggestion comment を併用する。
+
+- inline suggestion comment は、レビュー本文を投稿する前に投稿する。
+- inline suggestion comment では、必要に応じて GitHub の suggestion ブロックで変更案を提示する。
+- inline suggestion comment は対象PRのdiffに含まれる行にのみ投稿できる。差分外の既存行に対する指摘は、suggestionを付けず通常のレビュー本文で行う。
+- 投稿後に取得した inline suggestion comment のURLを、該当Findingに `comment: コメントURL` の形式で記載する。
+- `comment:` が指すのは inline suggestion comment（`#discussion_r...` のレビューコメント）のURLであり、そのコメント本文に含める GitHub の suggestion ブロックとは別物として扱う。
+- suggestion は、そのまま適用しても意図が崩れない最小単位にする。
+- 複数ファイルにまたがる修正、設計判断、テスト追加、責務分離など、単一suggestionで表現しづらい内容は無理に suggestion 化しない。
+- GitHub APIやツール制約で inline suggestion comment のURL取得が難しい場合は、通常のレビュー本文のみで指摘してよい。
+
+`gh api` を使う場合の例:
+
+````bash
+gh api --method POST \
+  repos/{owner}/{repo}/pulls/{pr番号}/comments \
+  -f commit_id="$(gh pr view {pr番号} --json headRefOid --jq .headRefOid)" \
+  -f path="path/to/file.ts" \
+  -F line=123 \
+  -f side="RIGHT" \
+  -f body=$'修正方針を簡潔に書く。\n\n```suggestion\n修正後のコード\n```' \
+  --jq .html_url
+````
+
+- `line` は対象ファイルの新側（RIGHT）の行番号を指定する。
+- 複数行に跨る場合は、必要に応じて `start_line` / `line` を使う。
+- 出力された `html_url` をレビュー本文の該当Findingに `comment:` として記載する。
 
 ## Posting To GitHub
 
