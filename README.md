@@ -28,6 +28,7 @@ Hono を使ったバックエンド API の実装用プロジェクトです。
 .
 |-- .claude/                         # Claude Code settings and skills
 |   |-- agents/
+|   |   `-- implementer.md           # implementation sub-agent (Sonnet)
 |   |-- hooks/
 |   |-- rules/
 |   `-- skills/
