@@ -8,13 +8,14 @@ import type { User } from '@/shared/user/entities'
 const findByToken = mock()
 const markExpired = mock()
 const accept = mock()
+const decline = mock()
 
 const findByUserAndOrganization = mock()
 
 const findById = mock()
 
 await mock.module('@/shared/invitation/repositories', () => ({
-  invitationRepository: { findByToken, markExpired, accept },
+  invitationRepository: { findByToken, markExpired, accept, decline },
 }))
 await mock.module('@/shared/membership/repositories', () => ({
   membershipRepository: { findByUserAndOrganization },
@@ -70,6 +71,7 @@ describe('invitationsService.accept', () => {
     findByToken.mockReset()
     markExpired.mockReset()
     accept.mockReset()
+    decline.mockReset()
     findByUserAndOrganization.mockReset()
     findById.mockReset()
   })
@@ -116,6 +118,13 @@ describe('invitationsService.accept', () => {
     expect(findById).not.toHaveBeenCalled()
   })
 
+  test('DECLINED状態の招待は409エラーを投げる', async () => {
+    findByToken.mockResolvedValue({ ...pendingInvitation, status: 'DECLINED' })
+
+    await expect(invitationsService.accept(5, TOKEN)).rejects.toThrow('既に辞退済みの招待です')
+    expect(findById).not.toHaveBeenCalled()
+  })
+
   test('PENDINGでも有効期限切れの場合は遅延失効してから409エラーを投げる', async () => {
     findByToken.mockResolvedValue({ ...pendingInvitation, expiresAt: pastDate })
     markExpired.mockResolvedValue(undefined)
@@ -158,5 +167,75 @@ describe('invitationsService.accept', () => {
     accept.mockResolvedValue(null)
 
     await expect(invitationsService.accept(5, TOKEN)).rejects.toThrow('招待を受諾できませんでした')
+  })
+})
+
+describe('invitationsService.decline', () => {
+  beforeEach(() => {
+    findByToken.mockReset()
+    markExpired.mockReset()
+    accept.mockReset()
+    decline.mockReset()
+    findByUserAndOrganization.mockReset()
+    findById.mockReset()
+  })
+
+  test('有効なPENDING招待を辞退してvoidを返す', async () => {
+    findByToken.mockResolvedValue(pendingInvitation)
+    decline.mockResolvedValue(true)
+
+    await expect(invitationsService.decline(TOKEN)).resolves.toBeUndefined()
+    expect(decline).toHaveBeenCalledWith(1)
+  })
+
+  test('トークンに対応する招待が存在しない場合は404エラーを投げる', async () => {
+    findByToken.mockResolvedValue(null)
+
+    await expect(invitationsService.decline('bad-token')).rejects.toThrow('招待が見つかりません')
+    expect(decline).not.toHaveBeenCalled()
+  })
+
+  test('ACCEPTED状態の招待は409エラーを投げる', async () => {
+    findByToken.mockResolvedValue({ ...pendingInvitation, status: 'ACCEPTED' })
+
+    await expect(invitationsService.decline(TOKEN)).rejects.toThrow('既に受諾済みの招待です')
+    expect(decline).not.toHaveBeenCalled()
+  })
+
+  test('CANCELED状態の招待は409エラーを投げる', async () => {
+    findByToken.mockResolvedValue({ ...pendingInvitation, status: 'CANCELED' })
+
+    await expect(invitationsService.decline(TOKEN)).rejects.toThrow('キャンセル済みの招待です')
+    expect(decline).not.toHaveBeenCalled()
+  })
+
+  test('EXPIRED状態の招待は409エラーを投げる', async () => {
+    findByToken.mockResolvedValue({ ...pendingInvitation, status: 'EXPIRED' })
+
+    await expect(invitationsService.decline(TOKEN)).rejects.toThrow('招待の有効期限が切れています')
+    expect(decline).not.toHaveBeenCalled()
+  })
+
+  test('DECLINED状態の招待は409エラーを投げる', async () => {
+    findByToken.mockResolvedValue({ ...pendingInvitation, status: 'DECLINED' })
+
+    await expect(invitationsService.decline(TOKEN)).rejects.toThrow('既に辞退済みの招待です')
+    expect(decline).not.toHaveBeenCalled()
+  })
+
+  test('PENDINGでも有効期限切れの場合は遅延失効してから409エラーを投げる', async () => {
+    findByToken.mockResolvedValue({ ...pendingInvitation, expiresAt: pastDate })
+    markExpired.mockResolvedValue(undefined)
+
+    await expect(invitationsService.decline(TOKEN)).rejects.toThrow('招待の有効期限が切れています')
+    expect(markExpired).toHaveBeenCalledWith(1)
+    expect(decline).not.toHaveBeenCalled()
+  })
+
+  test('declineがfalseを返した場合（競合）は409エラーを投げる', async () => {
+    findByToken.mockResolvedValue(pendingInvitation)
+    decline.mockResolvedValue(false)
+
+    await expect(invitationsService.decline(TOKEN)).rejects.toThrow('招待を辞退できませんでした')
   })
 })

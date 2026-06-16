@@ -67,6 +67,15 @@ export const invitationRepository = {
   },
 
   /**
+   * PENDING状態の招待を辞退済み（DECLINED）に更新する（条件付き更新）。
+   * 対象が存在しないかPENDING以外の場合はfalseを返す。
+   */
+  decline: async (id: number): Promise<boolean> => {
+    const result = await prisma.invitation.updateMany({ where: { id, status: 'PENDING' }, data: { status: 'DECLINED' } })
+    return result.count > 0
+  },
+
+  /**
    * 招待を受諾し、メンバーシップを作成する（トランザクション）。
    * 招待を PENDING → ACCEPTED に条件付き更新し、membership を作成する。
    * 更新数が0（競合）またはmembership一意制約違反の場合はnullを返す。

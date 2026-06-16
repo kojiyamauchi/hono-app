@@ -25,18 +25,10 @@ permissionMode: acceptEdits
 
 ## 実装の進め方
 
-レイヤード順で「実装 → そのテスト」をペアで刻むこと。標準的な順序（CLAUDE.md「feature実装時の標準コミット粒度」）:
+レイヤード順で「実装 → そのテスト」をペアで刻むこと。コミットの標準順は CLAUDE.md「feature実装時の標準コミット粒度」に従う（順序の正本は CLAUDE.md。番号付きの順序はそちらを参照すること）。
 
-1. DTO追加
-2. mapper追加 → mapperテスト
-3. repository追加 → repositoryテスト
-4. schema追加 → schemaテスト
-5. service追加 → serviceテスト
-6. controller追加 → controllerテスト
-7. routes追加 → routesテスト
-8. top-level route登録 → route統合テスト
-
-- 役割の異なる変更（`DTO + mapper + repository` や `schema + service + controller + routes`）を1コミットに混ぜないこと。
+- 「実装 → そのテスト」は必ず隣接させ、間に別レイヤーのコミットを挟まないこと。
+- 役割の異なる変更（`DTO + mapper + repository` や `service + schema + controller + routes`）を1コミットに混ぜないこと。
 - 薄いcontrollerや単純なrepositoryなど単体テストの効果が低い箇所はテストを省略してよいが、その場合はserviceテストまたはroute統合テストで振る舞いを担保すること。
 - テストはDB非依存にする（`mock.module` でrepository/clientをモックし、CIがDBなしで通るようにする）。
 
