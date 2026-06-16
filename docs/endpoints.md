@@ -61,3 +61,9 @@ APIの追加・変更・削除を行う場合は、実装と同じPRでこのド
 | GET | `/organizations/:id/invitations` | 必要 | OWNERまたはADMINがPENDING状態の招待一覧を取得する |
 | POST | `/organizations/:id/invitations` | 必要 | OWNERまたはADMINが招待を作成する |
 | DELETE | `/organizations/:id/invitations/:invitationId` | 必要 | OWNERまたはADMINがPENDING状態の招待をキャンセルする |
+
+## Invitations
+
+| Method | Path | 認証 | 概要 |
+| --- | --- | --- | --- |
+| POST | `/invitations/accept` | 必要 | 招待トークンを指定して招待を受諾し、組織メンバーになる |
