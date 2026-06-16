@@ -4,24 +4,28 @@ import type { Invitation } from '@/shared/invitation/entities'
 import type { Membership } from '@/shared/membership/entities'
 import type { User } from '@/shared/user/entities'
 
+process.env.JWT_SECRET = 'test-secret'
+
 // repositoryをモックしDB非依存でservice層のロジックを検証する
 const findByToken = mock()
 const markExpired = mock()
 const accept = mock()
 const decline = mock()
+const signup = mock()
 
 const findByUserAndOrganization = mock()
 
 const findById = mock()
+const findByEmail = mock()
 
 await mock.module('@/shared/invitation/repositories', () => ({
-  invitationRepository: { findByToken, markExpired, accept, decline },
+  invitationRepository: { findByToken, markExpired, accept, decline, signup },
 }))
 await mock.module('@/shared/membership/repositories', () => ({
   membershipRepository: { findByUserAndOrganization },
 }))
 await mock.module('@/shared/user/repositories', () => ({
-  userRepository: { findById },
+  userRepository: { findById, findByEmail },
 }))
 
 const { invitationsService } = await import('.')
@@ -72,8 +76,10 @@ describe('invitationsService.accept', () => {
     markExpired.mockReset()
     accept.mockReset()
     decline.mockReset()
+    signup.mockReset()
     findByUserAndOrganization.mockReset()
     findById.mockReset()
+    findByEmail.mockReset()
   })
 
   test('有効な招待を受諾してMemberResponseを返す', async () => {
@@ -176,8 +182,10 @@ describe('invitationsService.decline', () => {
     markExpired.mockReset()
     accept.mockReset()
     decline.mockReset()
+    signup.mockReset()
     findByUserAndOrganization.mockReset()
     findById.mockReset()
+    findByEmail.mockReset()
   })
 
   test('有効なPENDING招待を辞退してvoidを返す', async () => {
@@ -237,5 +245,110 @@ describe('invitationsService.decline', () => {
     decline.mockResolvedValue(false)
 
     await expect(invitationsService.decline(TOKEN)).rejects.toThrow('招待を辞退できませんでした')
+  })
+})
+
+describe('invitationsService.signup', () => {
+  beforeEach(() => {
+    findByToken.mockReset()
+    markExpired.mockReset()
+    accept.mockReset()
+    decline.mockReset()
+    signup.mockReset()
+    findByUserAndOrganization.mockReset()
+    findById.mockReset()
+    findByEmail.mockReset()
+  })
+
+  test('有効なPENDING招待なら招待メールでユーザー作成しトークンとUserResponseを返す', async () => {
+    findByToken.mockResolvedValue(pendingInvitation)
+    findByEmail.mockResolvedValue(null)
+    signup.mockImplementation(
+      async (_invitationId: number, _organizationId: number, email: string, name: string, password: string): Promise<User> => ({
+        id: 20,
+        name,
+        email,
+        password,
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+      }),
+    )
+
+    const result = await invitationsService.signup(TOKEN, 'New Invitee', 'password123')
+
+    expect(typeof result.token).toBe('string')
+    expect(result.user.id).toBe(20)
+    expect(result.user.email).toBe('invitee@example.com')
+    expect(result.user).not.toHaveProperty('password')
+
+    const signupArgs = signup.mock.calls[0]
+    expect(signupArgs[0]).toBe(1)
+    expect(signupArgs[1]).toBe(10)
+    expect(signupArgs[2]).toBe('invitee@example.com')
+    expect(signupArgs[3]).toBe('New Invitee')
+    expect(signupArgs[4]).not.toBe('password123')
+    expect(signupArgs[5]).toBe('MEMBER')
+  })
+
+  test('トークンに対応する招待が存在しない場合は404エラーを投げる', async () => {
+    findByToken.mockResolvedValue(null)
+
+    await expect(invitationsService.signup('bad-token', 'New Invitee', 'password123')).rejects.toThrow('招待が見つかりません')
+    expect(findByEmail).not.toHaveBeenCalled()
+    expect(signup).not.toHaveBeenCalled()
+  })
+
+  test('ACCEPTED状態の招待は409エラーを投げる', async () => {
+    findByToken.mockResolvedValue({ ...pendingInvitation, status: 'ACCEPTED' })
+
+    await expect(invitationsService.signup(TOKEN, 'New Invitee', 'password123')).rejects.toThrow('既に受諾済みの招待です')
+    expect(findByEmail).not.toHaveBeenCalled()
+  })
+
+  test('CANCELED状態の招待は409エラーを投げる', async () => {
+    findByToken.mockResolvedValue({ ...pendingInvitation, status: 'CANCELED' })
+
+    await expect(invitationsService.signup(TOKEN, 'New Invitee', 'password123')).rejects.toThrow('キャンセル済みの招待です')
+    expect(findByEmail).not.toHaveBeenCalled()
+  })
+
+  test('EXPIRED状態の招待は409エラーを投げる', async () => {
+    findByToken.mockResolvedValue({ ...pendingInvitation, status: 'EXPIRED' })
+
+    await expect(invitationsService.signup(TOKEN, 'New Invitee', 'password123')).rejects.toThrow('招待の有効期限が切れています')
+    expect(findByEmail).not.toHaveBeenCalled()
+  })
+
+  test('DECLINED状態の招待は409エラーを投げる', async () => {
+    findByToken.mockResolvedValue({ ...pendingInvitation, status: 'DECLINED' })
+
+    await expect(invitationsService.signup(TOKEN, 'New Invitee', 'password123')).rejects.toThrow('既に辞退済みの招待です')
+    expect(findByEmail).not.toHaveBeenCalled()
+  })
+
+  test('PENDINGでも有効期限切れの場合は遅延失効してから409エラーを投げる', async () => {
+    findByToken.mockResolvedValue({ ...pendingInvitation, expiresAt: pastDate })
+    markExpired.mockResolvedValue(undefined)
+
+    await expect(invitationsService.signup(TOKEN, 'New Invitee', 'password123')).rejects.toThrow('招待の有効期限が切れています')
+    expect(markExpired).toHaveBeenCalledWith(1)
+    expect(findByEmail).not.toHaveBeenCalled()
+  })
+
+  test('招待メールアドレスのユーザーが既に存在する場合は409エラーを投げる', async () => {
+    findByToken.mockResolvedValue(pendingInvitation)
+    findByEmail.mockResolvedValue(inviteeUser)
+
+    await expect(invitationsService.signup(TOKEN, 'New Invitee', 'password123')).rejects.toThrow('既に登録')
+    expect(findByEmail).toHaveBeenCalledWith('invitee@example.com')
+    expect(signup).not.toHaveBeenCalled()
+  })
+
+  test('signupがnullを返した場合（競合）は409エラーを投げる', async () => {
+    findByToken.mockResolvedValue(pendingInvitation)
+    findByEmail.mockResolvedValue(null)
+    signup.mockResolvedValue(null)
+
+    await expect(invitationsService.signup(TOKEN, 'New Invitee', 'password123')).rejects.toThrow('招待経由の登録に失敗しました')
   })
 })
