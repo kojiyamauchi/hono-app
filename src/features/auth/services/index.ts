@@ -1,41 +1,11 @@
-import { sign } from 'hono/jwt'
-
+import type { AuthResult } from '@/shared/auth/dtos'
+import { issueAuthToken } from '@/shared/auth/tokens'
 import type { UserResponse } from '@/shared/user/dtos'
 import { toUserResponse } from '@/shared/user/mappers'
 import { userRepository } from '@/shared/user/repositories'
 import { AppError } from '@/utils/errors'
 
 import type { LoginSchemaType, SignupSchemaType } from '../schemas'
-
-/**
- * 認証結果（発行したトークンとユーザー情報）。
- */
-type AuthResult = {
-  token: string
-  user: UserResponse
-}
-
-/**
- * 環境変数からJWT署名用のシークレットを取得する。未設定なら500エラー。
- */
-const getJwtSecret = (): string => {
-  const secret = process.env.JWT_SECRET
-  if (!secret) {
-    throw new AppError(500, 'JWT_SECRETが設定されていません')
-  }
-  return secret
-}
-
-/**
- * 指定ユーザーIDのJWTを発行する（有効期限24時間）。
- */
-const issueToken = async (userId: number): Promise<string> => {
-  const payload = {
-    sub: userId,
-    exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
-  }
-  return sign(payload, getJwtSecret())
-}
 
 /**
  * 認証に関するビジネスロジック。
@@ -57,7 +27,7 @@ export const authService = {
       password: hashedPassword,
     })
 
-    const token = await issueToken(user.id)
+    const token = await issueAuthToken(user.id)
     return { token, user: toUserResponse(user) }
   },
 
@@ -75,7 +45,7 @@ export const authService = {
       throw new AppError(401, 'メールアドレスまたはパスワードが正しくありません')
     }
 
-    const token = await issueToken(user.id)
+    const token = await issueAuthToken(user.id)
     return { token, user: toUserResponse(user) }
   },
 
