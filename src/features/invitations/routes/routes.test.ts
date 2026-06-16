@@ -12,19 +12,21 @@ const findByToken = mock()
 const markExpired = mock()
 const accept = mock()
 const decline = mock()
+const signup = mock()
 
 const findByUserAndOrganization = mock()
 
 const findById = mock()
+const findByEmail = mock()
 
 await mock.module('@/shared/invitation/repositories', () => ({
-  invitationRepository: { findByToken, markExpired, accept, decline },
+  invitationRepository: { findByToken, markExpired, accept, decline, signup },
 }))
 await mock.module('@/shared/membership/repositories', () => ({
   membershipRepository: { findByUserAndOrganization },
 }))
 await mock.module('@/shared/user/repositories', () => ({
-  userRepository: { findById },
+  userRepository: { findById, findByEmail },
 }))
 
 const { app } = await import('@/app')
@@ -82,8 +84,10 @@ describe('invitations routes', () => {
     markExpired.mockReset()
     accept.mockReset()
     decline.mockReset()
+    signup.mockReset()
     findByUserAndOrganization.mockReset()
     findById.mockReset()
+    findByEmail.mockReset()
   })
 
   test('POST /invitations/accept は有効な招待を受諾して201とMemberResponseを返す', async () => {
@@ -318,5 +322,151 @@ describe('invitations routes', () => {
     })
 
     expect(response.status).toBe(204)
+  })
+
+  test('POST /invitations/signup は有効な招待で新規登録して201とAuthResultを返す', async () => {
+    findByToken.mockResolvedValue(pendingInvitation)
+    findByEmail.mockResolvedValue(null)
+    signup.mockImplementation(
+      async (_invitationId: number, _organizationId: number, email: string, name: string, password: string): Promise<User> => ({
+        id: 20,
+        name,
+        email,
+        password,
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+      }),
+    )
+
+    const response = await app.request('/invitations/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: TOKEN, name: 'New Invitee', password: 'password123' }),
+    })
+
+    expect(response.status).toBe(201)
+    const body = (await response.json()) as { token?: string; user?: { id?: number; email?: string; password?: string } }
+    expect(typeof body.token).toBe('string')
+    expect(body.user?.id).toBe(20)
+    expect(body.user?.email).toBe('invitee@example.com')
+    expect(body.user).not.toHaveProperty('password')
+  })
+
+  test('POST /invitations/signup は認証なしでも201を返す（認証不要）', async () => {
+    findByToken.mockResolvedValue(pendingInvitation)
+    findByEmail.mockResolvedValue(null)
+    signup.mockResolvedValue({
+      id: 20,
+      name: 'New Invitee',
+      email: 'invitee@example.com',
+      password: 'hashed',
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+    })
+
+    const response = await app.request('/invitations/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: TOKEN, name: 'New Invitee', password: 'password123' }),
+    })
+
+    expect(response.status).toBe(201)
+  })
+
+  test('POST /invitations/signup はbodyが不正なら400を返す', async () => {
+    const response = await app.request('/invitations/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: TOKEN, name: 'New Invitee', password: 'short' }),
+    })
+
+    expect(response.status).toBe(400)
+  })
+
+  test('POST /invitations/signup は必須フィールド欠如なら400を返す', async () => {
+    const response = await app.request('/invitations/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: TOKEN, password: 'password123' }),
+    })
+
+    expect(response.status).toBe(400)
+  })
+
+  test('POST /invitations/signup はトークンが存在しない場合は404を返す', async () => {
+    findByToken.mockResolvedValue(null)
+
+    const response = await app.request('/invitations/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: 'bad-token', name: 'New Invitee', password: 'password123' }),
+    })
+
+    expect(response.status).toBe(404)
+  })
+
+  test('POST /invitations/signup はACCEPTED状態なら409を返す', async () => {
+    findByToken.mockResolvedValue({ ...pendingInvitation, status: 'ACCEPTED' })
+
+    const response = await app.request('/invitations/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: TOKEN, name: 'New Invitee', password: 'password123' }),
+    })
+
+    expect(response.status).toBe(409)
+  })
+
+  test('POST /invitations/signup はDECLINED状態なら409を返す', async () => {
+    findByToken.mockResolvedValue({ ...pendingInvitation, status: 'DECLINED' })
+
+    const response = await app.request('/invitations/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: TOKEN, name: 'New Invitee', password: 'password123' }),
+    })
+
+    expect(response.status).toBe(409)
+  })
+
+  test('POST /invitations/signup はPENDINGでも期限切れの場合は遅延失効してから409を返す', async () => {
+    findByToken.mockResolvedValue({ ...pendingInvitation, expiresAt: pastDate })
+    markExpired.mockResolvedValue(undefined)
+
+    const response = await app.request('/invitations/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: TOKEN, name: 'New Invitee', password: 'password123' }),
+    })
+
+    expect(response.status).toBe(409)
+    expect(markExpired).toHaveBeenCalledWith(1)
+  })
+
+  test('POST /invitations/signup は招待メールのユーザーが既に存在する場合は409を返す', async () => {
+    findByToken.mockResolvedValue(pendingInvitation)
+    findByEmail.mockResolvedValue(inviteeUser)
+
+    const response = await app.request('/invitations/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: TOKEN, name: 'New Invitee', password: 'password123' }),
+    })
+
+    expect(response.status).toBe(409)
+  })
+
+  test('POST /invitations/signup は競合で登録できなかった場合は409を返す', async () => {
+    findByToken.mockResolvedValue(pendingInvitation)
+    findByEmail.mockResolvedValue(null)
+    signup.mockResolvedValue(null)
+
+    const response = await app.request('/invitations/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: TOKEN, name: 'New Invitee', password: 'password123' }),
+    })
+
+    expect(response.status).toBe(409)
   })
 })
