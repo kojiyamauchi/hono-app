@@ -110,7 +110,7 @@ gh api --method POST \
 レビューコメントは以下の構成で記述：
 
 ```markdown
-## レビュー結果
+## レビュー結果（Claude）
 
 ### ✅ Good Points
 
