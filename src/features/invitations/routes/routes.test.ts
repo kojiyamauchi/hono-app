@@ -11,13 +11,14 @@ process.env.JWT_SECRET = 'test-secret'
 const findByToken = mock()
 const markExpired = mock()
 const accept = mock()
+const decline = mock()
 
 const findByUserAndOrganization = mock()
 
 const findById = mock()
 
 await mock.module('@/shared/invitation/repositories', () => ({
-  invitationRepository: { findByToken, markExpired, accept },
+  invitationRepository: { findByToken, markExpired, accept, decline },
 }))
 await mock.module('@/shared/membership/repositories', () => ({
   membershipRepository: { findByUserAndOrganization },
@@ -80,6 +81,7 @@ describe('invitations routes', () => {
     findByToken.mockReset()
     markExpired.mockReset()
     accept.mockReset()
+    decline.mockReset()
     findByUserAndOrganization.mockReset()
     findById.mockReset()
   })
@@ -207,5 +209,114 @@ describe('invitations routes', () => {
     })
 
     expect(response.status).toBe(409)
+  })
+
+  test('POST /invitations/decline は有効なPENDING招待を辞退して204を返す', async () => {
+    findByToken.mockResolvedValue(pendingInvitation)
+    decline.mockResolvedValue(true)
+
+    const response = await app.request('/invitations/decline', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: TOKEN }),
+    })
+
+    expect(response.status).toBe(204)
+    expect(decline).toHaveBeenCalledWith(1)
+  })
+
+  test('POST /invitations/decline はbodyが不正なら400を返す', async () => {
+    const response = await app.request('/invitations/decline', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: '' }),
+    })
+
+    expect(response.status).toBe(400)
+  })
+
+  test('POST /invitations/decline はtokenフィールド欠如なら400を返す', async () => {
+    const response = await app.request('/invitations/decline', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    })
+
+    expect(response.status).toBe(400)
+  })
+
+  test('POST /invitations/decline はトークンが存在しない場合は404を返す', async () => {
+    findByToken.mockResolvedValue(null)
+
+    const response = await app.request('/invitations/decline', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: 'bad-token' }),
+    })
+
+    expect(response.status).toBe(404)
+  })
+
+  test('POST /invitations/decline はACCEPTED状態なら409を返す', async () => {
+    findByToken.mockResolvedValue({ ...pendingInvitation, status: 'ACCEPTED' })
+
+    const response = await app.request('/invitations/decline', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: TOKEN }),
+    })
+
+    expect(response.status).toBe(409)
+  })
+
+  test('POST /invitations/decline はCANCELED状態なら409を返す', async () => {
+    findByToken.mockResolvedValue({ ...pendingInvitation, status: 'CANCELED' })
+
+    const response = await app.request('/invitations/decline', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: TOKEN }),
+    })
+
+    expect(response.status).toBe(409)
+  })
+
+  test('POST /invitations/decline はDECLINED状態なら409を返す', async () => {
+    findByToken.mockResolvedValue({ ...pendingInvitation, status: 'DECLINED' })
+
+    const response = await app.request('/invitations/decline', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: TOKEN }),
+    })
+
+    expect(response.status).toBe(409)
+  })
+
+  test('POST /invitations/decline はPENDINGでも期限切れの場合は遅延失効してから409を返す', async () => {
+    findByToken.mockResolvedValue({ ...pendingInvitation, expiresAt: pastDate })
+    markExpired.mockResolvedValue(undefined)
+
+    const response = await app.request('/invitations/decline', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: TOKEN }),
+    })
+
+    expect(response.status).toBe(409)
+    expect(markExpired).toHaveBeenCalledWith(1)
+  })
+
+  test('POST /invitations/decline は認証なしでも204を返す（認証不要）', async () => {
+    findByToken.mockResolvedValue(pendingInvitation)
+    decline.mockResolvedValue(true)
+
+    const response = await app.request('/invitations/decline', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: TOKEN }),
+    })
+
+    expect(response.status).toBe(204)
   })
 })
