@@ -3,7 +3,7 @@ import type { Role } from '@/shared/membership/entities'
 /**
  * 招待ステータス。
  */
-export type InvitationStatus = 'PENDING' | 'ACCEPTED' | 'EXPIRED' | 'CANCELED'
+export type InvitationStatus = 'PENDING' | 'ACCEPTED' | 'EXPIRED' | 'CANCELED' | 'DECLINED'
 
 /**
  * Invitationドメインエンティティ。
