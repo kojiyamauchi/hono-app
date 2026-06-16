@@ -67,3 +67,4 @@ APIの追加・変更・削除を行う場合は、実装と同じPRでこのド
 | Method | Path | 認証 | 概要 |
 | --- | --- | --- | --- |
 | POST | `/invitations/accept` | 必要 | 招待トークンを指定して招待を受諾し、組織メンバーになる |
+| POST | `/invitations/decline` | 不要 | 招待トークンを指定して招待を辞退する |
