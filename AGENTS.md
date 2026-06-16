@@ -341,6 +341,7 @@ git fetch https://github.com/kojiyamauchi/hono-app.git main:refs/remotes/origin/
 - レビュー指摘への修正は、PR上で追加コミットとして行うこと
 - 初回レビュー、再レビュー、修正後レビューを問わず、レビュー結果をGitHub上へコメントとして投稿すること
 - Codex がレビュー結果を投稿する場合は、コメント冒頭に`## Review by Codex`を記載すること
+- Claude がレビュー結果を投稿する場合は、コメント冒頭に`## レビュー結果（Claude）`を記載すること
 - 問題がない場合は、レビュー結果とは別の通常コメントとして`Approve by エージェント名 <メールアドレス> :octocat:`を投稿すること
 - 修正コミット追加後は、過去の承認に依存せず最新HEADを確認して再レビューすること
 - 指摘事項が残っている場合は、重大度に応じて`COMMENT`または`REQUEST_CHANGES`を投稿すること
