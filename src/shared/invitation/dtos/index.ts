@@ -15,3 +15,20 @@ export type InvitationResponse = {
   expiresAt: Date
   createdAt: Date
 }
+
+/**
+ * 招待詳細取得エンドポイント用の公開レスポンス型。
+ * トークンは含めず、organization情報（id・name）を含む。
+ */
+export type InvitationDetailResponse = {
+  id: number
+  organization: {
+    id: number
+    name: string
+  }
+  email: string
+  role: Role
+  status: InvitationStatus
+  expiresAt: Date
+  createdAt: Date
+}
