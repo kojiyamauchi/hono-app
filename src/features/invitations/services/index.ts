@@ -1,5 +1,5 @@
 import type { AuthResult } from '@/shared/auth/dtos'
-import { issueAuthToken } from '@/shared/auth/tokens'
+import { issueAuthToken } from '@/shared/auth/services'
 import type { Invitation } from '@/shared/invitation/entities'
 import { invitationRepository } from '@/shared/invitation/repositories'
 import type { MemberResponse } from '@/shared/membership/dtos'

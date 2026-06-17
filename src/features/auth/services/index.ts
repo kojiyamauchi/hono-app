@@ -1,5 +1,5 @@
 import type { AuthResult } from '@/shared/auth/dtos'
-import { issueAuthToken } from '@/shared/auth/tokens'
+import { issueAuthToken } from '@/shared/auth/services'
 import type { UserResponse } from '@/shared/user/dtos'
 import { toUserResponse } from '@/shared/user/mappers'
 import { userRepository } from '@/shared/user/repositories'
