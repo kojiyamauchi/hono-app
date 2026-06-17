@@ -1,6 +1,16 @@
 import { z } from 'zod'
 
 /**
+ * 招待詳細取得エンドポイントのパスパラメータバリデーションスキーマ。
+ * GET /invitations/:token のトークン部分を検証する。
+ */
+export const invitationTokenParamSchema = z.object({
+  token: z.string().min(1, '招待トークンは必須です'),
+})
+
+export type InvitationTokenParamSchemaType = z.infer<typeof invitationTokenParamSchema>
+
+/**
  * 招待受諾リクエストボディのバリデーションスキーマ。
  * トークンの存在確認はservice層のfindByTokenで行う。
  */
