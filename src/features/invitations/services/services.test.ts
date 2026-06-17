@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, mock, test } from 'bun:test'
 
-import type { Invitation } from '@/shared/invitation/entities'
+import type { Invitation, InvitationWithOrganization } from '@/shared/invitation/entities'
 import type { Membership } from '@/shared/membership/entities'
 import type { User } from '@/shared/user/entities'
 
@@ -8,6 +8,7 @@ process.env.JWT_SECRET = 'test-secret'
 
 // repositoryをモックしDB非依存でservice層のロジックを検証する
 const findByToken = mock()
+const findByTokenWithOrganization = mock()
 const markExpired = mock()
 const accept = mock()
 const decline = mock()
@@ -19,7 +20,7 @@ const findById = mock()
 const findByEmail = mock()
 
 await mock.module('@/shared/invitation/repositories', () => ({
-  invitationRepository: { findByToken, markExpired, accept, decline, signup },
+  invitationRepository: { findByToken, findByTokenWithOrganization, markExpired, accept, decline, signup },
 }))
 await mock.module('@/shared/membership/repositories', () => ({
   membershipRepository: { findByUserAndOrganization },
@@ -51,6 +52,12 @@ const pendingInvitation: Invitation = {
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
 }
 
+/** 組織情報付き招待フィクスチャ */
+const pendingInvitationWithOrg: InvitationWithOrganization = {
+  ...pendingInvitation,
+  organization: { id: 10, name: 'Example Organization' },
+}
+
 /** 招待されたユーザーフィクスチャ */
 const inviteeUser: User = {
   id: 5,
@@ -73,6 +80,7 @@ const createdMembership: Membership = {
 describe('invitationsService.accept', () => {
   beforeEach(() => {
     findByToken.mockReset()
+    findByTokenWithOrganization.mockReset()
     markExpired.mockReset()
     accept.mockReset()
     decline.mockReset()
@@ -179,6 +187,7 @@ describe('invitationsService.accept', () => {
 describe('invitationsService.decline', () => {
   beforeEach(() => {
     findByToken.mockReset()
+    findByTokenWithOrganization.mockReset()
     markExpired.mockReset()
     accept.mockReset()
     decline.mockReset()
@@ -251,6 +260,7 @@ describe('invitationsService.decline', () => {
 describe('invitationsService.signup', () => {
   beforeEach(() => {
     findByToken.mockReset()
+    findByTokenWithOrganization.mockReset()
     markExpired.mockReset()
     accept.mockReset()
     decline.mockReset()
@@ -350,5 +360,90 @@ describe('invitationsService.signup', () => {
     signup.mockResolvedValue(null)
 
     await expect(invitationsService.signup(TOKEN, 'New Invitee', 'password123')).rejects.toThrow('招待経由の登録に失敗しました')
+  })
+})
+
+describe('invitationsService.getDetailByToken', () => {
+  beforeEach(() => {
+    findByToken.mockReset()
+    findByTokenWithOrganization.mockReset()
+    markExpired.mockReset()
+    accept.mockReset()
+    decline.mockReset()
+    signup.mockReset()
+    findByUserAndOrganization.mockReset()
+    findById.mockReset()
+    findByEmail.mockReset()
+  })
+
+  test('PENDING有効な招待をInvitationDetailResponseで返す', async () => {
+    findByTokenWithOrganization.mockResolvedValue(pendingInvitationWithOrg)
+
+    const result = await invitationsService.getDetailByToken(TOKEN)
+
+    expect(result.id).toBe(1)
+    expect(result.organization).toEqual({ id: 10, name: 'Example Organization' })
+    expect(result.email).toBe('invitee@example.com')
+    expect(result.role).toBe('MEMBER')
+    expect(result.status).toBe('PENDING')
+    expect((result as Record<string, unknown>).token).toBeUndefined()
+  })
+
+  test('PENDINGでも期限切れの場合はDBを更新せずstatusをEXPIREDとして返す', async () => {
+    const expiredPendingWithOrg: InvitationWithOrganization = {
+      ...pendingInvitationWithOrg,
+      expiresAt: pastDate,
+    }
+    findByTokenWithOrganization.mockResolvedValue(expiredPendingWithOrg)
+
+    const result = await invitationsService.getDetailByToken(TOKEN)
+
+    expect(result.status).toBe('EXPIRED')
+    // DBは更新しない（markExpiredを呼ばない）
+    expect(markExpired).not.toHaveBeenCalled()
+  })
+
+  test('ACCEPTEDステータスの招待をstatus=ACCEPTEDで返す', async () => {
+    const acceptedWithOrg: InvitationWithOrganization = { ...pendingInvitationWithOrg, status: 'ACCEPTED' }
+    findByTokenWithOrganization.mockResolvedValue(acceptedWithOrg)
+
+    const result = await invitationsService.getDetailByToken(TOKEN)
+
+    expect(result.status).toBe('ACCEPTED')
+    expect(markExpired).not.toHaveBeenCalled()
+  })
+
+  test('CANCELEDステータスの招待をstatus=CANCELEDで返す', async () => {
+    const canceledWithOrg: InvitationWithOrganization = { ...pendingInvitationWithOrg, status: 'CANCELED' }
+    findByTokenWithOrganization.mockResolvedValue(canceledWithOrg)
+
+    const result = await invitationsService.getDetailByToken(TOKEN)
+
+    expect(result.status).toBe('CANCELED')
+  })
+
+  test('DECLINEDステータスの招待をstatus=DECLINEDで返す', async () => {
+    const declinedWithOrg: InvitationWithOrganization = { ...pendingInvitationWithOrg, status: 'DECLINED' }
+    findByTokenWithOrganization.mockResolvedValue(declinedWithOrg)
+
+    const result = await invitationsService.getDetailByToken(TOKEN)
+
+    expect(result.status).toBe('DECLINED')
+  })
+
+  test('EXPIREDステータスの招待をstatus=EXPIREDで返す', async () => {
+    const expiredWithOrg: InvitationWithOrganization = { ...pendingInvitationWithOrg, status: 'EXPIRED' }
+    findByTokenWithOrganization.mockResolvedValue(expiredWithOrg)
+
+    const result = await invitationsService.getDetailByToken(TOKEN)
+
+    expect(result.status).toBe('EXPIRED')
+    expect(markExpired).not.toHaveBeenCalled()
+  })
+
+  test('トークンに対応する招待が存在しない場合は404エラーを投げる', async () => {
+    findByTokenWithOrganization.mockResolvedValue(null)
+
+    await expect(invitationsService.getDetailByToken('bad-token')).rejects.toThrow('招待が見つかりません')
   })
 })
