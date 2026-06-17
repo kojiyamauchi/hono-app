@@ -1,5 +1,5 @@
 import { prisma } from '@/libs/prisma'
-import type { Invitation, InvitationStatus } from '@/shared/invitation/entities'
+import type { Invitation, InvitationStatus, InvitationWithOrganization } from '@/shared/invitation/entities'
 import type { Membership, Role } from '@/shared/membership/entities'
 import type { User } from '@/shared/user/entities'
 import { isPrismaUniqueConstraintError } from '@/utils/prisma'
@@ -57,6 +57,21 @@ export const invitationRepository = {
    */
   findByToken: async (token: string): Promise<Invitation | null> => {
     return prisma.invitation.findUnique({ where: { token } })
+  },
+
+  /**
+   * トークンで招待を取得し、紐づくOrganizationも同時に取得する。
+   * 招待詳細取得など、organization情報が必要な場合に使用する。
+   * 存在しない場合はnullを返す。
+   */
+  findByTokenWithOrganization: async (token: string): Promise<InvitationWithOrganization | null> => {
+    const result = await prisma.invitation.findUnique({
+      where: { token },
+      include: { organization: { select: { id: true, name: true } } },
+    })
+    if (!result) return null
+    const { organization, ...invitation } = result
+    return { ...invitation, organization }
   },
 
   /**
