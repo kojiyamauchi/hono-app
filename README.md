@@ -133,6 +133,28 @@ Hono を使ったバックエンド API の実装用プロジェクトです。
 - `src/shared/` から `src/features/` をimportすることは禁止です。
   - 依存方向は `features -> shared` の一方向に保ちます。
 
+### Standard Directories
+
+`src/features/<feature>/` と `src/shared/<domain>/` 配下の構成は、以下の標準ディレクトリに揃えます。
+
+```txt
+controllers/
+dtos/
+entities/
+mappers/
+repositories/
+routes/
+schemas/
+services/
+```
+
+- 新しい責務名のディレクトリは原則として増やしません。
+  - 例: `tokens/`、`handlers/`、`clients/` のような新しい概念を、個別判断で追加しません。
+- 新しい処理を置く場合は、まず既存の標準ディレクトリのどれに属するかを判断します。
+  - 例: JWT発行のような認証の共通処理は `src/shared/auth/services/` に置きます。
+- 標準ディレクトリでは表現しづらい責務が出た場合は、実装前に設計方針を確認し、必要に応じてこのドキュメントを更新してから追加します。
+- 現時点で実装がない標準ディレクトリには `.gitkeep` を置き、構成の一貫性を保ちます。
+
 ## Schema Naming
 
 `src/features/**/schemas/` および `src/shared/**/schemas/` 配下では、Zod schemaとそこから推論する型の対応が分かる命名に揃えます。

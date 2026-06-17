@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 
-import type { AcceptInvitationBodySchemaType, DeclineInvitationBodySchemaType } from '../schemas'
+import type { AcceptInvitationBodySchemaType, DeclineInvitationBodySchemaType, SignupInvitationBodySchemaType } from '../schemas'
 import { invitationsService } from '../services'
 
 /**
@@ -21,5 +21,13 @@ export const invitationsController = {
   decline: async (c: Context, input: DeclineInvitationBodySchemaType): Promise<Response> => {
     await invitationsService.decline(input.token)
     return c.body(null, 204)
+  },
+
+  /**
+   * 招待経由で新規登録する。201でAuthResultを返す。
+   */
+  signup: async (c: Context, input: SignupInvitationBodySchemaType): Promise<Response> => {
+    const result = await invitationsService.signup(input.token, input.name, input.password)
+    return c.json(result, 201)
   },
 }

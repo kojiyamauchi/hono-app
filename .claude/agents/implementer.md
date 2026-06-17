@@ -18,6 +18,7 @@ permissionMode: acceptEdits
 
 - **features独立**: `src/features/*` 同士の相互importは禁止。feature間で共有する処理・型・ドメインは `src/shared/*` に置く。依存方向は `features -> shared` の一方向。
 - **features設計**: 公開URLのトップレベルは `src/routes/`、feature内部のルート詳細は `src/features/<feature>/routes/`。URLはkebab-case、featureディレクトリはcamelCase可。
+- **標準ディレクトリ**: `src/features/<feature>/` と `src/shared/<domain>/` は CLAUDE.md「features設計」の標準ディレクトリ（`controllers`/`dtos`/`entities`/`mappers`/`repositories`/`routes`/`schemas`/`services`）に揃える。`tokens/`・`handlers/`・`clients/` のような**新しい責務名のディレクトリを増やさない**こと。新しい処理はまず既存の標準ディレクトリのどれに属するかを判断し、置き場所に迷う責務が出たら実装前に設計方針を確認すること。
 - **レイヤード**: controller → service → repository。リクエスト/レスポンスはHonoの `c`、バリデーションはzod + `@hono/zod-validator`、エラーは `AppError` + `app.onError`。DBアクセスはrepository層に閉じる（`@/libs/prisma`）。
 - **Zod schema命名**: schemaは `***Schema`、`z.infer` 由来の型は `***SchemaType`（param系は `***ParamSchemaType`）。`***Input` / `***Param` などの別接尾語は使わない。
 - **コメント・ドキュメントは日本語**。JSDocも日本語。変数名・関数名は英語のcamelCase/PascalCase。

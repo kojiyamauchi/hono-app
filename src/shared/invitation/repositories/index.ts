@@ -1,6 +1,7 @@
 import { prisma } from '@/libs/prisma'
 import type { Invitation, InvitationStatus } from '@/shared/invitation/entities'
 import type { Membership, Role } from '@/shared/membership/entities'
+import type { User } from '@/shared/user/entities'
 import { isPrismaUniqueConstraintError } from '@/utils/prisma'
 
 /**
@@ -95,6 +96,33 @@ export const invitationRepository = {
           return null
         }
         return await tx.membership.create({ data: { userId, organizationId, role } })
+      })
+    } catch (error) {
+      if (isPrismaUniqueConstraintError(error)) {
+        return null
+      }
+      throw error
+    }
+  },
+
+  /**
+   * 招待経由でユーザーを作成し、メンバーシップ作成と招待の受諾を同時に行う（トランザクション）。
+   * 招待の条件付き更新に失敗した場合、またはユーザー/メンバーシップの一意制約違反の場合はnullを返す。
+   */
+  signup: async (invitationId: number, organizationId: number, email: string, name: string, password: string, role: Role): Promise<User | null> => {
+    try {
+      return await prisma.$transaction(async (tx) => {
+        const result = await tx.invitation.updateMany({
+          where: { id: invitationId, status: 'PENDING' },
+          data: { status: 'ACCEPTED' },
+        })
+        if (result.count === 0) {
+          return null
+        }
+
+        const user = await tx.user.create({ data: { name, email, password } })
+        await tx.membership.create({ data: { userId: user.id, organizationId, role } })
+        return user
       })
     } catch (error) {
       if (isPrismaUniqueConstraintError(error)) {
