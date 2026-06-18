@@ -75,6 +75,18 @@ gh pr diff <PR番号>
 - テストの必要性
 - 潜在的なバグ
 
+#### migrationを含むPRの実DB検証
+
+テスト/CIはDB非依存のため、migrationの適用や実DB挙動はCIで検証されない。migrationを含むPRでは、CLAUDE.md「migrationを含む変更の実DB検証」に従って確認する。詳細・原則はCLAUDE.mdを正本とし、ここでは手順の要点のみ示す。
+
+1. まずPR本文/コメントの**実DB検証証跡**（commit SHA・適用migration・確認内容と結果・データ削除・DB起動状態）を確認する。
+2. 次のいずれかのときのみ再実行する: 証跡が無い/不明確、検証後にmigration・repository・transaction等が変更、並行制御や制約など再現確認すべき高リスク箇所がある。
+3. 再実行する場合:
+   - `bun run db:start` → `bunx prisma migrate status` で履歴とDB状態を確認（**未適用を前提にしない**）
+   - 未適用なら `bunx prisma migrate deploy`、適用済みなら実装者の証跡を確認
+   - clean適用そのものの再検証が必要な場合のみ、使い捨てDBまたは**ユーザー承認済みの `bun run db:reset`** を使う（`db:reset`は既存データを削除するため明示承認を必須とする）
+   - 非自明なデータ層は smoke（実APIへのHTTPリクエスト / repository・serviceを呼ぶ使い捨てスクリプト / `psql`）で確認する。使い捨てスクリプトはコミットせず、検証データは削除する。
+
 ### 5. inline suggestion comment の投稿（必要な場合）
 
 `Suggestions` または `Issues` に指摘を出す場合、変更内容が明確で、該当箇所へ直接適用できるものは、可能な範囲で inline suggestion comment を併用する。
