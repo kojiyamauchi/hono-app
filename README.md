@@ -209,6 +209,21 @@ http://localhost:3000
 
 公開エンドポイント一覧は [docs/endpoints.md](docs/endpoints.md) を参照してください。
 
+### ブラウザクライアントからの利用
+
+リフレッシュトークンは `HttpOnly Cookie`（`Path=/auth`）で管理されます。ブラウザからリクエストを送る場合は `credentials: 'include'` を指定してください。
+
+```js
+await fetch('/auth/login', {
+  method: 'POST',
+  credentials: 'include',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ email, password }),
+})
+```
+
+アクセストークンはメモリ上で保持し、ページ再読み込み時は `POST /auth/refresh`（`credentials: 'include'`）で復元してください。リフレッシュCookieは自動送信されます。
+
 ## Local Database
 
 Local development uses Supabase CLI and Docker.
