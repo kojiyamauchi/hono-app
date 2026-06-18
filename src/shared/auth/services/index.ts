@@ -1,5 +1,7 @@
 import { createHmac, randomBytes, randomUUID } from 'node:crypto'
 
+import type { Context } from 'hono'
+import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import { sign } from 'hono/jwt'
 
 import { AppError } from '@/utils/errors'
@@ -31,6 +33,43 @@ export const ACCESS_TOKEN_TTL_SECONDS = 15 * 60
 
 /** リフレッシュトークンの有効期間（14日）。 */
 export const REFRESH_TOKEN_TTL_MS = 14 * 24 * 60 * 60 * 1000
+
+/** リフレッシュトークンCookieの名前。 */
+export const REFRESH_TOKEN_COOKIE_NAME = 'refreshToken'
+
+/**
+ * リフレッシュトークンをHttpOnly CookieへセットするCookieヘルパー。
+ * Secure属性は本番環境でのみ有効にする。
+ */
+export const setRefreshTokenCookie = (c: Context, token: string): void => {
+  setCookie(c, REFRESH_TOKEN_COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'Lax',
+    path: '/auth',
+    maxAge: Math.floor(REFRESH_TOKEN_TTL_MS / 1000),
+  })
+}
+
+/**
+ * リフレッシュトークンをCookieから取得する。
+ */
+export const getRefreshTokenCookie = (c: Context): string | undefined => {
+  return getCookie(c, REFRESH_TOKEN_COOKIE_NAME)
+}
+
+/**
+ * リフレッシュトークンCookieを削除する。
+ * 削除時も設定時と同じPathを指定する。
+ */
+export const clearRefreshTokenCookie = (c: Context): void => {
+  deleteCookie(c, REFRESH_TOKEN_COOKIE_NAME, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'Lax',
+    path: '/auth',
+  })
+}
 
 /**
  * 発行したリフレッシュトークンと永続化に必要な値。
