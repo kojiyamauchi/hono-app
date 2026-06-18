@@ -20,7 +20,7 @@ APIの追加・変更・削除を行う場合は、実装と同じPRでこのド
 | POST   | `/auth/signup`  | 不要                         | ユーザーを登録する                                               |
 | POST   | `/auth/login`   | 不要                         | ログインして認証トークンを取得する                               |
 | POST   | `/auth/refresh` | Cookie（リフレッシュトークン） | Cookieのリフレッシュトークンをローテーションしてアクセストークンを再発行する |
-| POST   | `/auth/logout`  | Cookie（リフレッシュトークン） | Cookieのリフレッシュトークンのログインセッションをすべてのデバイスで失効する |
+| POST   | `/auth/logout`  | Cookie（リフレッシュトークン） | Cookieのリフレッシュトークンに対応するログインセッションを失効する |
 | GET    | `/auth/me`      | 必要                         | 認証トークンに紐づくユーザー情報を取得する                       |
 
 ## Supabase Auth
