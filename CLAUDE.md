@@ -93,7 +93,7 @@ bun run build        # typecheckのエイリアス
 bun run lint         # ESLintによる自動修正（max-warnings 0）
 bun run format       # Prettierによるフォーマット
 bun run spellcheck   # CSpellによるスペルチェック
-bun test             # Bun Testによるテストの実行
+bun test --isolate   # テストファイルを分離したBun Testの実行
 ```
 
 ### データベース操作
@@ -133,7 +133,7 @@ bun run lint-staged  # ステージングされたファイルのチェックを
 
 ### テスト
 
-- Bunに組み込まれた`bun test`を使用
+- Bunに組み込まれた`bun test --isolate`を使用
 - テストファイル: `**/*.test.ts`または`**/*.test.js`
 - テストがない場合は失敗するため、最低限の動作確認テストを維持
 
