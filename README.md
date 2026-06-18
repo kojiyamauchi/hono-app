@@ -247,7 +247,7 @@ bun run typecheck        # run TypeScript type check
 bun run lint             # run ESLint with auto-fix
 bun run format           # run Prettier
 bun run spellcheck       # run cspell
-bun test                 # run Bun Test
+bun test --isolate       # run Bun Test with isolated test files
 bun run prisma:generate  # generate Prisma Client
 bun run prisma:validate  # validate Prisma schema
 ```

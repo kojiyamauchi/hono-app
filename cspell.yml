@@ -16,6 +16,7 @@ words:
   - octocat
   - postgresql
   - Prisma
+  - Refreshable
   - Supabase
   - supabase
 flagWords:
