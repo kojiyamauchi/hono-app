@@ -1,5 +1,7 @@
 import type { Context } from 'hono'
 
+import { setRefreshTokenCookie } from '@/shared/auth/services'
+
 import type { AcceptInvitationBodySchemaType, DeclineInvitationBodySchemaType, SignupInvitationBodySchemaType } from '../schemas'
 import { invitationsService } from '../services'
 
@@ -33,10 +35,12 @@ export const invitationsController = {
   },
 
   /**
-   * 招待経由で新規登録する。201でAuthResultを返す。
+   * 招待経由で新規登録する。201でアクセストークンとユーザー情報を返す。
+   * リフレッシュトークンはCookieへセットする。
    */
   signup: async (c: Context, input: SignupInvitationBodySchemaType): Promise<Response> => {
     const result = await invitationsService.signup(input.token, input.name, input.password)
-    return c.json(result, 201)
+    setRefreshTokenCookie(c, result.refreshToken)
+    return c.json({ token: result.token, user: result.user }, 201)
   },
 }
