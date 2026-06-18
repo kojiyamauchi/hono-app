@@ -224,6 +224,12 @@ await fetch('/auth/login', {
 
 アクセストークンはメモリ上で保持し、ページ再読み込み時は `POST /auth/refresh`（`credentials: 'include'`）で復元してください。リフレッシュCookieは自動送信されます。
 
+#### Cookie の設定（環境差分）
+
+- リフレッシュCookieは既定で `SameSite=Lax`・Secure 付きで発行されます。**フロントエンドとAPIが同一サイトの構成を既定**とします。
+- `COOKIE_SECURE` は未設定なら有効（本番では必ず有効）。HTTP のローカル開発でのみ `COOKIE_SECURE=false` にしてください。
+- フロントエンドとAPIが**cross-site**になる構成では `COOKIE_SAMESITE=None` を設定します。`SameSite=None` はブラウザ仕様上 Secure が必須のため、その場合 Secure は自動的に有効化されます。あわせて `ALLOWED_ORIGINS` に許可するフロントエンドのOriginを設定してください。
+
 ## Local Database
 
 Local development uses Supabase CLI and Docker.

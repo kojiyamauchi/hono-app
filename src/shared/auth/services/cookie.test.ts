@@ -62,29 +62,9 @@ describe('setRefreshTokenCookie', () => {
     expect(attrs.get('max-age')).toBe(String(expectedMaxAge))
   })
 
-  test('非本番環境ではSecure属性が付かない', async () => {
-    const original = process.env.NODE_ENV
-    process.env.NODE_ENV = 'development'
-
-    try {
-      const app = new Hono().post('/test', (c) => {
-        setRefreshTokenCookie(c, 'test-token')
-        return c.text('ok')
-      })
-
-      const response = await app.request('/test', { method: 'POST' })
-      const setCookie = response.headers.get('set-cookie')!
-      const attrs = parseCookieAttributes(setCookie)
-
-      expect(attrs.has('secure')).toBe(false)
-    } finally {
-      process.env.NODE_ENV = original
-    }
-  })
-
-  test('本番環境ではSecure属性が付く', async () => {
-    const original = process.env.NODE_ENV
-    process.env.NODE_ENV = 'production'
+  test('既定（COOKIE_SECURE未設定）ではSecure属性が付く', async () => {
+    const original = process.env.COOKIE_SECURE
+    delete process.env.COOKIE_SECURE
 
     try {
       const app = new Hono().post('/test', (c) => {
@@ -98,7 +78,55 @@ describe('setRefreshTokenCookie', () => {
 
       expect(attrs.has('secure')).toBe(true)
     } finally {
-      process.env.NODE_ENV = original
+      if (original === undefined) delete process.env.COOKIE_SECURE
+      else process.env.COOKIE_SECURE = original
+    }
+  })
+
+  test('COOKIE_SECURE=falseのときだけSecure属性が付かない', async () => {
+    const original = process.env.COOKIE_SECURE
+    process.env.COOKIE_SECURE = 'false'
+
+    try {
+      const app = new Hono().post('/test', (c) => {
+        setRefreshTokenCookie(c, 'test-token')
+        return c.text('ok')
+      })
+
+      const response = await app.request('/test', { method: 'POST' })
+      const setCookie = response.headers.get('set-cookie')!
+      const attrs = parseCookieAttributes(setCookie)
+
+      expect(attrs.has('secure')).toBe(false)
+    } finally {
+      if (original === undefined) delete process.env.COOKIE_SECURE
+      else process.env.COOKIE_SECURE = original
+    }
+  })
+
+  test('COOKIE_SAMESITE=NoneではSameSite=Noneになり、COOKIE_SECURE=falseでもSecureが強制される', async () => {
+    const originalSecure = process.env.COOKIE_SECURE
+    const originalSameSite = process.env.COOKIE_SAMESITE
+    process.env.COOKIE_SECURE = 'false'
+    process.env.COOKIE_SAMESITE = 'None'
+
+    try {
+      const app = new Hono().post('/test', (c) => {
+        setRefreshTokenCookie(c, 'test-token')
+        return c.text('ok')
+      })
+
+      const response = await app.request('/test', { method: 'POST' })
+      const setCookie = response.headers.get('set-cookie')!
+      const attrs = parseCookieAttributes(setCookie)
+
+      expect(attrs.get('samesite')).toBe('None')
+      expect(attrs.has('secure')).toBe(true)
+    } finally {
+      if (originalSecure === undefined) delete process.env.COOKIE_SECURE
+      else process.env.COOKIE_SECURE = originalSecure
+      if (originalSameSite === undefined) delete process.env.COOKIE_SAMESITE
+      else process.env.COOKIE_SAMESITE = originalSameSite
     }
   })
 })
