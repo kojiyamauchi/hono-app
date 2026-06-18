@@ -1,4 +1,4 @@
-import type { RefreshableAuthResult } from '@/shared/auth/dtos'
+import type { IssuedAuthTokens } from '@/shared/auth/dtos'
 import { refreshTokenRepository } from '@/shared/auth/repositories'
 import { issueAuthToken, issueRefreshToken } from '@/shared/auth/services'
 import type { InvitationDetailResponse } from '@/shared/invitation/dtos'
@@ -138,7 +138,7 @@ export const invitationsService = {
    * 4. トランザクションでユーザー作成、membership作成、招待ACCEPTED更新を行う（nullなら409）
    * 5. JWTを発行して認証レスポンスを返す
    */
-  signup: async (token: string, name: string, password: string): Promise<RefreshableAuthResult> => {
+  signup: async (token: string, name: string, password: string): Promise<IssuedAuthTokens> => {
     // 1. PENDINGかつ有効な招待を取得
     const invitation = await findPendingValidInvitation(token)
 
