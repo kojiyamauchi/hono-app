@@ -5,6 +5,13 @@ import type { Membership } from '@/shared/membership/entities'
 import type { User } from '@/shared/user/entities'
 
 process.env.JWT_SECRET = 'test-secret'
+process.env.REFRESH_TOKEN_SECRET = 'test-refresh-secret'
+
+const createRefreshToken = mock()
+
+await mock.module('@/shared/auth/repositories', () => ({
+  refreshTokenRepository: { create: createRefreshToken },
+}))
 
 // repositoryをモックしDB非依存でservice層のロジックを検証する
 const findByToken = mock()
@@ -76,6 +83,10 @@ const createdMembership: Membership = {
   role: 'MEMBER',
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
 }
+
+beforeEach(() => {
+  createRefreshToken.mockReset()
+})
 
 describe('invitationsService.accept', () => {
   beforeEach(() => {
@@ -287,6 +298,7 @@ describe('invitationsService.signup', () => {
     const result = await invitationsService.signup(TOKEN, 'New Invitee', 'password123')
 
     expect(typeof result.token).toBe('string')
+    expect(typeof result.refreshToken).toBe('string')
     expect(result.user.id).toBe(20)
     expect(result.user.email).toBe('invitee@example.com')
     expect(result.user).not.toHaveProperty('password')
@@ -298,6 +310,12 @@ describe('invitationsService.signup', () => {
     expect(signupArgs[3]).toBe('New Invitee')
     expect(signupArgs[4]).not.toBe('password123')
     expect(signupArgs[5]).toBe('MEMBER')
+    expect(createRefreshToken).toHaveBeenCalledWith({
+      userId: 20,
+      familyId: expect.any(String),
+      tokenHash: expect.any(String),
+      expiresAt: expect.any(Date),
+    })
   })
 
   test('トークンに対応する招待が存在しない場合は404エラーを投げる', async () => {
