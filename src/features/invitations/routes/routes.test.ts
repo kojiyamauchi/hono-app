@@ -7,6 +7,7 @@ import type { User } from '@/shared/user/entities'
 
 process.env.JWT_SECRET = 'test-secret'
 process.env.REFRESH_TOKEN_SECRET = 'test-refresh-secret'
+process.env.ALLOWED_ORIGINS = 'http://localhost:3000'
 
 const createRefreshToken = mock()
 
@@ -340,7 +341,7 @@ describe('invitations routes', () => {
     expect(response.status).toBe(204)
   })
 
-  test('POST /invitations/signup は有効な招待で新規登録して201とAuthResultを返す', async () => {
+  test('POST /invitations/signup は有効な招待で新規登録して201とAuthResultを返し、Set-CookieヘッダーにリフレッシュトークンCookieをセットする', async () => {
     findByToken.mockResolvedValue(pendingInvitation)
     findByEmail.mockResolvedValue(null)
     signup.mockImplementation(
@@ -367,10 +368,18 @@ describe('invitations routes', () => {
       user?: { id?: number; email?: string; password?: string }
     }
     expect(typeof body.token).toBe('string')
-    expect(typeof body.refreshToken).toBe('string')
+    // bodyにrefreshTokenが含まれないことを確認する
+    expect(body.refreshToken).toBeUndefined()
     expect(body.user?.id).toBe(20)
     expect(body.user?.email).toBe('invitee@example.com')
     expect(body.user).not.toHaveProperty('password')
+
+    // リフレッシュトークンはCookieとして設定されることを確認する
+    const setCookie = response.headers.get('set-cookie')
+    expect(setCookie).not.toBeNull()
+    expect(setCookie).toContain('refreshToken=')
+    expect(setCookie).toContain('HttpOnly')
+    expect(setCookie).toContain('Path=/auth')
   })
 
   test('POST /invitations/signup は認証なしでも201を返す（認証不要）', async () => {
@@ -489,6 +498,32 @@ describe('invitations routes', () => {
     })
 
     expect(response.status).toBe(409)
+  })
+
+  test('POST /invitations/signup はOriginが許可リストに一致しない場合は403を返す', async () => {
+    const response = await app.request('/invitations/signup', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Origin: 'http://evil.com',
+      },
+      body: JSON.stringify({ token: TOKEN, name: 'New Invitee', password: 'password123' }),
+    })
+
+    expect(response.status).toBe(403)
+  })
+
+  test('POST /invitations/signup はOrigin=nullの場合は403を返す', async () => {
+    const response = await app.request('/invitations/signup', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Origin: 'null',
+      },
+      body: JSON.stringify({ token: TOKEN, name: 'New Invitee', password: 'password123' }),
+    })
+
+    expect(response.status).toBe(403)
   })
 
   test('GET /invitations/:token は認証なしで200とInvitationDetailResponseを返す', async () => {
