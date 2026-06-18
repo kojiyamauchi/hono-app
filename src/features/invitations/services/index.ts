@@ -158,6 +158,7 @@ export const invitationsService = {
     }
 
     // 5. アクセストークンとリフレッシュトークンを発行して認証レスポンスを返す
+    const authToken = await issueAuthToken(user.id)
     const refreshToken = issueRefreshToken()
     await refreshTokenRepository.create({
       userId: user.id,
@@ -165,7 +166,6 @@ export const invitationsService = {
       tokenHash: refreshToken.tokenHash,
       expiresAt: refreshToken.expiresAt,
     })
-    const authToken = await issueAuthToken(user.id)
     return { token: authToken, refreshToken: refreshToken.token, user: toUserResponse(user) }
   },
 }

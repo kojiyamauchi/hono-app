@@ -13,6 +13,7 @@ import type { LoginSchemaType, SignupSchemaType } from '../schemas'
  * アクセストークンと新しいfamilyのリフレッシュトークンを発行する。
  */
 const issueAuthentication = async (user: User): Promise<RefreshableAuthResult> => {
+  const token = await issueAuthToken(user.id)
   const refreshToken = issueRefreshToken()
   await refreshTokenRepository.create({
     userId: user.id,
@@ -22,7 +23,7 @@ const issueAuthentication = async (user: User): Promise<RefreshableAuthResult> =
   })
 
   return {
-    token: await issueAuthToken(user.id),
+    token,
     refreshToken: refreshToken.token,
     user: toUserResponse(user),
   }
@@ -98,6 +99,7 @@ export const authService = {
       throw invalidRefreshTokenError()
     }
 
+    const authToken = await issueAuthToken(user.id)
     const next = issueRefreshToken(current.familyId)
     const rotated = await refreshTokenRepository.rotate(current.id, {
       userId: current.userId,
@@ -111,7 +113,7 @@ export const authService = {
     }
 
     return {
-      token: await issueAuthToken(user.id),
+      token: authToken,
       refreshToken: next.token,
       user: toUserResponse(user),
     }
