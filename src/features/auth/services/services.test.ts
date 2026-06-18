@@ -211,6 +211,18 @@ describe('authService.refresh', () => {
 
     await expect(authService.refresh('reused-token')).rejects.toThrow('リフレッシュトークンが無効です')
   })
+
+  test('アクセストークンを発行できない場合はローテーションしない', async () => {
+    const jwtSecret = process.env.JWT_SECRET
+    delete process.env.JWT_SECRET
+
+    try {
+      await expect(authService.refresh('plain-refresh-token')).rejects.toThrow('JWT_SECRETが設定されていません')
+      expect(rotate).not.toHaveBeenCalled()
+    } finally {
+      process.env.JWT_SECRET = jwtSecret
+    }
+  })
 })
 
 describe('authService.logout', () => {
