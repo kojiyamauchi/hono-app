@@ -1,5 +1,6 @@
-import type { AuthResult } from '@/shared/auth/dtos'
-import { issueAuthToken } from '@/shared/auth/services'
+import type { RefreshableAuthResult } from '@/shared/auth/dtos'
+import { refreshTokenRepository } from '@/shared/auth/repositories'
+import { issueAuthToken, issueRefreshToken } from '@/shared/auth/services'
 import type { InvitationDetailResponse } from '@/shared/invitation/dtos'
 import type { Invitation } from '@/shared/invitation/entities'
 import { toInvitationDetailResponse } from '@/shared/invitation/mappers'
@@ -137,7 +138,7 @@ export const invitationsService = {
    * 4. トランザクションでユーザー作成、membership作成、招待ACCEPTED更新を行う（nullなら409）
    * 5. JWTを発行して認証レスポンスを返す
    */
-  signup: async (token: string, name: string, password: string): Promise<AuthResult> => {
+  signup: async (token: string, name: string, password: string): Promise<RefreshableAuthResult> => {
     // 1. PENDINGかつ有効な招待を取得
     const invitation = await findPendingValidInvitation(token)
 
@@ -156,8 +157,15 @@ export const invitationsService = {
       throw new AppError(409, '招待経由の登録に失敗しました')
     }
 
-    // 5. JWTを発行して認証レスポンスを返す
+    // 5. アクセストークンとリフレッシュトークンを発行して認証レスポンスを返す
+    const refreshToken = issueRefreshToken()
+    await refreshTokenRepository.create({
+      userId: user.id,
+      familyId: refreshToken.familyId,
+      tokenHash: refreshToken.tokenHash,
+      expiresAt: refreshToken.expiresAt,
+    })
     const authToken = await issueAuthToken(user.id)
-    return { token: authToken, user: toUserResponse(user) }
+    return { token: authToken, refreshToken: refreshToken.token, user: toUserResponse(user) }
   },
 }
