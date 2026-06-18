@@ -6,6 +6,13 @@ import type { Membership } from '@/shared/membership/entities'
 import type { User } from '@/shared/user/entities'
 
 process.env.JWT_SECRET = 'test-secret'
+process.env.REFRESH_TOKEN_SECRET = 'test-refresh-secret'
+
+const createRefreshToken = mock()
+
+await mock.module('@/shared/auth/repositories', () => ({
+  refreshTokenRepository: { create: createRefreshToken },
+}))
 
 // repositoryをモックしDB非依存でroute統合を検証する
 const findByToken = mock()
@@ -96,6 +103,7 @@ describe('invitations routes', () => {
     findByUserAndOrganization.mockReset()
     findById.mockReset()
     findByEmail.mockReset()
+    createRefreshToken.mockReset()
   })
 
   test('POST /invitations/accept は有効な招待を受諾して201とMemberResponseを返す', async () => {
@@ -353,8 +361,13 @@ describe('invitations routes', () => {
     })
 
     expect(response.status).toBe(201)
-    const body = (await response.json()) as { token?: string; user?: { id?: number; email?: string; password?: string } }
+    const body = (await response.json()) as {
+      token?: string
+      refreshToken?: string
+      user?: { id?: number; email?: string; password?: string }
+    }
     expect(typeof body.token).toBe('string')
+    expect(typeof body.refreshToken).toBe('string')
     expect(body.user?.id).toBe(20)
     expect(body.user?.email).toBe('invitee@example.com')
     expect(body.user).not.toHaveProperty('password')
