@@ -23,6 +23,7 @@ permissionMode: acceptEdits
 - **Zod schema命名**: schemaは `***Schema`、`z.infer` 由来の型は `***SchemaType`（param系は `***ParamSchemaType`）。`***Input` / `***Param` などの別接尾語は使わない。
 - **コメント・ドキュメントは日本語**。JSDocも日本語。変数名・関数名は英語のcamelCase/PascalCase。
 - APIを追加・変更・削除した場合は、同じPRで `docs/endpoints.md`（公開APIの正本）も更新すること。
+- **migrationを伴う実装は実DBで一次検証する**: `prisma migrate dev` でローカルDBへ適用し、非自明なデータ層（transaction・条件付き更新・一意制約・外部キー等）は実DB smoke（実APIへのHTTPリクエスト / repository・serviceを呼ぶ使い捨てスクリプト / `psql` 等）で挙動を確認して結果を報告すること。使い捨てスクリプトはコミットせず、検証データは削除する。詳細はCLAUDE.md「migrationを含む変更の実DB検証」を参照。
 
 ## 実装の進め方
 
