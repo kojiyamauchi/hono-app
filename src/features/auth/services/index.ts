@@ -1,11 +1,37 @@
-import type { AuthResult } from '@/shared/auth/dtos'
-import { issueAuthToken } from '@/shared/auth/services'
+import type { RefreshableAuthResult } from '@/shared/auth/dtos'
+import { refreshTokenRepository } from '@/shared/auth/repositories'
+import { hashRefreshToken, issueAuthToken, issueRefreshToken } from '@/shared/auth/services'
 import type { UserResponse } from '@/shared/user/dtos'
+import type { User } from '@/shared/user/entities'
 import { toUserResponse } from '@/shared/user/mappers'
 import { userRepository } from '@/shared/user/repositories'
 import { AppError } from '@/utils/errors'
 
 import type { LoginSchemaType, SignupSchemaType } from '../schemas'
+
+/**
+ * アクセストークンと新しいfamilyのリフレッシュトークンを発行する。
+ */
+const issueAuthentication = async (user: User): Promise<RefreshableAuthResult> => {
+  const refreshToken = issueRefreshToken()
+  await refreshTokenRepository.create({
+    userId: user.id,
+    familyId: refreshToken.familyId,
+    tokenHash: refreshToken.tokenHash,
+    expiresAt: refreshToken.expiresAt,
+  })
+
+  return {
+    token: await issueAuthToken(user.id),
+    refreshToken: refreshToken.token,
+    user: toUserResponse(user),
+  }
+}
+
+/**
+ * リフレッシュトークンが無効な場合の共通エラーを生成する。
+ */
+const invalidRefreshTokenError = (): AppError => new AppError(401, 'リフレッシュトークンが無効です')
 
 /**
  * 認証に関するビジネスロジック。
@@ -14,7 +40,7 @@ export const authService = {
   /**
    * サインアップ。メール重複を確認し、パスワードをハッシュ化して登録する。
    */
-  signup: async (input: SignupSchemaType): Promise<AuthResult> => {
+  signup: async (input: SignupSchemaType): Promise<RefreshableAuthResult> => {
     const existing = await userRepository.findByEmail(input.email)
     if (existing) {
       throw new AppError(409, 'このメールアドレスは既に登録されています')
@@ -27,14 +53,13 @@ export const authService = {
       password: hashedPassword,
     })
 
-    const token = await issueAuthToken(user.id)
-    return { token, user: toUserResponse(user) }
+    return issueAuthentication(user)
   },
 
   /**
    * ログイン。メールでユーザーを引き、パスワードを検証してトークンを発行する。
    */
-  login: async (input: LoginSchemaType): Promise<AuthResult> => {
+  login: async (input: LoginSchemaType): Promise<RefreshableAuthResult> => {
     const user = await userRepository.findByEmail(input.email)
     if (!user) {
       throw new AppError(401, 'メールアドレスまたはパスワードが正しくありません')
@@ -45,8 +70,61 @@ export const authService = {
       throw new AppError(401, 'メールアドレスまたはパスワードが正しくありません')
     }
 
-    const token = await issueAuthToken(user.id)
-    return { token, user: toUserResponse(user) }
+    return issueAuthentication(user)
+  },
+
+  /**
+   * リフレッシュトークンをローテーションして新しい認証結果を返す。
+   */
+  refresh: async (token: string): Promise<RefreshableAuthResult> => {
+    const current = await refreshTokenRepository.findByTokenHash(hashRefreshToken(token))
+    if (!current) {
+      throw invalidRefreshTokenError()
+    }
+
+    if (current.revokedAt) {
+      await refreshTokenRepository.revokeFamily(current.familyId)
+      throw invalidRefreshTokenError()
+    }
+
+    if (current.expiresAt <= new Date()) {
+      await refreshTokenRepository.revokeById(current.id)
+      throw invalidRefreshTokenError()
+    }
+
+    const user = await userRepository.findById(current.userId)
+    if (!user) {
+      await refreshTokenRepository.revokeFamily(current.familyId)
+      throw invalidRefreshTokenError()
+    }
+
+    const next = issueRefreshToken(current.familyId)
+    const rotated = await refreshTokenRepository.rotate(current.id, {
+      userId: current.userId,
+      familyId: next.familyId,
+      tokenHash: next.tokenHash,
+      expiresAt: next.expiresAt,
+    })
+
+    if (rotated.status === 'REUSED') {
+      throw invalidRefreshTokenError()
+    }
+
+    return {
+      token: await issueAuthToken(user.id),
+      refreshToken: next.token,
+      user: toUserResponse(user),
+    }
+  },
+
+  /**
+   * リフレッシュトークンのfamilyを失効させる。存在しない場合も成功として扱う。
+   */
+  logout: async (token: string): Promise<void> => {
+    const current = await refreshTokenRepository.findByTokenHash(hashRefreshToken(token))
+    if (current) {
+      await refreshTokenRepository.revokeFamily(current.familyId)
+    }
   },
 
   /**
