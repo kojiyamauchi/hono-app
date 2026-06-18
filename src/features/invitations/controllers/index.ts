@@ -8,6 +8,15 @@ import { invitationsService } from '../services'
  */
 export const invitationsController = {
   /**
+   * 招待トークンから招待詳細を取得する。200でInvitationDetailResponseを返す。
+   * 認証不要・読み取り専用。
+   */
+  getDetail: async (c: Context, token: string): Promise<Response> => {
+    const result = await invitationsService.getDetailByToken(token)
+    return c.json(result, 200)
+  },
+
+  /**
    * 招待を受諾してメンバーになる。201でMemberResponseを返す。
    */
   accept: async (c: Context, userId: number, input: AcceptInvitationBodySchemaType): Promise<Response> => {
