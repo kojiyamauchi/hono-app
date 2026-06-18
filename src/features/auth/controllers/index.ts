@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 
-import type { LoginSchemaType, SignupSchemaType } from '../schemas'
+import type { LoginSchemaType, RefreshTokenBodySchemaType, SignupSchemaType } from '../schemas'
 import { authService } from '../services'
 
 /**
@@ -22,6 +22,22 @@ export const authController = {
   login: async (c: Context, input: LoginSchemaType): Promise<Response> => {
     const result = await authService.login(input)
     return c.json(result, 200)
+  },
+
+  /**
+   * リフレッシュトークンをローテーションし、200で新しい認証結果を返す。
+   */
+  refresh: async (c: Context, input: RefreshTokenBodySchemaType): Promise<Response> => {
+    const result = await authService.refresh(input.refreshToken)
+    return c.json(result, 200)
+  },
+
+  /**
+   * リフレッシュトークンのfamilyを失効し、204を返す。
+   */
+  logout: async (c: Context, input: RefreshTokenBodySchemaType): Promise<Response> => {
+    await authService.logout(input.refreshToken)
+    return c.body(null, 204)
   },
 
   /**
