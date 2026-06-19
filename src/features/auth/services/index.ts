@@ -1,4 +1,4 @@
-import type { RefreshableAuthResult } from '@/shared/auth/dtos'
+import type { IssuedAuthTokens } from '@/shared/auth/dtos'
 import { refreshTokenRepository } from '@/shared/auth/repositories'
 import { hashRefreshToken, issueAuthToken, issueRefreshToken } from '@/shared/auth/services'
 import type { UserResponse } from '@/shared/user/dtos'
@@ -12,7 +12,7 @@ import type { LoginSchemaType, SignupSchemaType } from '../schemas'
 /**
  * アクセストークンと新しいfamilyのリフレッシュトークンを発行する。
  */
-const issueAuthentication = async (user: User): Promise<RefreshableAuthResult> => {
+const issueAuthentication = async (user: User): Promise<IssuedAuthTokens> => {
   const token = await issueAuthToken(user.id)
   const refreshToken = issueRefreshToken()
   await refreshTokenRepository.create({
@@ -41,7 +41,7 @@ export const authService = {
   /**
    * サインアップ。メール重複を確認し、パスワードをハッシュ化して登録する。
    */
-  signup: async (input: SignupSchemaType): Promise<RefreshableAuthResult> => {
+  signup: async (input: SignupSchemaType): Promise<IssuedAuthTokens> => {
     const existing = await userRepository.findByEmail(input.email)
     if (existing) {
       throw new AppError(409, 'このメールアドレスは既に登録されています')
@@ -60,7 +60,7 @@ export const authService = {
   /**
    * ログイン。メールでユーザーを引き、パスワードを検証してトークンを発行する。
    */
-  login: async (input: LoginSchemaType): Promise<RefreshableAuthResult> => {
+  login: async (input: LoginSchemaType): Promise<IssuedAuthTokens> => {
     const user = await userRepository.findByEmail(input.email)
     if (!user) {
       throw new AppError(401, 'メールアドレスまたはパスワードが正しくありません')
@@ -77,7 +77,7 @@ export const authService = {
   /**
    * リフレッシュトークンをローテーションして新しい認証結果を返す。
    */
-  refresh: async (token: string): Promise<RefreshableAuthResult> => {
+  refresh: async (token: string): Promise<IssuedAuthTokens> => {
     const current = await refreshTokenRepository.findByTokenHash(hashRefreshToken(token))
     if (!current) {
       throw invalidRefreshTokenError()

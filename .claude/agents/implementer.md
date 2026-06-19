@@ -30,7 +30,9 @@ permissionMode: acceptEdits
 レイヤード順で「実装 → そのテスト」をペアで刻むこと。コミットの標準順は CLAUDE.md「feature実装時の標準コミット粒度」に従う（順序の正本は CLAUDE.md。番号付きの順序はそちらを参照すること）。
 
 - 「実装 → そのテスト」は必ず隣接させ、間に別レイヤーのコミットを挟まないこと。
-- 役割の異なる変更（`DTO + mapper + repository` や `service + schema + controller + routes`）を1コミットに混ぜないこと。
+- 役割の異なる変更（`DTO + mapper + repository` や `service + schema + controller + routes`）を1コミットに混ぜないこと。**特に controller と routes は必ず別コミットにする**（同一コミットへまとめない）。
+- 新規に追加する実装には、その振る舞いを確認するテストを**同じ流れで隣接コミット**すること。これは feature のレイヤーだけでなく、**middleware・`app.ts` の CORS などの横断的な追加にも適用**する（実装だけ先にコミットしてテストを後回しにしない）。
+- **コミット前の自己点検**: 各コミットが触る標準ディレクトリ（`controllers/` / `routes/` / `services/` / `schemas/` など）を確認し、**1コミットが複数レイヤーを跨いでいないか**、**実装コミットに対応テストが隣接しているか**を `git log` / `git show --stat` で点検してから完了とすること。
 - 薄いcontrollerや単純なrepositoryなど単体テストの効果が低い箇所はテストを省略してよいが、その場合はserviceテストまたはroute統合テストで振る舞いを担保すること。
 - テストはDB非依存にする（`mock.module` でrepository/clientをモックし、CIがDBなしで通るようにする）。
 

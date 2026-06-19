@@ -75,6 +75,15 @@ gh pr diff <PR番号>
 - テストの必要性
 - 潜在的なバグ
 
+#### コミット粒度の確認（push前・必須）
+
+CLAUDE.md「コミットの粒度」「feature実装時の標準コミット粒度」に従っているかを、`git log --oneline origin/main..HEAD` と `git show --stat <commit>` で**1コミットずつ**確認する。詳細・原則はCLAUDE.mdを正本とする。
+
+- **レイヤー混在がないか**: 1コミットが複数の標準レイヤーを跨いでいないか（特に `controllers/` と `routes/` を同一コミットに混ぜていないか、`DTO + mapper + repository` をまとめていないか）。
+- **実装→テストの隣接**: 新規実装コミットに対応するテストが同一または隣接コミットにあるか。middleware・`app.ts`（CORS等）の横断的な追加にもテストがあるか。
+- **review対応コミット**: 指摘ごと・関心事ごとに分かれているか。
+- 逸脱を見つけたら、Suggestions/Issues として指摘する（重大度に応じて分類）。実装者由来（implementer委譲）のPRでは特に見落としやすいため必ず確認する。
+
 #### migrationを含むPRの実DB検証
 
 テスト/CIはDB非依存のため、migrationの適用や実DB挙動はCIで検証されない。migrationを含むPRでは、CLAUDE.md「migrationを含む変更の実DB検証」に従って確認する。詳細・原則はCLAUDE.mdを正本とし、ここでは手順の要点のみ示す。

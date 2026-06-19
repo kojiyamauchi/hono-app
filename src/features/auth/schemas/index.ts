@@ -17,13 +17,5 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'パスワードは必須です'),
 })
 
-/**
- * リフレッシュトークン入力のバリデーションスキーマ。
- */
-export const refreshTokenBodySchema = z.object({
-  refreshToken: z.string().min(1, 'リフレッシュトークンは必須です'),
-})
-
 export type SignupSchemaType = z.infer<typeof signupSchema>
 export type LoginSchemaType = z.infer<typeof loginSchema>
-export type RefreshTokenBodySchemaType = z.infer<typeof refreshTokenBodySchema>

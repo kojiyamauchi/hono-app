@@ -1,7 +1,7 @@
 import type { UserResponse } from '@/shared/user/dtos'
 
 /**
- * 認証結果のAPIレスポンス表現。
+ * 認証結果の公開HTTPレスポンス表現。アクセストークンとユーザー情報のみ含む。
  */
 export type AuthResult = {
   token: string
@@ -9,8 +9,9 @@ export type AuthResult = {
 }
 
 /**
- * 自前認証でリフレッシュトークンを含めて返す認証結果。
+ * 自前認証における内部発行結果。アクセストークン・リフレッシュトークン・ユーザー情報を含む。
+ * controllerでリフレッシュトークンをCookieへ設定し、bodyにはAuthResultのみ返す。
  */
-export type RefreshableAuthResult = AuthResult & {
+export type IssuedAuthTokens = AuthResult & {
   refreshToken: string
 }
