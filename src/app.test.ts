@@ -37,11 +37,13 @@ describe('CORS（資格情報付き）', () => {
       headers: {
         Origin: 'http://localhost:3000',
         'Access-Control-Request-Method': 'POST',
+        'Access-Control-Request-Headers': 'Content-Type',
       },
     })
 
     expect(response.headers.get('Access-Control-Allow-Origin')).toBe('http://localhost:3000')
     expect(response.headers.get('Access-Control-Allow-Credentials')).toBe('true')
+    expect(response.headers.get('Access-Control-Allow-Headers')).toContain('Content-Type')
   })
 
   test('未許可OriginのpreflightにはAllow-Originを返さない', async () => {
@@ -50,9 +52,10 @@ describe('CORS（資格情報付き）', () => {
       headers: {
         Origin: 'http://evil.example',
         'Access-Control-Request-Method': 'POST',
+        'Access-Control-Request-Headers': 'Content-Type',
       },
     })
 
-    expect(response.headers.get('Access-Control-Allow-Origin')).not.toBe('http://evil.example')
+    expect(response.headers.get('Access-Control-Allow-Origin')).toBeNull()
   })
 })
