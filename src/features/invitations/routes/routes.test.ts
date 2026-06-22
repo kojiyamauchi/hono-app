@@ -13,6 +13,7 @@ const createRefreshToken = mock()
 
 await mock.module('@/shared/auth/repositories', () => ({
   refreshTokenRepository: { create: createRefreshToken },
+  passwordResetTokenRepository: {},
 }))
 
 // repositoryをモックしDB非依存でroute統合を検証する

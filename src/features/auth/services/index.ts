@@ -1,6 +1,13 @@
 import type { IssuedAuthTokens } from '@/shared/auth/dtos'
-import { refreshTokenRepository } from '@/shared/auth/repositories'
-import { hashRefreshToken, issueAuthToken, issueRefreshToken } from '@/shared/auth/services'
+import { passwordResetTokenRepository, refreshTokenRepository } from '@/shared/auth/repositories'
+import {
+  hashPasswordResetToken,
+  hashRefreshToken,
+  issueAuthToken,
+  issuePasswordResetToken,
+  issueRefreshToken,
+  passwordResetNotifier,
+} from '@/shared/auth/services'
 import type { UserResponse } from '@/shared/user/dtos'
 import type { User } from '@/shared/user/entities'
 import { toUserResponse } from '@/shared/user/mappers'
@@ -138,5 +145,54 @@ export const authService = {
       throw new AppError(404, 'ユーザーが見つかりません')
     }
     return toUserResponse(user)
+  },
+
+  /**
+   * パスワードリセット用トークンを発行し、notifierへ送信を依頼する。
+   * メールアドレスが登録済みかどうかにかかわらず、常に正常終了する（登録有無を外部に漏らさない）。
+   * 通知失敗時は発行済みトークンをbest-effortで無効化する。
+   */
+  requestPasswordReset: async (email: string): Promise<void> => {
+    const user = await userRepository.findByEmail(email)
+    if (!user) {
+      // 未登録の場合は何もせず正常終了する（登録有無を外部に漏らさない）
+      return
+    }
+
+    const issued = issuePasswordResetToken()
+    const saved = await passwordResetTokenRepository.create(user.id, issued.tokenHash, issued.expiresAt)
+
+    try {
+      await passwordResetNotifier.send({ email, token: issued.token })
+    } catch {
+      // 通知失敗時はbest-effortで「自分が発行したトークン」だけを削除する。
+      // id と tokenHash の両方を条件にし、並行requestが同じ行を更新済みの場合は削除しない。
+      // 補償削除自体の失敗は握りつぶす（best-effort）。requestは登録有無・通知/補償結果に
+      // よらず常に202で正常終了し、列挙防止のためレスポンスを変えない。
+      await passwordResetTokenRepository.deleteByIdAndTokenHash(saved.id, issued.tokenHash).catch(() => {
+        // 補償削除に失敗しても無視する（トークンは有効期限で失効する）
+      })
+    }
+  },
+
+  /**
+   * パスワードリセットトークンを検証し、新しいパスワードを設定する。
+   * トークンが無効・期限切れ・使用済みの場合はすべて同一の401エラーを返す。
+   * 成功後はアクセストークン・リフレッシュトークンを返さない（再ログインを要求する）。
+   */
+  confirmPasswordReset: async (token: string, password: string): Promise<void> => {
+    const tokenHash = hashPasswordResetToken(token)
+    const record = await passwordResetTokenRepository.findByTokenHash(tokenHash)
+
+    if (!record || record.expiresAt <= new Date() || record.usedAt !== null) {
+      throw new AppError(401, '無効なトークンです')
+    }
+
+    const hashedPassword = await Bun.password.hash(password)
+    const success = await passwordResetTokenRepository.confirm(record.id, record.userId, hashedPassword)
+
+    if (!success) {
+      throw new AppError(401, '無効なトークンです')
+    }
   },
 }

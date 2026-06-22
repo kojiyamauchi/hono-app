@@ -34,6 +34,9 @@ export const ACCESS_TOKEN_TTL_SECONDS = 15 * 60
 /** リフレッシュトークンの有効期間（14日）。 */
 export const REFRESH_TOKEN_TTL_MS = 14 * 24 * 60 * 60 * 1000
 
+/** パスワードリセットトークンの有効期間（1時間）。 */
+export const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000
+
 /** リフレッシュトークンCookieの名前。 */
 export const REFRESH_TOKEN_COOKIE_NAME = 'refreshToken'
 
@@ -97,6 +100,17 @@ export const clearRefreshTokenCookie = (c: Context): void => {
 }
 
 /**
+ * 環境変数からパスワードリセットトークンのHMAC鍵を取得する。未設定なら500エラー。
+ */
+const getPasswordResetTokenSecret = (): string => {
+  const secret = process.env.PASSWORD_RESET_TOKEN_SECRET
+  if (!secret) {
+    throw new AppError(500, 'PASSWORD_RESET_TOKEN_SECRETが設定されていません')
+  }
+  return secret
+}
+
+/**
  * 発行したリフレッシュトークンと永続化に必要な値。
  */
 export type IssuedRefreshToken = {
@@ -136,4 +150,61 @@ export const issueRefreshToken = (familyId: string = randomUUID()): IssuedRefres
     familyId,
     expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
   }
+}
+
+/**
+ * パスワードリセットトークンをHMAC-SHA256でハッシュ化する。
+ * 鍵には PASSWORD_RESET_TOKEN_SECRET を使用する。
+ */
+export const hashPasswordResetToken = (token: string): string => {
+  return createHmac('sha256', getPasswordResetTokenSecret()).update(token).digest('hex')
+}
+
+/**
+ * 発行したパスワードリセットトークンと永続化に必要な値。
+ */
+export type IssuedPasswordResetToken = {
+  token: string
+  tokenHash: string
+  expiresAt: Date
+}
+
+/**
+ * パスワードリセットトークンと永続化に必要な値を生成する。
+ * 有効期間は PASSWORD_RESET_TOKEN_TTL_MS（1時間）。
+ */
+export const issuePasswordResetToken = (): IssuedPasswordResetToken => {
+  const token = randomBytes(32).toString('base64url')
+  return {
+    token,
+    tokenHash: hashPasswordResetToken(token),
+    expiresAt: new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL_MS),
+  }
+}
+
+/**
+ * パスワードリセット通知の送信パラメータ。
+ */
+export type PasswordResetNotifierParams = {
+  email: string
+  token: string
+}
+
+/**
+ * パスワードリセット通知の境界インタフェース。
+ * 実Resend配送はIssue #44で実装する。
+ */
+export type PasswordResetNotifier = {
+  send: (params: PasswordResetNotifierParams) => Promise<void>
+}
+
+/**
+ * パスワードリセット通知のデフォルト実装（no-op）。
+ * 本番メール配送はIssue #44で差し替える。
+ * 平文トークンやメールアドレスをログへ出力しない。
+ */
+export const passwordResetNotifier: PasswordResetNotifier = {
+  send: async (_params: PasswordResetNotifierParams): Promise<void> => {
+    // no-op: 実配送は #44 で実装する
+  },
 }

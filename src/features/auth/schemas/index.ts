@@ -17,5 +17,22 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'パスワードは必須です'),
 })
 
+/**
+ * パスワードリセット要求入力のバリデーションスキーマ。
+ */
+export const requestPasswordResetSchema = z.object({
+  email: z.email('メールアドレスの形式が正しくありません'),
+})
+
+/**
+ * パスワードリセット確認入力のバリデーションスキーマ。
+ */
+export const confirmPasswordResetSchema = z.object({
+  token: z.string().min(1, 'トークンは必須です'),
+  password: z.string().min(8, 'パスワードは8文字以上で入力してください'),
+})
+
 export type SignupSchemaType = z.infer<typeof signupSchema>
 export type LoginSchemaType = z.infer<typeof loginSchema>
+export type RequestPasswordResetSchemaType = z.infer<typeof requestPasswordResetSchema>
+export type ConfirmPasswordResetSchemaType = z.infer<typeof confirmPasswordResetSchema>

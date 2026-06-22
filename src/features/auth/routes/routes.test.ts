@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, mock, test } from 'bun:test'
 
-import type { RefreshToken } from '@/shared/auth/entities'
+import type { PasswordResetToken, RefreshToken } from '@/shared/auth/entities'
 import type { User } from '@/shared/user/entities'
 
 process.env.JWT_SECRET = 'test-secret'
 process.env.REFRESH_TOKEN_SECRET = 'test-refresh-secret'
+process.env.PASSWORD_RESET_TOKEN_SECRET = 'test-password-reset-secret'
 process.env.ALLOWED_ORIGINS = 'http://localhost:3000'
 
 const create = mock()
@@ -12,16 +13,36 @@ const findByTokenHash = mock()
 const revokeById = mock()
 const revokeFamily = mock()
 const rotate = mock()
+const revokeAllByUserId = mock()
+
+const prtCreate = mock()
+const prtFindByTokenHash = mock()
+const prtDeleteById = mock()
+const prtConfirm = mock()
 
 const findByEmail = mock()
 const findById = mock()
 const createUser = mock()
 
 await mock.module('@/shared/auth/repositories', () => ({
-  refreshTokenRepository: { create, findByTokenHash, revokeById, revokeFamily, rotate },
+  refreshTokenRepository: { create, findByTokenHash, revokeById, revokeFamily, rotate, revokeAllByUserId },
+  passwordResetTokenRepository: {
+    create: prtCreate,
+    findByTokenHash: prtFindByTokenHash,
+    deleteById: prtDeleteById,
+    confirm: prtConfirm,
+  },
 }))
 await mock.module('@/shared/user/repositories', () => ({
   userRepository: { findByEmail, findById, create: createUser },
+}))
+
+// notifierをモックしてno-op実装を差し替える
+const notifierSend = mock()
+const authServicesModule = await import('@/shared/auth/services')
+await mock.module('@/shared/auth/services', () => ({
+  ...authServicesModule,
+  passwordResetNotifier: { send: notifierSend },
 }))
 
 const { app } = await import('@/app')
@@ -45,15 +66,30 @@ const refreshToken: RefreshToken = {
   createdAt: new Date('2026-06-18T00:00:00.000Z'),
 }
 
+const passwordResetToken: PasswordResetToken = {
+  id: 20,
+  userId: 1,
+  tokenHash: 'hashed-reset-token',
+  expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+  usedAt: null,
+  createdAt: new Date('2026-06-18T00:00:00.000Z'),
+}
+
 beforeEach(() => {
   create.mockReset()
   findByTokenHash.mockReset()
   revokeById.mockReset()
   revokeFamily.mockReset()
   rotate.mockReset()
+  revokeAllByUserId.mockReset()
+  prtCreate.mockReset()
+  prtFindByTokenHash.mockReset()
+  prtDeleteById.mockReset()
+  prtConfirm.mockReset()
   findByEmail.mockReset()
   findById.mockReset()
   createUser.mockReset()
+  notifierSend.mockReset()
 })
 
 describe('auth signup/login routes（Cookie設定）', () => {
@@ -242,5 +278,160 @@ describe('auth routes（Origin検証）', () => {
     })
 
     expect(response.status).toBe(200)
+  })
+})
+
+describe('POST /auth/password-reset/request', () => {
+  test('登録済みユーザーでも未登録でも同じ202を返す（登録有無を外部に漏らさない）', async () => {
+    findByEmail.mockResolvedValue(user)
+    prtCreate.mockResolvedValue(passwordResetToken)
+    notifierSend.mockResolvedValue(undefined)
+
+    const registered = await app.request('/auth/password-reset/request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'taro@example.com' }),
+    })
+
+    expect(registered.status).toBe(202)
+    const registeredBody = await registered.text()
+    expect(registeredBody).toBe('')
+
+    findByEmail.mockResolvedValue(null)
+
+    const unregistered = await app.request('/auth/password-reset/request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'notregistered@example.com' }),
+    })
+
+    expect(unregistered.status).toBe(202)
+    const unregisteredBody = await unregistered.text()
+    expect(unregisteredBody).toBe('')
+  })
+
+  test('不正なメール形式は400を返す（validationエラー統一形式）', async () => {
+    const response = await app.request('/auth/password-reset/request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'not-an-email' }),
+    })
+
+    expect(response.status).toBe(400)
+    const body = (await response.json()) as { error?: { message?: string } }
+    expect(body.error).toBeDefined()
+    expect(typeof body.error?.message).toBe('string')
+  })
+
+  test('レスポンスbodyにトークンやメールアドレスを含めない', async () => {
+    findByEmail.mockResolvedValue(user)
+    prtCreate.mockResolvedValue(passwordResetToken)
+    notifierSend.mockResolvedValue(undefined)
+
+    const response = await app.request('/auth/password-reset/request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'taro@example.com' }),
+    })
+
+    expect(response.status).toBe(202)
+    const body = await response.text()
+    expect(body).toBe('')
+  })
+})
+
+describe('POST /auth/password-reset/confirm', () => {
+  test('有効なトークンでパスワードを更新し204を返す', async () => {
+    prtFindByTokenHash.mockResolvedValue(passwordResetToken)
+    prtConfirm.mockResolvedValue(true)
+
+    const response = await app.request('/auth/password-reset/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: 'valid-reset-token', password: 'new-password-123' }),
+    })
+
+    expect(response.status).toBe(204)
+    const body = await response.text()
+    expect(body).toBe('')
+  })
+
+  test('不正なトークンは401を返す', async () => {
+    prtFindByTokenHash.mockResolvedValue(null)
+
+    const response = await app.request('/auth/password-reset/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: 'invalid-token', password: 'new-password-123' }),
+    })
+
+    expect(response.status).toBe(401)
+  })
+
+  test('期限切れトークンは401を返す', async () => {
+    prtFindByTokenHash.mockResolvedValue({ ...passwordResetToken, expiresAt: new Date(Date.now() - 1) })
+
+    const response = await app.request('/auth/password-reset/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: 'expired-token', password: 'new-password-123' }),
+    })
+
+    expect(response.status).toBe(401)
+  })
+
+  test('使用済みトークンは401を返す', async () => {
+    prtFindByTokenHash.mockResolvedValue({ ...passwordResetToken, usedAt: new Date() })
+
+    const response = await app.request('/auth/password-reset/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: 'used-token', password: 'new-password-123' }),
+    })
+
+    expect(response.status).toBe(401)
+  })
+
+  test('並行競合（confirmがfalse）は401を返す', async () => {
+    prtFindByTokenHash.mockResolvedValue(passwordResetToken)
+    prtConfirm.mockResolvedValue(false)
+
+    const response = await app.request('/auth/password-reset/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: 'concurrent-token', password: 'new-password-123' }),
+    })
+
+    expect(response.status).toBe(401)
+  })
+
+  test('成功レスポンスにトークンやユーザー情報を含めない', async () => {
+    prtFindByTokenHash.mockResolvedValue(passwordResetToken)
+    prtConfirm.mockResolvedValue(true)
+
+    const response = await app.request('/auth/password-reset/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: 'valid-reset-token', password: 'new-password-123' }),
+    })
+
+    expect(response.status).toBe(204)
+    const body = await response.text()
+    expect(body).toBe('')
+    // Cookieにリフレッシュトークンを含めない
+    expect(response.headers.get('set-cookie')).toBeNull()
+  })
+
+  test('validationエラーは統一形式の400を返す', async () => {
+    const response = await app.request('/auth/password-reset/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: '', password: 'short' }),
+    })
+
+    expect(response.status).toBe(400)
+    const body = (await response.json()) as { error?: { message?: string } }
+    expect(body.error).toBeDefined()
+    expect(typeof body.error?.message).toBe('string')
   })
 })
