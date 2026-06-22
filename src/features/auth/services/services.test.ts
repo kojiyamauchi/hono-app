@@ -17,7 +17,7 @@ const revokeAllByUserId = mock()
 
 const prtCreate = mock()
 const prtFindByTokenHash = mock()
-const prtDeleteById = mock()
+const prtDeleteByIdAndTokenHash = mock()
 const prtConfirm = mock()
 
 await mock.module('@/shared/auth/repositories', () => ({
@@ -32,7 +32,7 @@ await mock.module('@/shared/auth/repositories', () => ({
   passwordResetTokenRepository: {
     create: prtCreate,
     findByTokenHash: prtFindByTokenHash,
-    deleteById: prtDeleteById,
+    deleteByIdAndTokenHash: prtDeleteByIdAndTokenHash,
     confirm: prtConfirm,
   },
 }))
@@ -96,7 +96,7 @@ beforeEach(() => {
   findById.mockReset()
   prtCreate.mockReset()
   prtFindByTokenHash.mockReset()
-  prtDeleteById.mockReset()
+  prtDeleteByIdAndTokenHash.mockReset()
   prtConfirm.mockReset()
   notifierSend.mockReset()
 })
@@ -320,7 +320,8 @@ describe('authService.requestPasswordReset', () => {
     notifierSend.mockRejectedValue(new Error('SMTP error'))
 
     await expect(authService.requestPasswordReset('taro@example.com')).resolves.toBeUndefined()
-    expect(prtDeleteById).toHaveBeenCalledWith(savedPasswordResetToken.id)
+    // idだけでなく発行したtokenHashも条件に渡す（並行requestで後発トークンを誤削除しないため）
+    expect(prtDeleteByIdAndTokenHash).toHaveBeenCalledWith(savedPasswordResetToken.id, expect.any(String))
   })
 })
 

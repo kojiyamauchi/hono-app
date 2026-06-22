@@ -165,8 +165,9 @@ export const authService = {
     try {
       await passwordResetNotifier.send({ email, token: issued.token })
     } catch {
-      // 通知失敗時はbest-effortでトークンを削除する
-      await passwordResetTokenRepository.deleteById(saved.id)
+      // 通知失敗時はbest-effortで「自分が発行したトークン」だけを削除する。
+      // id と tokenHash の両方を条件にし、並行requestが同じ行を更新済みの場合は削除しない。
+      await passwordResetTokenRepository.deleteByIdAndTokenHash(saved.id, issued.tokenHash)
     }
   },
 

@@ -28,6 +28,7 @@ const prtCreate = mock()
 const prtFindUnique = mock()
 const prtUpdateMany = mock()
 const prtDelete = mock()
+const prtDeleteMany = mock()
 const prtUpsert = mock()
 
 await mock.module('@/libs/prisma', () => ({
@@ -38,6 +39,7 @@ await mock.module('@/libs/prisma', () => ({
       findUnique: prtFindUnique,
       updateMany: prtUpdateMany,
       delete: prtDelete,
+      deleteMany: prtDeleteMany,
       upsert: prtUpsert,
     },
     $transaction: transaction,
@@ -85,6 +87,7 @@ beforeEach(() => {
   prtFindUnique.mockReset()
   prtUpdateMany.mockReset()
   prtDelete.mockReset()
+  prtDeleteMany.mockReset()
   prtUpsert.mockReset()
 })
 
@@ -186,11 +189,19 @@ describe('passwordResetTokenRepository', () => {
     await expect(passwordResetTokenRepository.findByTokenHash('unknown-hash')).resolves.toBeNull()
   })
 
-  test('deleteByIdでトークンを削除する', async () => {
-    prtDelete.mockResolvedValue(passwordResetToken)
+  test('deleteByIdAndTokenHashはidとtokenHashが一致する行を削除する', async () => {
+    prtDeleteMany.mockResolvedValue({ count: 1 })
 
-    await expect(passwordResetTokenRepository.deleteById(20)).resolves.toBeUndefined()
-    expect(prtDelete).toHaveBeenCalledWith({ where: { id: 20 } })
+    await expect(passwordResetTokenRepository.deleteByIdAndTokenHash(20, 'reset-token-hash')).resolves.toBe(1)
+    expect(prtDeleteMany).toHaveBeenCalledWith({ where: { id: 20, tokenHash: 'reset-token-hash' } })
+  })
+
+  test('deleteByIdAndTokenHashはtokenHash不一致（別requestが更新済み）なら削除しない（count0）', async () => {
+    // 並行requestで同じ行が新しいtokenHashへ更新済みの場合、後発トークンを保護する
+    prtDeleteMany.mockResolvedValue({ count: 0 })
+
+    await expect(passwordResetTokenRepository.deleteByIdAndTokenHash(20, 'old-token-hash')).resolves.toBe(0)
+    expect(prtDeleteMany).toHaveBeenCalledWith({ where: { id: 20, tokenHash: 'old-token-hash' } })
   })
 
   test('confirmで未使用トークンを消費し、パスワード更新・全refresh失効を原子的に行う', async () => {

@@ -122,10 +122,14 @@ export const passwordResetTokenRepository = {
   /**
    * IDでパスワードリセットトークンを無効化（削除）する。通知失敗時の補償処理に使用する。
    */
-  deleteById: async (id: number): Promise<void> => {
-    await prisma.passwordResetToken.delete({ where: { id } }).catch(() => {
-      // best-effort: 既に削除済みの場合は無視する
+  deleteByIdAndTokenHash: async (id: number, tokenHash: string): Promise<number> => {
+    // id だけでなく tokenHash の一致も条件にする。createがuserId基準のupsertで行IDを
+    // 再利用するため、別requestが同じ行を新しいtokenHashへ更新済みの場合は削除件数0となり、
+    // 後発の有効なトークンを誤って削除しない（通知失敗時の補償の安全化）。
+    const result = await prisma.passwordResetToken.deleteMany({
+      where: { id, tokenHash },
     })
+    return result.count
   },
 
   /**
