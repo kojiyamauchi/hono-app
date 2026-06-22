@@ -323,6 +323,17 @@ describe('authService.requestPasswordReset', () => {
     // idだけでなく発行したtokenHashも条件に渡す（並行requestで後発トークンを誤削除しないため）
     expect(prtDeleteByIdAndTokenHash).toHaveBeenCalledWith(savedPasswordResetToken.id, expect.any(String))
   })
+
+  test('補償削除自体が失敗してもrequestは正常終了する（best-effort）', async () => {
+    findByEmail.mockResolvedValue(user)
+    prtCreate.mockResolvedValue(savedPasswordResetToken)
+    notifierSend.mockRejectedValue(new Error('SMTP error'))
+    prtDeleteByIdAndTokenHash.mockRejectedValue(new Error('DB error'))
+
+    // 補償削除の例外を握りつぶし、エンドポイントは202相当の正常終了を維持する
+    await expect(authService.requestPasswordReset('taro@example.com')).resolves.toBeUndefined()
+    expect(prtDeleteByIdAndTokenHash).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('authService.confirmPasswordReset', () => {
