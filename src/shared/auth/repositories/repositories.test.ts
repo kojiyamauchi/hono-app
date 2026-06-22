@@ -10,6 +10,7 @@ const transactionUpdateMany = mock()
 const prtTransactionCreate = mock()
 const prtTransactionFindUnique = mock()
 const prtTransactionUpdateMany = mock()
+const prtTransactionDeleteMany = mock()
 const userTransactionUpdate = mock()
 const transaction = mock(async (callback: (tx: unknown) => Promise<unknown>) =>
   callback({
@@ -18,6 +19,7 @@ const transaction = mock(async (callback: (tx: unknown) => Promise<unknown>) =>
       create: prtTransactionCreate,
       findUnique: prtTransactionFindUnique,
       updateMany: prtTransactionUpdateMany,
+      deleteMany: prtTransactionDeleteMany,
     },
     user: { update: userTransactionUpdate },
   }),
@@ -153,18 +155,17 @@ describe('refreshTokenRepository', () => {
 })
 
 describe('passwordResetTokenRepository', () => {
-  test('createでトークンを作成し、旧未使用トークンを無効化する', async () => {
-    prtTransactionUpdateMany.mockResolvedValue({ count: 1 })
+  test('createで旧トークンを全削除してから新規作成する', async () => {
+    prtTransactionDeleteMany.mockResolvedValue({ count: 1 })
     prtTransactionCreate.mockResolvedValue(passwordResetToken)
 
     const result = await passwordResetTokenRepository.create(1, 'reset-token-hash', expiresAt)
 
     expect(result).toEqual(passwordResetToken)
     expect(transaction).toHaveBeenCalledTimes(1)
-    // 旧トークンを無効化してから新規作成する
-    expect(prtTransactionUpdateMany).toHaveBeenCalledWith({
-      where: { userId: 1, usedAt: null },
-      data: { usedAt: expect.any(Date) },
+    // 同一ユーザーの旧トークンを全削除してから新規作成する（レコード無制限増加の防止）
+    expect(prtTransactionDeleteMany).toHaveBeenCalledWith({
+      where: { userId: 1 },
     })
     expect(prtTransactionCreate).toHaveBeenCalledWith({
       data: { userId: 1, tokenHash: 'reset-token-hash', expiresAt },
@@ -200,8 +201,9 @@ describe('passwordResetTokenRepository', () => {
 
     expect(result).toBe(true)
     expect(transaction).toHaveBeenCalledTimes(1)
+    // 未使用かつ有効期限内のみ消費する条件になっている
     expect(prtTransactionUpdateMany).toHaveBeenCalledWith({
-      where: { id: 20, usedAt: null },
+      where: { id: 20, usedAt: null, expiresAt: { gt: expect.any(Date) } },
       data: { usedAt: expect.any(Date) },
     })
     expect(userTransactionUpdate).toHaveBeenCalledWith({
@@ -214,7 +216,7 @@ describe('passwordResetTokenRepository', () => {
     })
   })
 
-  test('confirmで既に消費済みのトークンの場合はfalseを返す', async () => {
+  test('confirmで期限切れ・使用済み・並行競合（条件不一致でcount0）はfalseを返し副作用なし', async () => {
     prtTransactionUpdateMany.mockResolvedValue({ count: 0 })
 
     const result = await passwordResetTokenRepository.confirm(20, 1, 'new-hashed-password')

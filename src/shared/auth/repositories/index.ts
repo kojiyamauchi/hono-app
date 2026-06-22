@@ -1,3 +1,4 @@
+import type { Prisma } from '@/generated/prisma/client'
 import { prisma } from '@/libs/prisma'
 import type { PasswordResetToken, RefreshToken } from '@/shared/auth/entities'
 
@@ -83,8 +84,8 @@ export const refreshTokenRepository = {
   /**
    * 指定ユーザーの全未失効リフレッシュトークンを失効させる。
    */
-  revokeAllByUserId: async (userId: number): Promise<number> => {
-    const result = await prisma.refreshToken.updateMany({
+  revokeAllByUserId: async (userId: number, client: Prisma.TransactionClient = prisma): Promise<number> => {
+    const result = await client.refreshToken.updateMany({
       where: { userId, revokedAt: null },
       data: { revokedAt: new Date() },
     })
@@ -102,10 +103,10 @@ export const passwordResetTokenRepository = {
    */
   create: async (userId: number, tokenHash: string, expiresAt: Date): Promise<PasswordResetToken> => {
     return prisma.$transaction(async (tx) => {
-      // 同一ユーザーの未使用・未失効の旧トークンを無効化する
-      await tx.passwordResetToken.updateMany({
-        where: { userId, usedAt: null },
-        data: { usedAt: new Date() },
+      // 同一ユーザーの旧トークン（未使用・使用済み・期限切れ含む）を削除し、常時1ユーザー1行程度に保つ。
+      // 未認証requestの繰り返しでレコードが無制限に増える経路を防ぐ。
+      await tx.passwordResetToken.deleteMany({
+        where: { userId },
       })
 
       return tx.passwordResetToken.create({
@@ -137,9 +138,11 @@ export const passwordResetTokenRepository = {
    */
   confirm: async (tokenId: number, userId: number, hashedPassword: string): Promise<boolean> => {
     return prisma.$transaction(async (tx) => {
-      // 条件付き更新でトークンを消費する（並行実行時の二重使用を防ぐ）
+      // 条件付き更新でトークンを消費する。未使用かつ有効期限内のみ消費し、
+      // 期限切れ・使用済み・並行競合をすべて count===0（false）へ畳み込む。
+      // serviceの事前チェックとtransaction開始の間に期限を跨いでも、ここで原子的に弾く。
       const consumed = await tx.passwordResetToken.updateMany({
-        where: { id: tokenId, usedAt: null },
+        where: { id: tokenId, usedAt: null, expiresAt: { gt: new Date() } },
         data: { usedAt: new Date() },
       })
 
@@ -153,11 +156,8 @@ export const passwordResetTokenRepository = {
         data: { password: hashedPassword },
       })
 
-      // 同一トランザクション内で全リフレッシュトークンを失効させる
-      await tx.refreshToken.updateMany({
-        where: { userId, revokedAt: null },
-        data: { revokedAt: new Date() },
-      })
+      // 同一トランザクション内で全リフレッシュトークンを失効させる（同じtxへ参加させる）
+      await refreshTokenRepository.revokeAllByUserId(userId, tx)
 
       return true
     })
