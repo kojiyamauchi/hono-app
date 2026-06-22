@@ -318,6 +318,7 @@ describe('authService.requestPasswordReset', () => {
     findByEmail.mockResolvedValue(user)
     prtCreate.mockResolvedValue(savedPasswordResetToken)
     notifierSend.mockRejectedValue(new Error('SMTP error'))
+    prtDeleteByIdAndTokenHash.mockResolvedValue(1)
 
     await expect(authService.requestPasswordReset('taro@example.com')).resolves.toBeUndefined()
     // idだけでなく発行したtokenHashも条件に渡す（並行requestで後発トークンを誤削除しないため）

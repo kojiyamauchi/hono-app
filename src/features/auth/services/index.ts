@@ -169,11 +169,9 @@ export const authService = {
       // id と tokenHash の両方を条件にし、並行requestが同じ行を更新済みの場合は削除しない。
       // 補償削除自体の失敗は握りつぶす（best-effort）。requestは登録有無・通知/補償結果に
       // よらず常に202で正常終了し、列挙防止のためレスポンスを変えない。
-      try {
-        await passwordResetTokenRepository.deleteByIdAndTokenHash(saved.id, issued.tokenHash)
-      } catch {
+      await passwordResetTokenRepository.deleteByIdAndTokenHash(saved.id, issued.tokenHash).catch(() => {
         // 補償削除に失敗しても無視する（トークンは有効期限で失効する）
-      }
+      })
     }
   },
 
