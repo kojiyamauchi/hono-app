@@ -1,17 +1,24 @@
 import { beforeEach, describe, expect, mock, test } from 'bun:test'
 
-import type { RefreshToken } from '@/shared/auth/entities'
+import type { PasswordResetToken, RefreshToken } from '@/shared/auth/entities'
 import type { User } from '@/shared/user/entities'
 
 // JWT発行に必要なシークレットをテスト用に設定
 process.env.JWT_SECRET = 'test-secret'
 process.env.REFRESH_TOKEN_SECRET = 'test-refresh-secret'
+process.env.PASSWORD_RESET_TOKEN_SECRET = 'test-password-reset-secret'
 
 const createRefreshToken = mock()
 const findByTokenHash = mock()
 const revokeById = mock()
 const revokeFamily = mock()
 const rotate = mock()
+const revokeAllByUserId = mock()
+
+const prtCreate = mock()
+const prtFindByTokenHash = mock()
+const prtDeleteById = mock()
+const prtConfirm = mock()
 
 await mock.module('@/shared/auth/repositories', () => ({
   refreshTokenRepository: {
@@ -20,7 +27,24 @@ await mock.module('@/shared/auth/repositories', () => ({
     revokeById,
     revokeFamily,
     rotate,
+    revokeAllByUserId,
   },
+  passwordResetTokenRepository: {
+    create: prtCreate,
+    findByTokenHash: prtFindByTokenHash,
+    deleteById: prtDeleteById,
+    confirm: prtConfirm,
+  },
+}))
+
+// notifierをモックしてno-op実装を差し替える
+const notifierSend = mock()
+
+// shared/auth/servicesの実装関数はそのまま使い、passwordResetNotifierのみ差し替える
+const authServicesModule = await import('@/shared/auth/services')
+await mock.module('@/shared/auth/services', () => ({
+  ...authServicesModule,
+  passwordResetNotifier: { send: notifierSend },
 }))
 
 // userRepositoryをモックし、DBに依存せずserviceのロジックを検証する
@@ -53,13 +77,28 @@ const refreshToken: RefreshToken = {
   createdAt: new Date('2026-06-18T00:00:00.000Z'),
 }
 
+const savedPasswordResetToken: PasswordResetToken = {
+  id: 20,
+  userId: 1,
+  tokenHash: 'hashed-reset-token',
+  expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+  usedAt: null,
+  createdAt: new Date('2026-06-18T00:00:00.000Z'),
+}
+
 beforeEach(() => {
   createRefreshToken.mockReset()
   findByTokenHash.mockReset()
   revokeById.mockReset()
   revokeFamily.mockReset()
   rotate.mockReset()
+  revokeAllByUserId.mockReset()
   findById.mockReset()
+  prtCreate.mockReset()
+  prtFindByTokenHash.mockReset()
+  prtDeleteById.mockReset()
+  prtConfirm.mockReset()
+  notifierSend.mockReset()
 })
 
 describe('authService.signup', () => {
@@ -238,5 +277,101 @@ describe('authService.logout', () => {
 
     await expect(authService.logout('unknown-token')).resolves.toBeUndefined()
     expect(revokeFamily).not.toHaveBeenCalled()
+  })
+})
+
+describe('authService.requestPasswordReset', () => {
+  test('登録済みユーザーへトークンを発行し、notifierへ送信を依頼する', async () => {
+    findByEmail.mockResolvedValue(user)
+    prtCreate.mockResolvedValue(savedPasswordResetToken)
+    notifierSend.mockResolvedValue(undefined)
+
+    await expect(authService.requestPasswordReset('taro@example.com')).resolves.toBeUndefined()
+    expect(prtCreate).toHaveBeenCalledTimes(1)
+    expect(notifierSend).toHaveBeenCalledTimes(1)
+  })
+
+  test('未登録メールアドレスの場合は何もせず正常終了する（登録有無を外部に漏らさない）', async () => {
+    findByEmail.mockResolvedValue(null)
+
+    await expect(authService.requestPasswordReset('notregistered@example.com')).resolves.toBeUndefined()
+    expect(prtCreate).not.toHaveBeenCalled()
+    expect(notifierSend).not.toHaveBeenCalled()
+  })
+
+  test('DBへ平文トークンを保存しない（ハッシュ値を保存する）', async () => {
+    findByEmail.mockResolvedValue(user)
+    prtCreate.mockResolvedValue(savedPasswordResetToken)
+    notifierSend.mockResolvedValue(undefined)
+
+    await authService.requestPasswordReset('taro@example.com')
+
+    const [_userId, tokenHash] = prtCreate.mock.calls[0] as [number, string, Date]
+    // notifierへ渡すtokenはprtCreateへ渡すtokenHashと一致しない（ハッシュされている）
+    const sentParams = notifierSend.mock.calls[0][0] as { token: string }
+    expect(tokenHash).not.toBe(sentParams.token)
+    // tokenHashは空文字でない
+    expect(tokenHash.length).toBeGreaterThan(0)
+  })
+
+  test('通知失敗時はbest-effortで発行済みトークンを削除する', async () => {
+    findByEmail.mockResolvedValue(user)
+    prtCreate.mockResolvedValue(savedPasswordResetToken)
+    notifierSend.mockRejectedValue(new Error('SMTP error'))
+
+    await expect(authService.requestPasswordReset('taro@example.com')).resolves.toBeUndefined()
+    expect(prtDeleteById).toHaveBeenCalledWith(savedPasswordResetToken.id)
+  })
+})
+
+describe('authService.confirmPasswordReset', () => {
+  test('有効なトークンでパスワードを更新する', async () => {
+    prtFindByTokenHash.mockResolvedValue(savedPasswordResetToken)
+    prtConfirm.mockResolvedValue(true)
+
+    await expect(authService.confirmPasswordReset('plain-reset-token', 'new-password-123')).resolves.toBeUndefined()
+    expect(prtConfirm).toHaveBeenCalledTimes(1)
+    // 平文パスワードをDB保存しない（ハッシュ化された値を渡す）
+    const [_tokenId, _userId, hashedPassword] = prtConfirm.mock.calls[0] as [number, number, string]
+    expect(hashedPassword).not.toBe('new-password-123')
+    expect(hashedPassword.length).toBeGreaterThan(0)
+  })
+
+  test('存在しないトークンは401エラーを投げる', async () => {
+    prtFindByTokenHash.mockResolvedValue(null)
+
+    await expect(authService.confirmPasswordReset('unknown-token', 'new-password-123')).rejects.toThrow('無効なトークンです')
+    expect(prtConfirm).not.toHaveBeenCalled()
+  })
+
+  test('期限切れトークンは401エラーを投げる', async () => {
+    prtFindByTokenHash.mockResolvedValue({ ...savedPasswordResetToken, expiresAt: new Date(Date.now() - 1) })
+
+    await expect(authService.confirmPasswordReset('expired-token', 'new-password-123')).rejects.toThrow('無効なトークンです')
+    expect(prtConfirm).not.toHaveBeenCalled()
+  })
+
+  test('使用済みトークンは401エラーを投げる', async () => {
+    prtFindByTokenHash.mockResolvedValue({ ...savedPasswordResetToken, usedAt: new Date() })
+
+    await expect(authService.confirmPasswordReset('used-token', 'new-password-123')).rejects.toThrow('無効なトークンです')
+    expect(prtConfirm).not.toHaveBeenCalled()
+  })
+
+  test('confirmがfalseを返した場合（並行競合）は401エラーを投げる', async () => {
+    prtFindByTokenHash.mockResolvedValue(savedPasswordResetToken)
+    prtConfirm.mockResolvedValue(false)
+
+    await expect(authService.confirmPasswordReset('concurrent-token', 'new-password-123')).rejects.toThrow('無効なトークンです')
+  })
+
+  test('confirm成功後は全refresh tokenの失効が呼ばれる（repositoryのconfirmで実行される）', async () => {
+    prtFindByTokenHash.mockResolvedValue(savedPasswordResetToken)
+    prtConfirm.mockResolvedValue(true)
+
+    await authService.confirmPasswordReset('plain-reset-token', 'new-password-123')
+
+    // confirm が success の場合、repository.confirm 内で全refresh失効が実行される
+    expect(prtConfirm).toHaveBeenCalledWith(savedPasswordResetToken.id, savedPasswordResetToken.userId, expect.any(String))
   })
 })
