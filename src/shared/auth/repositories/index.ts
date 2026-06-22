@@ -1,5 +1,5 @@
 import { prisma } from '@/libs/prisma'
-import type { RefreshToken } from '@/shared/auth/entities'
+import type { PasswordResetToken, RefreshToken } from '@/shared/auth/entities'
 
 /**
  * リフレッシュトークン作成時の入力値。
@@ -77,6 +77,89 @@ export const refreshTokenRepository = {
 
       const refreshToken = await tx.refreshToken.create({ data: input })
       return { status: 'ROTATED', refreshToken }
+    })
+  },
+
+  /**
+   * 指定ユーザーの全未失効リフレッシュトークンを失効させる。
+   */
+  revokeAllByUserId: async (userId: number): Promise<number> => {
+    const result = await prisma.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    })
+    return result.count
+  },
+}
+
+/**
+ * パスワードリセットトークンのデータアクセスを提供するリポジトリ。
+ */
+export const passwordResetTokenRepository = {
+  /**
+   * パスワードリセットトークンを作成する。
+   * 同一ユーザーの未使用・未失効の旧トークンを同一トランザクション内で無効化してから作成する。
+   */
+  create: async (userId: number, tokenHash: string, expiresAt: Date): Promise<PasswordResetToken> => {
+    return prisma.$transaction(async (tx) => {
+      // 同一ユーザーの未使用・未失効の旧トークンを無効化する
+      await tx.passwordResetToken.updateMany({
+        where: { userId, usedAt: null },
+        data: { usedAt: new Date() },
+      })
+
+      return tx.passwordResetToken.create({
+        data: { userId, tokenHash, expiresAt },
+      })
+    })
+  },
+
+  /**
+   * ハッシュ値でパスワードリセットトークンを取得する。
+   */
+  findByTokenHash: async (tokenHash: string): Promise<PasswordResetToken | null> => {
+    return prisma.passwordResetToken.findUnique({ where: { tokenHash } })
+  },
+
+  /**
+   * IDでパスワードリセットトークンを無効化（削除）する。通知失敗時の補償処理に使用する。
+   */
+  deleteById: async (id: number): Promise<void> => {
+    await prisma.passwordResetToken.delete({ where: { id } }).catch(() => {
+      // best-effort: 既に削除済みの場合は無視する
+    })
+  },
+
+  /**
+   * トークン消費・パスワード更新・全リフレッシュトークン失効を原子的に行う。
+   * 並行実行時に1件だけ成功するよう条件付き updateMany でトークンを消費する。
+   * 戻り値が false の場合はトークンが既に消費済みまたは並行競合を示す。
+   */
+  confirm: async (tokenId: number, userId: number, hashedPassword: string): Promise<boolean> => {
+    return prisma.$transaction(async (tx) => {
+      // 条件付き更新でトークンを消費する（並行実行時の二重使用を防ぐ）
+      const consumed = await tx.passwordResetToken.updateMany({
+        where: { id: tokenId, usedAt: null },
+        data: { usedAt: new Date() },
+      })
+
+      if (consumed.count === 0) {
+        return false
+      }
+
+      // パスワードを更新する
+      await tx.user.update({
+        where: { id: userId },
+        data: { password: hashedPassword },
+      })
+
+      // 同一トランザクション内で全リフレッシュトークンを失効させる
+      await tx.refreshToken.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      })
+
+      return true
     })
   },
 }
