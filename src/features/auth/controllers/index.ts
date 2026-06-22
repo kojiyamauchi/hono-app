@@ -3,7 +3,7 @@ import type { Context } from 'hono'
 import { clearRefreshTokenCookie, getRefreshTokenCookie, setRefreshTokenCookie } from '@/shared/auth/services'
 import { AppError } from '@/utils/errors'
 
-import type { LoginSchemaType, SignupSchemaType } from '../schemas'
+import type { ConfirmPasswordResetSchemaType, LoginSchemaType, RequestPasswordResetSchemaType, SignupSchemaType } from '../schemas'
 import { authService } from '../services'
 
 /**
@@ -65,5 +65,23 @@ export const authController = {
   me: async (c: Context, userId: number): Promise<Response> => {
     const user = await authService.getById(userId)
     return c.json(user, 200)
+  },
+
+  /**
+   * パスワードリセット要求。
+   * 登録有無・通知成否にかかわらず202を返す。
+   */
+  requestPasswordReset: async (c: Context, input: RequestPasswordResetSchemaType): Promise<Response> => {
+    await authService.requestPasswordReset(input.email)
+    return c.body(null, 202)
+  },
+
+  /**
+   * パスワードリセット確認。
+   * トークン検証・パスワード更新成功時に204を返す。
+   */
+  confirmPasswordReset: async (c: Context, input: ConfirmPasswordResetSchemaType): Promise<Response> => {
+    await authService.confirmPasswordReset(input.token, input.password)
+    return c.body(null, 204)
   },
 }
