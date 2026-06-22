@@ -82,12 +82,10 @@ model RefreshToken {
 
 model PasswordResetToken {
   id        Int       @id @default(autoincrement())
-  userId    Int
+  userId    Int       @unique
   tokenHash String    @unique
   expiresAt DateTime
   usedAt    DateTime?
   createdAt DateTime  @default(now())
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
 }

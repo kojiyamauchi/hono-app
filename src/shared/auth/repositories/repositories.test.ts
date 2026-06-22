@@ -28,6 +28,7 @@ const prtCreate = mock()
 const prtFindUnique = mock()
 const prtUpdateMany = mock()
 const prtDelete = mock()
+const prtUpsert = mock()
 
 await mock.module('@/libs/prisma', () => ({
   prisma: {
@@ -37,6 +38,7 @@ await mock.module('@/libs/prisma', () => ({
       findUnique: prtFindUnique,
       updateMany: prtUpdateMany,
       delete: prtDelete,
+      upsert: prtUpsert,
     },
     $transaction: transaction,
   },
@@ -77,11 +79,13 @@ beforeEach(() => {
   prtTransactionCreate.mockReset()
   prtTransactionFindUnique.mockReset()
   prtTransactionUpdateMany.mockReset()
+  prtTransactionDeleteMany.mockReset()
   userTransactionUpdate.mockReset()
   prtCreate.mockReset()
   prtFindUnique.mockReset()
   prtUpdateMany.mockReset()
   prtDelete.mockReset()
+  prtUpsert.mockReset()
 })
 
 describe('refreshTokenRepository', () => {
@@ -155,20 +159,17 @@ describe('refreshTokenRepository', () => {
 })
 
 describe('passwordResetTokenRepository', () => {
-  test('createで旧トークンを全削除してから新規作成する', async () => {
-    prtTransactionDeleteMany.mockResolvedValue({ count: 1 })
-    prtTransactionCreate.mockResolvedValue(passwordResetToken)
+  test('createはuserId一意のupsertで1ユーザー1行に保つ（並行requestでも増えない）', async () => {
+    prtUpsert.mockResolvedValue(passwordResetToken)
 
     const result = await passwordResetTokenRepository.create(1, 'reset-token-hash', expiresAt)
 
     expect(result).toEqual(passwordResetToken)
-    expect(transaction).toHaveBeenCalledTimes(1)
-    // 同一ユーザーの旧トークンを全削除してから新規作成する（レコード無制限増加の防止）
-    expect(prtTransactionDeleteMany).toHaveBeenCalledWith({
+    // userId をconflict keyにしたupsert（PostgreSQLでINSERT ... ON CONFLICT DO UPDATEに展開され原子的）
+    expect(prtUpsert).toHaveBeenCalledWith({
       where: { userId: 1 },
-    })
-    expect(prtTransactionCreate).toHaveBeenCalledWith({
-      data: { userId: 1, tokenHash: 'reset-token-hash', expiresAt },
+      create: { userId: 1, tokenHash: 'reset-token-hash', expiresAt },
+      update: { tokenHash: 'reset-token-hash', expiresAt, usedAt: null },
     })
   })
 

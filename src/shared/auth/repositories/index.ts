@@ -102,16 +102,13 @@ export const passwordResetTokenRepository = {
    * 同一ユーザーの未使用・未失効の旧トークンを同一トランザクション内で無効化してから作成する。
    */
   create: async (userId: number, tokenHash: string, expiresAt: Date): Promise<PasswordResetToken> => {
-    return prisma.$transaction(async (tx) => {
-      // 同一ユーザーの旧トークン（未使用・使用済み・期限切れ含む）を削除し、常時1ユーザー1行程度に保つ。
-      // 未認証requestの繰り返しでレコードが無制限に増える経路を防ぐ。
-      await tx.passwordResetToken.deleteMany({
-        where: { userId },
-      })
-
-      return tx.passwordResetToken.create({
-        data: { userId, tokenHash, expiresAt },
-      })
+    // userId は @unique。upsert は PostgreSQL では INSERT ... ON CONFLICT DO UPDATE に
+    // コンパイルされ原子的なため、同一ユーザーへの並行requestでも常に1行に保たれる
+    // （未認証requestの繰り返しによるレコード無制限増加を防ぐ）。
+    return prisma.passwordResetToken.upsert({
+      where: { userId },
+      create: { userId, tokenHash, expiresAt },
+      update: { tokenHash, expiresAt, usedAt: null },
     })
   },
 
