@@ -3,8 +3,18 @@ import { decode } from 'hono/jwt'
 
 process.env.JWT_SECRET = 'test-jwt-secret'
 process.env.REFRESH_TOKEN_SECRET = 'test-refresh-secret'
+process.env.PASSWORD_RESET_TOKEN_SECRET = 'test-password-reset-secret'
 
-const { ACCESS_TOKEN_TTL_SECONDS, REFRESH_TOKEN_TTL_MS, hashRefreshToken, issueAuthToken, issueRefreshToken } = await import('.')
+const {
+  ACCESS_TOKEN_TTL_SECONDS,
+  REFRESH_TOKEN_TTL_MS,
+  PASSWORD_RESET_TOKEN_TTL_MS,
+  hashRefreshToken,
+  issueAuthToken,
+  issueRefreshToken,
+  hashPasswordResetToken,
+  issuePasswordResetToken,
+} = await import('.')
 
 describe('issueAuthToken', () => {
   test('15分後に期限切れになるアクセストークンを発行する', async () => {
@@ -49,5 +59,54 @@ describe('issueRefreshToken', () => {
     expect(second.familyId).toBe('family-id')
     expect(first.token).not.toBe(second.token)
     expect(first.tokenHash).not.toBe(second.tokenHash)
+  })
+})
+
+describe('hashPasswordResetToken', () => {
+  test('同じtoken/secretで同じHMAC、異なるtokenで異なるHMACを生成する', () => {
+    expect(hashPasswordResetToken('reset-token')).toBe(hashPasswordResetToken('reset-token'))
+    expect(hashPasswordResetToken('reset-token')).not.toBe(hashPasswordResetToken('other-token'))
+    expect(hashPasswordResetToken('reset-token')).toHaveLength(64)
+    expect(hashPasswordResetToken('reset-token')).not.toBe('reset-token')
+  })
+
+  test('専用鍵を使う（リフレッシュトークンのHMACとは異なる）', () => {
+    expect(hashPasswordResetToken('same-token')).not.toBe(hashRefreshToken('same-token'))
+  })
+
+  test('PASSWORD_RESET_TOKEN_SECRET未設定時はエラーを投げる', () => {
+    const original = process.env.PASSWORD_RESET_TOKEN_SECRET
+    delete process.env.PASSWORD_RESET_TOKEN_SECRET
+    try {
+      expect(() => hashPasswordResetToken('reset-token')).toThrow()
+    } finally {
+      process.env.PASSWORD_RESET_TOKEN_SECRET = original
+    }
+  })
+})
+
+describe('issuePasswordResetToken', () => {
+  test('32バイト相当のbase64urlトークンを発行し、tokenHashが対応する', () => {
+    const result = issuePasswordResetToken()
+
+    expect(result.token).toMatch(/^[A-Za-z0-9_-]{43}$/) // 32バイトのbase64url（パディングなし）
+    expect(result.tokenHash).toBe(hashPasswordResetToken(result.token))
+    expect(result.token).not.toBe(result.tokenHash)
+  })
+
+  test('連続発行でトークンが重複しない', () => {
+    const first = issuePasswordResetToken()
+    const second = issuePasswordResetToken()
+
+    expect(first.token).not.toBe(second.token)
+    expect(first.tokenHash).not.toBe(second.tokenHash)
+  })
+
+  test('発行時刻から約PASSWORD_RESET_TOKEN_TTL_MS後の有効期限を持つ', () => {
+    const before = Date.now()
+    const result = issuePasswordResetToken()
+
+    expect(result.expiresAt.getTime()).toBeGreaterThanOrEqual(before + PASSWORD_RESET_TOKEN_TTL_MS)
+    expect(result.expiresAt.getTime()).toBeLessThanOrEqual(Date.now() + PASSWORD_RESET_TOKEN_TTL_MS)
   })
 })
