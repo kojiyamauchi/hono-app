@@ -3,7 +3,7 @@ import type { Context } from 'hono'
 import { clearRefreshTokenCookie, getRefreshTokenCookie, setRefreshTokenCookie } from '@/shared/auth/services'
 import { AppError } from '@/utils/errors'
 
-import type { ConfirmPasswordResetSchemaType, LoginSchemaType, RequestPasswordResetSchemaType, SignupSchemaType } from '../schemas'
+import type { ChangePasswordSchemaType, ConfirmPasswordResetSchemaType, LoginSchemaType, RequestPasswordResetSchemaType, SignupSchemaType } from '../schemas'
 import { authService } from '../services'
 
 /**
@@ -85,6 +85,16 @@ export const authController = {
   me: async (c: Context, userId: number): Promise<Response> => {
     const user = await authService.getById(userId)
     return c.json(user, 200)
+  },
+
+  /**
+   * ログイン済みユーザーのパスワード変更。
+   * 成功時は全リフレッシュトークンが失効するため、Cookieをクリアして204を返す。
+   */
+  changePassword: async (c: Context, userId: number, input: ChangePasswordSchemaType): Promise<Response> => {
+    await authService.changePassword(userId, input.currentPassword, input.newPassword)
+    clearRefreshTokenCookie(c)
+    return c.body(null, 204)
   },
 
   /**
