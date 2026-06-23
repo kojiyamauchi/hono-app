@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { confirmPasswordResetSchema, loginSchema, requestPasswordResetSchema, signupSchema } from '.'
+import { changePasswordSchema, confirmPasswordResetSchema, loginSchema, requestPasswordResetSchema, signupSchema } from '.'
 
 describe('signupSchema', () => {
   test('正しい入力を受け付ける', () => {
@@ -93,6 +93,40 @@ describe('confirmPasswordResetSchema', () => {
 
   test('passwordが空文字なら拒否する', () => {
     const result = confirmPasswordResetSchema.safeParse({ token: 'valid-token', password: '' })
+    expect(result.success).toBe(false)
+  })
+})
+
+describe('changePasswordSchema', () => {
+  test('正しいcurrentPassword・newPasswordを受け付ける', () => {
+    const result = changePasswordSchema.safeParse({
+      currentPassword: 'current-password-123',
+      newPassword: 'new-password-123',
+    })
+    expect(result.success).toBe(true)
+  })
+
+  test('currentPasswordが空文字なら拒否する', () => {
+    const result = changePasswordSchema.safeParse({
+      currentPassword: '',
+      newPassword: 'new-password-123',
+    })
+    expect(result.success).toBe(false)
+  })
+
+  test('8文字未満のnewPasswordを拒否する', () => {
+    const result = changePasswordSchema.safeParse({
+      currentPassword: 'current-password-123',
+      newPassword: 'short',
+    })
+    expect(result.success).toBe(false)
+  })
+
+  test('currentPasswordとnewPasswordが同じなら拒否する', () => {
+    const result = changePasswordSchema.safeParse({
+      currentPassword: 'same-password-123',
+      newPassword: 'same-password-123',
+    })
     expect(result.success).toBe(false)
   })
 })
