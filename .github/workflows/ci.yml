@@ -14,6 +14,9 @@ env:
   DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
   REFRESH_TOKEN_SECRET: ci-placeholder-refresh-token-secret
   PASSWORD_RESET_TOKEN_SECRET: ci-placeholder-password-reset-token-secret
+  RESEND_API_KEY: ci-placeholder-resend-api-key
+  PASSWORD_RESET_FROM_EMAIL: ci-placeholder@example.com
+  PASSWORD_RESET_URL_BASE: https://ci-placeholder.example.com/reset-password
   SUPABASE_URL: http://127.0.0.1:54321
   SUPABASE_ANON_KEY: ci-placeholder-key
   ALLOWED_ORIGINS: http://localhost:3000

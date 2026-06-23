@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, mock, test } from 'bun:test'
+import { beforeEach, describe, expect, mock, spyOn, test } from 'bun:test'
 
 import type { PasswordResetToken, RefreshToken } from '@/shared/auth/entities'
 import type { User } from '@/shared/user/entities'
@@ -334,6 +334,28 @@ describe('authService.requestPasswordReset', () => {
     // 補償削除の例外を握りつぶし、エンドポイントは202相当の正常終了を維持する
     await expect(authService.requestPasswordReset('taro@example.com')).resolves.toBeUndefined()
     expect(prtDeleteByIdAndTokenHash).toHaveBeenCalledTimes(1)
+  })
+
+  test('配送失敗時は運用検知用ログを出力し、メール・トークンを含めない', async () => {
+    findByEmail.mockResolvedValue(user)
+    prtCreate.mockResolvedValue(savedPasswordResetToken)
+    prtDeleteByIdAndTokenHash.mockResolvedValue(1)
+    notifierSend.mockRejectedValue(new Error('Resend API error'))
+    const errorSpy = spyOn(console, 'error').mockImplementation(() => {})
+
+    try {
+      await expect(authService.requestPasswordReset('taro@example.com')).resolves.toBeUndefined()
+
+      // 配送失敗が運用検知できるようログが出ている
+      expect(errorSpy).toHaveBeenCalledTimes(1)
+      // ただしメールアドレス・平文トークンなどの機密はログに含めない
+      const sentToken = (notifierSend.mock.calls[0]?.[0] as { token: string }).token
+      const logged = JSON.stringify(errorSpy.mock.calls)
+      expect(logged).not.toContain('taro@example.com')
+      expect(logged).not.toContain(sentToken)
+    } finally {
+      errorSpy.mockRestore()
+    }
   })
 })
 

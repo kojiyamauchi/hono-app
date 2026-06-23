@@ -283,3 +283,23 @@ DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 ```
 
 For staging and production, create separate Supabase projects and set each environment's `DATABASE_URL` in the deployment platform or CI secrets.
+
+### パスワードリセットメール（本番利用に必要な設定）
+
+パスワードリセット機能を本番利用する場合、以下の環境変数を設定してください。
+
+| 環境変数 | 説明 |
+| -------- | ---- |
+| `RESEND_API_KEY` | Resend の API キー。[resend.com](https://resend.com) でアカウントを作成し発行する。 |
+| `PASSWORD_RESET_FROM_EMAIL` | パスワードリセットメールの送信元アドレス。Resend で検証済みのドメインを使用する。 |
+| `PASSWORD_RESET_URL_BASE` | フロントエンドのパスワード再設定ページの URL。`?token=...` が付与されてメール本文のリセット URL になる。 |
+
+```txt
+RESEND_API_KEY="re_your_resend_api_key"
+PASSWORD_RESET_FROM_EMAIL="noreply@your-domain.com"
+PASSWORD_RESET_URL_BASE="https://your-frontend.com/reset-password"
+```
+
+- `RESEND_API_KEY` / `PASSWORD_RESET_FROM_EMAIL` / `PASSWORD_RESET_URL_BASE` のいずれかが未設定の場合、メール送信は失敗し、発行済みのリセットトークンは補償削除されます。ただし**アカウント列挙を防ぐため、外部レスポンスは登録有無・配送成否によらず常に `202 Accepted`** を返します（配送失敗は機密を含めない形でサーバーログに記録されます）。
+- CI では Resend SDK をモックするため、実際のAPIキーは不要です。
+- Resend 受理後の非同期バウンス・迷惑メール判定・実配達失敗は補償対象外です（Resend の管理画面で確認してください）。

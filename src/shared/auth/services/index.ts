@@ -3,6 +3,7 @@ import { createHmac, randomBytes, randomUUID } from 'node:crypto'
 import type { Context } from 'hono'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import { sign } from 'hono/jwt'
+import { Resend } from 'resend'
 
 import { AppError } from '@/utils/errors'
 
@@ -199,12 +200,81 @@ export type PasswordResetNotifier = {
 }
 
 /**
- * パスワードリセット通知のデフォルト実装（no-op）。
- * 本番メール配送はIssue #44で差し替える。
- * 平文トークンやメールアドレスをログへ出力しない。
+ * 環境変数から Resend API キーを取得する。未設定なら500エラー。
+ */
+const getResendApiKey = (): string => {
+  const key = process.env.RESEND_API_KEY
+  if (!key) {
+    throw new AppError(500, 'RESEND_API_KEYが設定されていません')
+  }
+  return key
+}
+
+/**
+ * 環境変数からパスワードリセットメールの送信元アドレスを取得する。未設定なら500エラー。
+ */
+const getPasswordResetFromEmail = (): string => {
+  const from = process.env.PASSWORD_RESET_FROM_EMAIL
+  if (!from) {
+    throw new AppError(500, 'PASSWORD_RESET_FROM_EMAILが設定されていません')
+  }
+  return from
+}
+
+/**
+ * 環境変数からパスワードリセットページのベースURLを取得する。未設定なら500エラー。
+ */
+const getPasswordResetUrlBase = (): string => {
+  const urlBase = process.env.PASSWORD_RESET_URL_BASE
+  if (!urlBase) {
+    throw new AppError(500, 'PASSWORD_RESET_URL_BASEが設定されていません')
+  }
+  return urlBase
+}
+
+/**
+ * パスワードリセット通知のResend実装。
+ * Resend APIを使い、リセットURLを含むメールを送信する。
+ * 平文トークン・メールアドレス・APIキーをログへ出力しない。
+ * Resendが同期的にエラーを返した場合はthrowし、呼び出し元の補償処理を起動する。
  */
 export const passwordResetNotifier: PasswordResetNotifier = {
-  send: async (_params: PasswordResetNotifierParams): Promise<void> => {
-    // no-op: 実配送は #44 で実装する
+  send: async (params: PasswordResetNotifierParams): Promise<void> => {
+    const resend = new Resend(getResendApiKey())
+    const from = getPasswordResetFromEmail()
+    const urlBase = getPasswordResetUrlBase()
+    const resetUrl = `${urlBase}?token=${params.token}`
+    const ttlHours = PASSWORD_RESET_TOKEN_TTL_MS / (60 * 60 * 1000)
+
+    const { error } = await resend.emails.send({
+      from,
+      to: params.email,
+      subject: 'パスワード再設定のご案内',
+      text: [
+        'パスワードの再設定が申請されました。',
+        '',
+        '以下のURLからパスワードを再設定してください。',
+        resetUrl,
+        '',
+        `このURLの有効期限は${ttlHours}時間です。`,
+        '',
+        'このメールに心当たりがない場合は、操作は不要です。このメールを無視してください。',
+        'パスワードやリセット用URLを他者へ共有・返信しないでください。',
+      ].join('\n'),
+      html: [
+        '<p>パスワードの再設定が申請されました。</p>',
+        '<p>以下のURLからパスワードを再設定してください。</p>',
+        `<p><a href="${resetUrl}">${resetUrl}</a></p>`,
+        `<p>このURLの有効期限は${ttlHours}時間です。</p>`,
+        '<hr>',
+        '<p>このメールに心当たりがない場合は、操作は不要です。このメールを無視してください。</p>',
+        '<p>パスワードやリセット用URLを他者へ共有・返信しないでください。</p>',
+      ].join('\n'),
+    })
+
+    if (error) {
+      // Resend APIがエラーを返した場合はthrowし、呼び出し元の補償処理を起動する
+      throw new Error(`メール送信に失敗しました: ${error.name}`)
+    }
   },
 }
