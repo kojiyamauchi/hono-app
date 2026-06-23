@@ -12,6 +12,7 @@ process.env.ALLOWED_ORIGINS = 'http://localhost:3000'
 const createRefreshToken = mock()
 
 await mock.module('@/shared/auth/repositories', () => ({
+  authCredentialRepository: {},
   refreshTokenRepository: { create: createRefreshToken },
   passwordResetTokenRepository: {},
 }))
