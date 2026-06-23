@@ -7,6 +7,26 @@ import type { ConfirmPasswordResetSchemaType, LoginSchemaType, RequestPasswordRe
 import { authService } from '../services'
 
 /**
+ * レート制限に使うクライアントIPを取得する。
+ * x-forwarded-for は信頼できるプロキシ/CDN背後でのみ信頼する前提とし、複数値の場合は先頭を使う。
+ * IPを特定できない場合は、全クライアントを同じキーへ束ねないようundefinedを返す。
+ */
+const getClientIp = (c: Context): string | undefined => {
+  const forwardedFor = c.req.header('x-forwarded-for')
+  const forwardedIp = forwardedFor?.split(',')[0]?.trim()
+  if (forwardedIp) {
+    return forwardedIp
+  }
+
+  const realIp = c.req.header('x-real-ip')?.trim()
+  if (realIp) {
+    return realIp
+  }
+
+  return undefined
+}
+
+/**
  * 認証エンドポイントのコントローラ。
  * バリデーション済みの入力を受け取り、serviceを呼び出してレスポンスを返す。
  * リフレッシュトークンはHttpOnly CookieとしてセットしbodyにはAuthResultのみ返す。
@@ -70,9 +90,10 @@ export const authController = {
   /**
    * パスワードリセット要求。
    * 登録有無・通知成否にかかわらず202を返す。
+   * IP単位のレート制限超過時のみ429を返す。
    */
   requestPasswordReset: async (c: Context, input: RequestPasswordResetSchemaType): Promise<Response> => {
-    await authService.requestPasswordReset(input.email)
+    await authService.requestPasswordReset(input.email, getClientIp(c))
     return c.body(null, 202)
   },
 

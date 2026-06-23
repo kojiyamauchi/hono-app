@@ -365,6 +365,13 @@ git commit --allow-empty -m "initial commit."
 
 これにより、PRの起点が明確になり、以降の変更を追いやすくなる。
 
+### PR作成時の公開状態
+
+PRを作成する際、ユーザーから特段の指定がない場合は **draftではなくready/open状態** で作成すること。
+
+- draft PRにするのは、ユーザーが明示的にdraftを指定した場合、または未完了・未検証でレビュー可能状態ではないことをユーザーへ説明した場合に限定する
+- AIエージェントが誤ってdraftで作成した場合は、気づいた時点でready for reviewへ切り替えること
+
 ### GitHubへのpush
 
 ユーザーの通常のpush方法を変えないため、`origin` のURLはSSHのまま維持すること:
