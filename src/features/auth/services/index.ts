@@ -172,7 +172,13 @@ export const authService = {
 
     try {
       await passwordResetNotifier.send({ email, token: issued.token })
-    } catch {
+    } catch (error) {
+      // 配送失敗は運用が検知できるようログに残す。
+      // メールアドレス・平文トークン・APIキーなどの機密は含めず、エラー種別/メッセージのみ記録する。
+      console.error('パスワードリセットメールの配送に失敗しました', {
+        name: error instanceof Error ? error.name : 'UnknownError',
+        reason: error instanceof Error ? error.message : 'unknown',
+      })
       // 通知失敗時はbest-effortで「自分が発行したトークン」だけを削除する。
       // id と tokenHash の両方を条件にし、並行requestが同じ行を更新済みの場合は削除しない。
       // 補償削除自体の失敗は握りつぶす（best-effort）。requestは登録有無・通知/補償結果に
