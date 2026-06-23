@@ -6,7 +6,7 @@ import { originMiddleware } from '@/middlewares/origin'
 import { onValidationError } from '@/utils/validation'
 
 import { authController } from '../controllers'
-import { confirmPasswordResetSchema, loginSchema, requestPasswordResetSchema, signupSchema } from '../schemas'
+import { changePasswordSchema, confirmPasswordResetSchema, loginSchema, requestPasswordResetSchema, signupSchema } from '../schemas'
 
 /**
  * 認証関連のルート（/auth配下）。
@@ -19,6 +19,9 @@ export const authRoutes = new Hono()
   .post('/refresh', originMiddleware, (c) => authController.refresh(c))
   .post('/logout', originMiddleware, (c) => authController.logout(c))
   .get('/me', authMiddleware, (c) => authController.me(c, c.get('userId')))
+  .post('/change-password', originMiddleware, authMiddleware, zValidator('json', changePasswordSchema, onValidationError), (c) =>
+    authController.changePassword(c, c.get('userId'), c.req.valid('json')),
+  )
   .post('/password-reset/request', zValidator('json', requestPasswordResetSchema, onValidationError), (c) =>
     authController.requestPasswordReset(c, c.req.valid('json')),
   )
