@@ -327,10 +327,15 @@ describe('authService.requestPasswordReset', () => {
     prtCreate.mockResolvedValue(savedPasswordResetToken)
     notifierSend.mockRejectedValue(new Error('SMTP error'))
     prtDeleteByIdAndTokenHash.mockResolvedValue(1)
+    const errorSpy = spyOn(console, 'error').mockImplementation(() => {})
 
-    await expect(authService.requestPasswordReset('taro@example.com')).resolves.toBeUndefined()
-    // idだけでなく発行したtokenHashも条件に渡す（並行requestで後発トークンを誤削除しないため）
-    expect(prtDeleteByIdAndTokenHash).toHaveBeenCalledWith(savedPasswordResetToken.id, expect.any(String))
+    try {
+      await expect(authService.requestPasswordReset('taro@example.com')).resolves.toBeUndefined()
+      // idだけでなく発行したtokenHashも条件に渡す（並行requestで後発トークンを誤削除しないため）
+      expect(prtDeleteByIdAndTokenHash).toHaveBeenCalledWith(savedPasswordResetToken.id, expect.any(String))
+    } finally {
+      errorSpy.mockRestore()
+    }
   })
 
   test('補償削除自体が失敗してもrequestは正常終了する（best-effort）', async () => {
@@ -338,10 +343,15 @@ describe('authService.requestPasswordReset', () => {
     prtCreate.mockResolvedValue(savedPasswordResetToken)
     notifierSend.mockRejectedValue(new Error('SMTP error'))
     prtDeleteByIdAndTokenHash.mockRejectedValue(new Error('DB error'))
+    const errorSpy = spyOn(console, 'error').mockImplementation(() => {})
 
-    // 補償削除の例外を握りつぶし、エンドポイントは202相当の正常終了を維持する
-    await expect(authService.requestPasswordReset('taro@example.com')).resolves.toBeUndefined()
-    expect(prtDeleteByIdAndTokenHash).toHaveBeenCalledTimes(1)
+    try {
+      // 補償削除の例外を握りつぶし、エンドポイントは202相当の正常終了を維持する
+      await expect(authService.requestPasswordReset('taro@example.com')).resolves.toBeUndefined()
+      expect(prtDeleteByIdAndTokenHash).toHaveBeenCalledTimes(1)
+    } finally {
+      errorSpy.mockRestore()
+    }
   })
 
   test('配送失敗時は運用検知用ログを出力し、メール・トークンを含めない', async () => {
@@ -421,17 +431,22 @@ describe('authService.requestPasswordReset', () => {
     findByEmail.mockResolvedValue(user)
     prtCreate.mockResolvedValue(savedPasswordResetToken)
     notifierSend.mockResolvedValue(undefined)
+    const infoSpy = spyOn(console, 'info').mockImplementation(() => {})
 
-    await authService.requestPasswordReset('TARO@example.com')
-    await authService.requestPasswordReset('taro@example.com')
-    await authService.requestPasswordReset('taro@EXAMPLE.com')
-    prtCreate.mockClear()
-    notifierSend.mockClear()
+    try {
+      await authService.requestPasswordReset('TARO@example.com')
+      await authService.requestPasswordReset('taro@example.com')
+      await authService.requestPasswordReset('taro@EXAMPLE.com')
+      prtCreate.mockClear()
+      notifierSend.mockClear()
 
-    await expect(authService.requestPasswordReset('taro@example.com')).resolves.toBeUndefined()
+      await expect(authService.requestPasswordReset('taro@example.com')).resolves.toBeUndefined()
 
-    expect(prtCreate).not.toHaveBeenCalled()
-    expect(notifierSend).not.toHaveBeenCalled()
+      expect(prtCreate).not.toHaveBeenCalled()
+      expect(notifierSend).not.toHaveBeenCalled()
+    } finally {
+      infoSpy.mockRestore()
+    }
   })
 })
 
