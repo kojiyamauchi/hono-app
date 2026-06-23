@@ -113,12 +113,12 @@ describe('authController', () => {
     expect(requestPasswordReset).toHaveBeenCalledWith('taro@example.com', '198.51.100.20')
   })
 
-  test('password-reset/requestはIPヘッダが無い場合にunknownをserviceへ渡す', async () => {
+  test('password-reset/requestはIPヘッダが無い場合にundefinedをserviceへ渡す', async () => {
     requestPasswordReset.mockResolvedValue(undefined)
 
     const response = await app.request('/password-reset/request', { method: 'POST' })
 
     expect(response.status).toBe(202)
-    expect(requestPasswordReset).toHaveBeenCalledWith('taro@example.com', 'unknown')
+    expect(requestPasswordReset).toHaveBeenCalledWith('taro@example.com', undefined)
   })
 })

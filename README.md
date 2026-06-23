@@ -288,11 +288,11 @@ For staging and production, create separate Supabase projects and set each envir
 
 パスワードリセット機能を本番利用する場合、以下の環境変数を設定してください。
 
-| 環境変数 | 説明 |
-| -------- | ---- |
-| `RESEND_API_KEY` | Resend の API キー。[resend.com](https://resend.com) でアカウントを作成し発行する。 |
-| `PASSWORD_RESET_FROM_EMAIL` | パスワードリセットメールの送信元アドレス。Resend で検証済みのドメインを使用する。 |
-| `PASSWORD_RESET_URL_BASE` | フロントエンドのパスワード再設定ページの URL。`?token=...` が付与されてメール本文のリセット URL になる。 |
+| 環境変数                    | 説明                                                                                                     |
+| --------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `RESEND_API_KEY`            | Resend の API キー。[resend.com](https://resend.com) でアカウントを作成し発行する。                      |
+| `PASSWORD_RESET_FROM_EMAIL` | パスワードリセットメールの送信元アドレス。Resend で検証済みのドメインを使用する。                        |
+| `PASSWORD_RESET_URL_BASE`   | フロントエンドのパスワード再設定ページの URL。`?token=...` が付与されてメール本文のリセット URL になる。 |
 
 ```txt
 RESEND_API_KEY="re_your_resend_api_key"
@@ -308,14 +308,14 @@ PASSWORD_RESET_URL_BASE="https://your-frontend.com/reset-password"
 
 `POST /auth/password-reset/request` は、メール大量送信や連打を抑制するため、IP単位とemail単位のレート制限を行います。
 
-| 制限単位 | 初期値 | 超過時の外部レスポンス |
-| -------- | ------ | ---------------------- |
-| IP単位 | 15分で5回まで | `429 Too Many Requests` |
-| email単位 | 1時間で3回まで | `202 Accepted` |
+| 制限単位  | 初期値         | 超過時の外部レスポンス  |
+| --------- | -------------- | ----------------------- |
+| IP単位    | 15分で5回まで  | `429 Too Many Requests` |
+| email単位 | 1時間で3回まで | `202 Accepted`          |
 
 - email単位の制限では、アカウント列挙を防ぐため、超過時も外部レスポンスは通常の受理時と同じ `202 Accepted` を維持します。この場合、トークン発行とメール送信は行いません。
 - email単位の制限キーには、正規化したメールアドレスのHMACを使用し、平文メールアドレスをレート制限storeへ保存しません。
 - email単位の制限により送信をスキップする場合も、通常の `202 Accepted` と区別しにくいよう最低応答時間＋jitterを適用します。
 - レート制限の保存先はプロセス内メモリです。プロセス再起動でリセットされ、複数インスタンス間では共有されません。
 - インメモリstoreはTTLで期限切れエントリを掃除し、キーが残り続けないようにします。
-- `x-forwarded-for` を使うIP判定は、信頼できるプロキシ/CDN背後でのみ信頼する前提です。
+- `x-forwarded-for` を使うIP判定は、信頼できるプロキシ/CDN背後でのみ信頼する前提です。IPを特定できない場合は、全クライアントを同じキーへ束ねないようIP単位の制限をスキップします。

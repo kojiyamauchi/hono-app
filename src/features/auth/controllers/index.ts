@@ -9,8 +9,9 @@ import { authService } from '../services'
 /**
  * レート制限に使うクライアントIPを取得する。
  * x-forwarded-for は信頼できるプロキシ/CDN背後でのみ信頼する前提とし、複数値の場合は先頭を使う。
+ * IPを特定できない場合は、全クライアントを同じキーへ束ねないようundefinedを返す。
  */
-const getClientIp = (c: Context): string => {
+const getClientIp = (c: Context): string | undefined => {
   const forwardedFor = c.req.header('x-forwarded-for')
   const forwardedIp = forwardedFor?.split(',')[0]?.trim()
   if (forwardedIp) {
@@ -22,7 +23,7 @@ const getClientIp = (c: Context): string => {
     return realIp
   }
 
-  return 'unknown'
+  return undefined
 }
 
 /**
