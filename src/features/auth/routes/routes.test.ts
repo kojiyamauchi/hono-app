@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, mock, test } from 'bun:test'
+import { beforeEach, describe, expect, mock, spyOn, test } from 'bun:test'
 
 import type { PasswordResetToken, RefreshToken } from '@/shared/auth/entities'
 import type { User } from '@/shared/user/entities'
@@ -45,7 +45,13 @@ await mock.module('@/shared/auth/services', () => ({
   passwordResetNotifier: { send: notifierSend },
 }))
 
+const passwordResetRequestDelayMs = mock(() => 0)
+await mock.module('@/utils/timing', () => ({
+  passwordResetRequestDelayMs,
+}))
+
 const { app } = await import('@/app')
+const { passwordResetRequestRateLimiter } = await import('../services')
 
 const user: User = {
   id: 1,
@@ -90,6 +96,9 @@ beforeEach(() => {
   findById.mockReset()
   createUser.mockReset()
   notifierSend.mockReset()
+  passwordResetRequestDelayMs.mockReset()
+  passwordResetRequestDelayMs.mockImplementation(() => 0)
+  passwordResetRequestRateLimiter.reset()
 })
 
 describe('auth signup/login routes（Cookie設定）', () => {
@@ -337,6 +346,42 @@ describe('POST /auth/password-reset/request', () => {
     expect(response.status).toBe(202)
     const body = await response.text()
     expect(body).toBe('')
+  })
+
+  test('IP単位のレート制限超過時は429を返し、トークン発行・通知を行わない', async () => {
+    findByEmail.mockResolvedValue(null)
+    const infoSpy = spyOn(console, 'info').mockImplementation(() => {})
+
+    try {
+      for (let i = 0; i < 5; i++) {
+        const response = await app.request('/auth/password-reset/request', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-forwarded-for': '203.0.113.10',
+          },
+          body: JSON.stringify({ email: `user-${i}@example.com` }),
+        })
+        expect(response.status).toBe(202)
+      }
+
+      const limited = await app.request('/auth/password-reset/request', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-forwarded-for': '203.0.113.10',
+        },
+        body: JSON.stringify({ email: 'user-6@example.com' }),
+      })
+
+      expect(limited.status).toBe(429)
+      const body = (await limited.json()) as { error?: { message?: string } }
+      expect(body.error?.message).toBe('リクエストが多すぎます。しばらくしてから再試行してください')
+      expect(prtCreate).not.toHaveBeenCalled()
+      expect(notifierSend).not.toHaveBeenCalled()
+    } finally {
+      infoSpy.mockRestore()
+    }
   })
 })
 

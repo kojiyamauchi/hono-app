@@ -9,9 +9,10 @@ process.env.REFRESH_TOKEN_SECRET = 'test-refresh-secret'
 
 const refresh = mock()
 const logout = mock()
+const requestPasswordReset = mock()
 
 await mock.module('../services', () => ({
-  authService: { refresh, logout },
+  authService: { refresh, logout, requestPasswordReset },
 }))
 
 const { authController } = await import('.')
@@ -24,6 +25,7 @@ const { authController } = await import('.')
 const app = new Hono()
   .post('/refresh', (c) => authController.refresh(c))
   .post('/logout', (c) => authController.logout(c))
+  .post('/password-reset/request', (c) => authController.requestPasswordReset(c, { email: 'taro@example.com' }))
   .onError((err, c) => {
     if (err instanceof AppError) {
       return c.json({ error: { message: err.message } }, err.statusCode as ContentfulStatusCode)
@@ -34,6 +36,7 @@ const app = new Hono()
 beforeEach(() => {
   refresh.mockReset()
   logout.mockReset()
+  requestPasswordReset.mockReset()
 })
 
 describe('authController', () => {
@@ -84,5 +87,38 @@ describe('authController', () => {
 
     expect(response.status).toBe(204)
     expect(logout).not.toHaveBeenCalled()
+  })
+
+  test('password-reset/requestはx-forwarded-forの先頭IPをserviceへ渡す', async () => {
+    requestPasswordReset.mockResolvedValue(undefined)
+
+    const response = await app.request('/password-reset/request', {
+      method: 'POST',
+      headers: { 'x-forwarded-for': '203.0.113.10, 198.51.100.20' },
+    })
+
+    expect(response.status).toBe(202)
+    expect(requestPasswordReset).toHaveBeenCalledWith('taro@example.com', '203.0.113.10')
+  })
+
+  test('password-reset/requestはx-forwarded-forが無い場合にx-real-ipをserviceへ渡す', async () => {
+    requestPasswordReset.mockResolvedValue(undefined)
+
+    const response = await app.request('/password-reset/request', {
+      method: 'POST',
+      headers: { 'x-real-ip': '198.51.100.20' },
+    })
+
+    expect(response.status).toBe(202)
+    expect(requestPasswordReset).toHaveBeenCalledWith('taro@example.com', '198.51.100.20')
+  })
+
+  test('password-reset/requestはIPヘッダが無い場合にunknownをserviceへ渡す', async () => {
+    requestPasswordReset.mockResolvedValue(undefined)
+
+    const response = await app.request('/password-reset/request', { method: 'POST' })
+
+    expect(response.status).toBe(202)
+    expect(requestPasswordReset).toHaveBeenCalledWith('taro@example.com', 'unknown')
   })
 })
