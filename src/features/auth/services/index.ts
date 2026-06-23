@@ -13,6 +13,7 @@ import type { User } from '@/shared/user/entities'
 import { toUserResponse } from '@/shared/user/mappers'
 import { userRepository } from '@/shared/user/repositories'
 import { AppError } from '@/utils/errors'
+import { createInMemoryRateLimiter } from '@/utils/rateLimit'
 import { passwordResetRequestDelayMs } from '@/utils/timing'
 
 import type { LoginSchemaType, SignupSchemaType } from '../schemas'
@@ -41,6 +42,50 @@ const issueAuthentication = async (user: User): Promise<IssuedAuthTokens> => {
  * リフレッシュトークンが無効な場合の共通エラーを生成する。
  */
 const invalidRefreshTokenError = (): AppError => new AppError(401, 'リフレッシュトークンが無効です')
+
+/** パスワードリセットリクエストのIP単位制限回数。 */
+export const PASSWORD_RESET_IP_RATE_LIMIT = 5
+
+/** パスワードリセットリクエストのIP単位制限期間（15分）。 */
+export const PASSWORD_RESET_IP_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000
+
+/** パスワードリセットリクエストのemail単位制限回数。 */
+export const PASSWORD_RESET_EMAIL_RATE_LIMIT = 3
+
+/** パスワードリセットリクエストのemail単位制限期間（1時間）。 */
+export const PASSWORD_RESET_EMAIL_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000
+
+/** パスワードリセットリクエスト専用のインメモリレートリミッター。 */
+export const passwordResetRequestRateLimiter = createInMemoryRateLimiter()
+
+/**
+ * レート制限用にメールアドレスを正規化する。
+ */
+const normalizeEmailForRateLimit = (email: string): string => email.trim().toLowerCase()
+
+/**
+ * 平文メールアドレスを保存しないため、レート制限用emailキーはHMAC化する。
+ */
+const passwordResetEmailRateLimitKey = (email: string): string => {
+  return `password-reset:email:${hashPasswordResetToken(normalizeEmailForRateLimit(email))}`
+}
+
+/**
+ * IP単位のレート制限キーを生成する。
+ */
+const passwordResetIpRateLimitKey = (clientIp: string): string => {
+  return `password-reset:ip:${clientIp}`
+}
+
+/**
+ * パスワードリセットリクエスト用の最低応答時間＋ジッターを適用する。
+ */
+const waitPasswordResetRequestDelay = async (startMs: number): Promise<void> => {
+  const delayMs = passwordResetRequestDelayMs(Date.now() - startMs)
+  if (delayMs > 0) {
+    await Bun.sleep(delayMs)
+  }
+}
 
 /**
  * 認証に関するビジネスロジック。
@@ -154,16 +199,46 @@ export const authService = {
    * 同期送信による処理時間差を緩和するため、最低応答時間＋ジッターを確保する。
    * 通知失敗時は発行済みトークンをbest-effortで無効化する。
    */
-  requestPasswordReset: async (email: string): Promise<void> => {
+  requestPasswordReset: async (email: string, clientIp?: string): Promise<void> => {
     const startMs = Date.now()
+
+    if (clientIp) {
+      const ipRateLimit = passwordResetRequestRateLimiter.check({
+        key: passwordResetIpRateLimitKey(clientIp),
+        limit: PASSWORD_RESET_IP_RATE_LIMIT,
+        windowMs: PASSWORD_RESET_IP_RATE_LIMIT_WINDOW_MS,
+      })
+      if (!ipRateLimit.allowed) {
+        // IP単位の制限はアカウント非依存のtransport層制限として429を返す。
+        // IP・メール・トークンなどの機密/個人情報はログに含めない。
+        console.info('パスワードリセットリクエストをIP単位で制限しました', {
+          scope: 'ip',
+          retryAfterMs: ipRateLimit.retryAfterMs,
+        })
+        throw new AppError(429, 'リクエストが多すぎます。しばらくしてから再試行してください')
+      }
+    }
+
+    const emailRateLimit = passwordResetRequestRateLimiter.check({
+      key: passwordResetEmailRateLimitKey(email),
+      limit: PASSWORD_RESET_EMAIL_RATE_LIMIT,
+      windowMs: PASSWORD_RESET_EMAIL_RATE_LIMIT_WINDOW_MS,
+    })
+    if (!emailRateLimit.allowed) {
+      // email単位の制限結果は外部に出さず、通常の202経路と区別しにくいよう最低応答時間＋ジッターを通す。
+      // 平文メールアドレスはログに含めない。
+      console.info('パスワードリセットリクエストをemail単位で制限しました', {
+        scope: 'email',
+        retryAfterMs: emailRateLimit.retryAfterMs,
+      })
+      await waitPasswordResetRequestDelay(startMs)
+      return
+    }
 
     const user = await userRepository.findByEmail(email)
     if (!user) {
       // 未登録の場合も遅延を挿入してから正常終了する（タイミングによる登録有無の漏えいを防ぐ）
-      const delayMs = passwordResetRequestDelayMs(Date.now() - startMs)
-      if (delayMs > 0) {
-        await Bun.sleep(delayMs)
-      }
+      await waitPasswordResetRequestDelay(startMs)
       return
     }
 
@@ -189,10 +264,7 @@ export const authService = {
     }
 
     // 登録済みパスの遅延挿入（送信成功・失敗いずれも同じ遅延を適用する）
-    const delayMs = passwordResetRequestDelayMs(Date.now() - startMs)
-    if (delayMs > 0) {
-      await Bun.sleep(delayMs)
-    }
+    await waitPasswordResetRequestDelay(startMs)
   },
 
   /**

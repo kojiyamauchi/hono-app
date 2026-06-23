@@ -47,6 +47,11 @@ await mock.module('@/shared/auth/services', () => ({
   passwordResetNotifier: { send: notifierSend },
 }))
 
+const passwordResetRequestDelayMs = mock(() => 0)
+await mock.module('@/utils/timing', () => ({
+  passwordResetRequestDelayMs,
+}))
+
 // userRepositoryをモックし、DBに依存せずserviceのロジックを検証する
 const findByEmail = mock()
 const create = mock()
@@ -56,7 +61,7 @@ await mock.module('@/shared/user/repositories', () => ({
   userRepository: { findByEmail, create, findById },
 }))
 
-const { authService } = await import('.')
+const { authService, passwordResetRequestRateLimiter } = await import('.')
 
 const user: User = {
   id: 1,
@@ -99,6 +104,9 @@ beforeEach(() => {
   prtDeleteByIdAndTokenHash.mockReset()
   prtConfirm.mockReset()
   notifierSend.mockReset()
+  passwordResetRequestDelayMs.mockReset()
+  passwordResetRequestDelayMs.mockImplementation(() => 0)
+  passwordResetRequestRateLimiter.reset()
 })
 
 describe('authService.signup', () => {
@@ -356,6 +364,74 @@ describe('authService.requestPasswordReset', () => {
     } finally {
       errorSpy.mockRestore()
     }
+  })
+
+  test('IP単位の閾値超過時は429を投げ、トークン発行・通知を行わない', async () => {
+    findByEmail.mockResolvedValue(null)
+    const infoSpy = spyOn(console, 'info').mockImplementation(() => {})
+
+    try {
+      for (let i = 0; i < 5; i++) {
+        await expect(authService.requestPasswordReset(`user-${i}@example.com`, '203.0.113.10')).resolves.toBeUndefined()
+      }
+
+      await expect(authService.requestPasswordReset('user-6@example.com', '203.0.113.10')).rejects.toMatchObject({
+        statusCode: 429,
+      })
+
+      expect(prtCreate).not.toHaveBeenCalled()
+      expect(notifierSend).not.toHaveBeenCalled()
+      expect(infoSpy).toHaveBeenCalledWith('パスワードリセットリクエストをIP単位で制限しました', expect.objectContaining({ scope: 'ip' }))
+    } finally {
+      infoSpy.mockRestore()
+    }
+  })
+
+  test('email単位の閾値超過時は202相当で正常終了し、トークン発行・通知を行わない', async () => {
+    findByEmail.mockResolvedValue(user)
+    prtCreate.mockResolvedValue(savedPasswordResetToken)
+    notifierSend.mockResolvedValue(undefined)
+
+    await authService.requestPasswordReset('taro@example.com')
+    await authService.requestPasswordReset('taro@example.com')
+    await authService.requestPasswordReset('taro@example.com')
+    prtCreate.mockClear()
+    notifierSend.mockClear()
+    findByEmail.mockClear()
+    passwordResetRequestDelayMs.mockClear()
+
+    const infoSpy = spyOn(console, 'info').mockImplementation(() => {})
+
+    try {
+      await expect(authService.requestPasswordReset('taro@example.com')).resolves.toBeUndefined()
+
+      expect(findByEmail).not.toHaveBeenCalled()
+      expect(prtCreate).not.toHaveBeenCalled()
+      expect(notifierSend).not.toHaveBeenCalled()
+      expect(passwordResetRequestDelayMs).toHaveBeenCalledTimes(1)
+      const logged = JSON.stringify(infoSpy.mock.calls)
+      expect(logged).not.toContain('taro@example.com')
+      expect(infoSpy).toHaveBeenCalledWith('パスワードリセットリクエストをemail単位で制限しました', expect.objectContaining({ scope: 'email' }))
+    } finally {
+      infoSpy.mockRestore()
+    }
+  })
+
+  test('email単位の制限キーは大文字小文字を正規化して扱う', async () => {
+    findByEmail.mockResolvedValue(user)
+    prtCreate.mockResolvedValue(savedPasswordResetToken)
+    notifierSend.mockResolvedValue(undefined)
+
+    await authService.requestPasswordReset('TARO@example.com')
+    await authService.requestPasswordReset('taro@example.com')
+    await authService.requestPasswordReset('taro@EXAMPLE.com')
+    prtCreate.mockClear()
+    notifierSend.mockClear()
+
+    await expect(authService.requestPasswordReset('taro@example.com')).resolves.toBeUndefined()
+
+    expect(prtCreate).not.toHaveBeenCalled()
+    expect(notifierSend).not.toHaveBeenCalled()
   })
 })
 
