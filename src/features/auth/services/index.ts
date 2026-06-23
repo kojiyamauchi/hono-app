@@ -13,6 +13,7 @@ import type { User } from '@/shared/user/entities'
 import { toUserResponse } from '@/shared/user/mappers'
 import { userRepository } from '@/shared/user/repositories'
 import { AppError } from '@/utils/errors'
+import { passwordResetRequestDelayMs } from '@/utils/timing'
 
 import type { LoginSchemaType, SignupSchemaType } from '../schemas'
 
@@ -150,12 +151,19 @@ export const authService = {
   /**
    * パスワードリセット用トークンを発行し、notifierへ送信を依頼する。
    * メールアドレスが登録済みかどうかにかかわらず、常に正常終了する（登録有無を外部に漏らさない）。
+   * 同期送信による処理時間差を緩和するため、最低応答時間＋ジッターを確保する。
    * 通知失敗時は発行済みトークンをbest-effortで無効化する。
    */
   requestPasswordReset: async (email: string): Promise<void> => {
+    const startMs = Date.now()
+
     const user = await userRepository.findByEmail(email)
     if (!user) {
-      // 未登録の場合は何もせず正常終了する（登録有無を外部に漏らさない）
+      // 未登録の場合も遅延を挿入してから正常終了する（タイミングによる登録有無の漏えいを防ぐ）
+      const delayMs = passwordResetRequestDelayMs(Date.now() - startMs)
+      if (delayMs > 0) {
+        await Bun.sleep(delayMs)
+      }
       return
     }
 
@@ -172,6 +180,12 @@ export const authService = {
       await passwordResetTokenRepository.deleteByIdAndTokenHash(saved.id, issued.tokenHash).catch(() => {
         // 補償削除に失敗しても無視する（トークンは有効期限で失効する）
       })
+    }
+
+    // 登録済みパスの遅延挿入（送信成功・失敗いずれも同じ遅延を適用する）
+    const delayMs = passwordResetRequestDelayMs(Date.now() - startMs)
+    if (delayMs > 0) {
+      await Bun.sleep(delayMs)
     }
   },
 
