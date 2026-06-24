@@ -45,8 +45,17 @@ export const changePasswordSchema = z
     path: ['newPassword'],
   })
 
+/**
+ * リフレッシュセッションIDパラメータのバリデーションスキーマ。
+ * idはrefresh token familyIdを表すUUID文字列。
+ */
+export const deleteSessionParamSchema = z.object({
+  id: z.uuid('セッションIDの形式が正しくありません'),
+})
+
 export type SignupSchemaType = z.infer<typeof signupSchema>
 export type LoginSchemaType = z.infer<typeof loginSchema>
 export type RequestPasswordResetSchemaType = z.infer<typeof requestPasswordResetSchema>
 export type ConfirmPasswordResetSchemaType = z.infer<typeof confirmPasswordResetSchema>
 export type ChangePasswordSchemaType = z.infer<typeof changePasswordSchema>
+export type DeleteSessionParamSchemaType = z.infer<typeof deleteSessionParamSchema>
