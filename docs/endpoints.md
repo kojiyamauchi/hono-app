@@ -23,6 +23,7 @@ APIの追加・変更・削除を行う場合は、実装と同じPRでこのド
 | POST   | `/auth/logout`                    | Cookie（リフレッシュトークン） | Cookieのリフレッシュトークンに対応するログインセッションを失効する |
 | GET    | `/auth/me`                        | 必要                         | 認証トークンに紐づくユーザー情報を取得する                       |
 | POST   | `/auth/change-password`           | 必要                         | 現在のパスワードを検証して新しいパスワードへ変更し、全リフレッシュセッションを失効する |
+| POST   | `/auth/logout-all`              | 必要                         | 認証済みユーザーの全リフレッシュセッションを失効する                             |
 | POST   | `/auth/password-reset/request`    | 不要                         | パスワードリセット用トークンを発行し通知する（登録有無・email単位制限時は202、IP単位制限時は429）|
 | POST   | `/auth/password-reset/confirm`    | 不要                         | リセットトークンを使い新しいパスワードを設定する                   |
 
