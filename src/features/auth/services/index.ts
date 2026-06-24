@@ -314,4 +314,12 @@ export const authService = {
       throw new AppError(401, '無効なトークンです')
     }
   },
+
+  /**
+   * ログイン済みユーザーの全リフレッシュセッションを失効させる。
+   * 失効対象が存在しない場合も正常終了する。
+   */
+  logoutAll: async (userId: number): Promise<void> => {
+    await refreshTokenRepository.revokeAllByUserId(userId)
+  },
 }
