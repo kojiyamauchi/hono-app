@@ -13,9 +13,10 @@ const requestPasswordReset = mock()
 const changePassword = mock()
 const logoutAll = mock()
 const listSessions = mock()
+const logoutSession = mock()
 
 await mock.module('../services', () => ({
-  authService: { refresh, logout, requestPasswordReset, changePassword, logoutAll, listSessions },
+  authService: { refresh, logout, requestPasswordReset, changePassword, logoutAll, listSessions, logoutSession },
 }))
 
 const { authController } = await import('.')
@@ -37,6 +38,7 @@ const app = new Hono()
   .post('/password-reset/request', (c) => authController.requestPasswordReset(c, { email: 'taro@example.com' }))
   .post('/logout-all', (c) => authController.logoutAll(c, 1))
   .get('/sessions', (c) => authController.listSessions(c, 1))
+  .delete('/sessions/:id', (c) => authController.logoutSession(c, 1, { id: c.req.param('id') }))
   .onError((err, c) => {
     if (err instanceof AppError) {
       return c.json({ error: { message: err.message } }, err.statusCode as ContentfulStatusCode)
@@ -51,6 +53,7 @@ beforeEach(() => {
   changePassword.mockReset()
   logoutAll.mockReset()
   listSessions.mockReset()
+  logoutSession.mockReset()
 })
 
 describe('authController', () => {
@@ -171,5 +174,15 @@ describe('authController', () => {
     const body = (await response.json()) as { sessions?: Array<{ id?: string }> }
     expect(body.sessions).toHaveLength(1)
     expect(body.sessions?.[0].id).toBe('family-uuid-1')
+  })
+
+  test('logoutSessionはserviceをuserIdとsessionIdで呼び出し204を返す', async () => {
+    logoutSession.mockResolvedValue(undefined)
+
+    const response = await app.request('/sessions/550e8400-e29b-41d4-a716-446655440000', { method: 'DELETE' })
+
+    expect(response.status).toBe(204)
+    expect(await response.text()).toBe('')
+    expect(logoutSession).toHaveBeenCalledWith(1, '550e8400-e29b-41d4-a716-446655440000')
   })
 })
