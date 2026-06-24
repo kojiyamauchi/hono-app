@@ -511,6 +511,22 @@ describe('authService.requestPasswordReset', () => {
   })
 })
 
+describe('authService.logoutAll', () => {
+  test('全リフレッシュトークンを失効させるためrevokeAllByUserIdをuserIdで呼び出す', async () => {
+    revokeAllByUserId.mockResolvedValue(2)
+
+    await authService.logoutAll(1)
+
+    expect(revokeAllByUserId).toHaveBeenCalledWith(1)
+  })
+
+  test('失効対象が存在しない場合（revokeAllByUserId が0件）も正常終了する', async () => {
+    revokeAllByUserId.mockResolvedValue(0)
+
+    await expect(authService.logoutAll(1)).resolves.toBeUndefined()
+  })
+})
+
 describe('authService.confirmPasswordReset', () => {
   test('有効なトークンでパスワードを更新する', async () => {
     prtFindByTokenHash.mockResolvedValue(savedPasswordResetToken)
