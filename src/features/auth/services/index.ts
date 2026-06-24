@@ -1,4 +1,5 @@
-import type { IssuedAuthTokens } from '@/shared/auth/dtos'
+import type { IssuedAuthTokens, SessionResponse } from '@/shared/auth/dtos'
+import { toSessionResponse } from '@/shared/auth/mappers'
 import { authCredentialRepository, passwordResetTokenRepository, refreshTokenRepository } from '@/shared/auth/repositories'
 import {
   hashPasswordResetToken,
@@ -321,5 +322,14 @@ export const authService = {
    */
   logoutAll: async (userId: number): Promise<void> => {
     await refreshTokenRepository.revokeAllByUserId(userId)
+  },
+
+  /**
+   * ログイン済みユーザーのactiveなリフレッシュセッション一覧を返す。
+   * repositoryから取得したセッションをDTOへ変換し、tokenHash等の内部値は含めない。
+   */
+  listSessions: async (userId: number): Promise<SessionResponse[]> => {
+    const sessions = await refreshTokenRepository.findActiveSessionsByUserId(userId)
+    return sessions.map(toSessionResponse)
   },
 }
