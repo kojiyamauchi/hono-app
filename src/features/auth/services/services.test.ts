@@ -14,6 +14,7 @@ const revokeById = mock()
 const revokeFamily = mock()
 const rotate = mock()
 const revokeAllByUserId = mock()
+const revokeByUserIdAndFamilyId = mock()
 const changePassword = mock()
 const findActiveSessionsByUserId = mock()
 
@@ -33,6 +34,7 @@ await mock.module('@/shared/auth/repositories', () => ({
     revokeFamily,
     rotate,
     revokeAllByUserId,
+    revokeByUserIdAndFamilyId,
     findActiveSessionsByUserId,
   },
   passwordResetTokenRepository: {
@@ -104,6 +106,7 @@ beforeEach(() => {
   revokeFamily.mockReset()
   rotate.mockReset()
   revokeAllByUserId.mockReset()
+  revokeByUserIdAndFamilyId.mockReset()
   changePassword.mockReset()
   findActiveSessionsByUserId.mockReset()
   findById.mockReset()
@@ -527,6 +530,24 @@ describe('authService.logoutAll', () => {
     revokeAllByUserId.mockResolvedValue(0)
 
     await expect(authService.logoutAll(1)).resolves.toBeUndefined()
+  })
+})
+
+describe('authService.logoutSession', () => {
+  test('指定ユーザーのセッションIDで失効処理を呼び出す', async () => {
+    revokeByUserIdAndFamilyId.mockResolvedValue(1)
+
+    await expect(authService.logoutSession(1, '550e8400-e29b-41d4-a716-446655440000')).resolves.toBeUndefined()
+
+    expect(revokeByUserIdAndFamilyId).toHaveBeenCalledWith(1, '550e8400-e29b-41d4-a716-446655440000')
+  })
+
+  test('存在しない・他ユーザー・失効済みのセッションは404へ畳み込む', async () => {
+    revokeByUserIdAndFamilyId.mockResolvedValue(0)
+
+    await expect(authService.logoutSession(1, '550e8400-e29b-41d4-a716-446655440000')).rejects.toMatchObject({
+      statusCode: 404,
+    })
   })
 })
 
