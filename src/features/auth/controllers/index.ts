@@ -115,4 +115,14 @@ export const authController = {
     await authService.confirmPasswordReset(input.token, input.password)
     return c.body(null, 204)
   },
+
+  /**
+   * ログイン済みユーザーの全リフレッシュセッションを失効させる。
+   * 成功時はrefresh cookieをクリアして204を返す。
+   */
+  logoutAll: async (c: Context, userId: number): Promise<Response> => {
+    await authService.logoutAll(userId)
+    clearRefreshTokenCookie(c)
+    return c.body(null, 204)
+  },
 }

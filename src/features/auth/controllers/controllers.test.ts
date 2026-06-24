@@ -11,9 +11,10 @@ const refresh = mock()
 const logout = mock()
 const requestPasswordReset = mock()
 const changePassword = mock()
+const logoutAll = mock()
 
 await mock.module('../services', () => ({
-  authService: { refresh, logout, requestPasswordReset, changePassword },
+  authService: { refresh, logout, requestPasswordReset, changePassword, logoutAll },
 }))
 
 const { authController } = await import('.')
@@ -33,6 +34,7 @@ const app = new Hono()
     }),
   )
   .post('/password-reset/request', (c) => authController.requestPasswordReset(c, { email: 'taro@example.com' }))
+  .post('/logout-all', (c) => authController.logoutAll(c, 1))
   .onError((err, c) => {
     if (err instanceof AppError) {
       return c.json({ error: { message: err.message } }, err.statusCode as ContentfulStatusCode)
@@ -45,6 +47,7 @@ beforeEach(() => {
   logout.mockReset()
   requestPasswordReset.mockReset()
   changePassword.mockReset()
+  logoutAll.mockReset()
 })
 
 describe('authController', () => {
@@ -139,5 +142,16 @@ describe('authController', () => {
 
     expect(response.status).toBe(202)
     expect(requestPasswordReset).toHaveBeenCalledWith('taro@example.com', undefined)
+  })
+
+  test('logoutAllはserviceを呼び出し、Cookieをクリアして204を返す', async () => {
+    logoutAll.mockResolvedValue(undefined)
+
+    const response = await app.request('/logout-all', { method: 'POST' })
+
+    expect(response.status).toBe(204)
+    expect(await response.text()).toBe('')
+    expect(logoutAll).toHaveBeenCalledWith(1)
+    expect(response.headers.get('set-cookie')).toContain('refreshToken=')
   })
 })

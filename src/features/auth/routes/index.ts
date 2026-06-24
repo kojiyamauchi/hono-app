@@ -28,3 +28,4 @@ export const authRoutes = new Hono()
   .post('/password-reset/confirm', zValidator('json', confirmPasswordResetSchema, onValidationError), (c) =>
     authController.confirmPasswordReset(c, c.req.valid('json')),
   )
+  .post('/logout-all', originMiddleware, authMiddleware, (c) => authController.logoutAll(c, c.get('userId')))
