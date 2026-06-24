@@ -10,9 +10,10 @@ process.env.REFRESH_TOKEN_SECRET = 'test-refresh-secret'
 const refresh = mock()
 const logout = mock()
 const requestPasswordReset = mock()
+const changePassword = mock()
 
 await mock.module('../services', () => ({
-  authService: { refresh, logout, requestPasswordReset },
+  authService: { refresh, logout, requestPasswordReset, changePassword },
 }))
 
 const { authController } = await import('.')
@@ -25,6 +26,12 @@ const { authController } = await import('.')
 const app = new Hono()
   .post('/refresh', (c) => authController.refresh(c))
   .post('/logout', (c) => authController.logout(c))
+  .post('/change-password', (c) =>
+    authController.changePassword(c, 1, {
+      currentPassword: 'current-password-123',
+      newPassword: 'new-password-123',
+    }),
+  )
   .post('/password-reset/request', (c) => authController.requestPasswordReset(c, { email: 'taro@example.com' }))
   .onError((err, c) => {
     if (err instanceof AppError) {
@@ -37,6 +44,7 @@ beforeEach(() => {
   refresh.mockReset()
   logout.mockReset()
   requestPasswordReset.mockReset()
+  changePassword.mockReset()
 })
 
 describe('authController', () => {
@@ -87,6 +95,17 @@ describe('authController', () => {
 
     expect(response.status).toBe(204)
     expect(logout).not.toHaveBeenCalled()
+  })
+
+  test('change-passwordはserviceを呼び出し、Cookieをクリアして204を返す', async () => {
+    changePassword.mockResolvedValue(undefined)
+
+    const response = await app.request('/change-password', { method: 'POST' })
+
+    expect(response.status).toBe(204)
+    expect(await response.text()).toBe('')
+    expect(changePassword).toHaveBeenCalledWith(1, 'current-password-123', 'new-password-123')
+    expect(response.headers.get('set-cookie')).toContain('refreshToken=')
   })
 
   test('password-reset/requestはx-forwarded-forの先頭IPをserviceへ渡す', async () => {

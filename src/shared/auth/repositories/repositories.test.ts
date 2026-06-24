@@ -12,6 +12,7 @@ const prtTransactionFindUnique = mock()
 const prtTransactionUpdateMany = mock()
 const prtTransactionDeleteMany = mock()
 const userTransactionUpdate = mock()
+const userTransactionUpdateMany = mock()
 const transaction = mock(async (callback: (tx: unknown) => Promise<unknown>) =>
   callback({
     refreshToken: { create: transactionCreate, updateMany: transactionUpdateMany },
@@ -21,7 +22,7 @@ const transaction = mock(async (callback: (tx: unknown) => Promise<unknown>) =>
       updateMany: prtTransactionUpdateMany,
       deleteMany: prtTransactionDeleteMany,
     },
-    user: { update: userTransactionUpdate },
+    user: { update: userTransactionUpdate, updateMany: userTransactionUpdateMany },
   }),
 )
 const prtCreate = mock()
@@ -46,7 +47,7 @@ await mock.module('@/libs/prisma', () => ({
   },
 }))
 
-const { passwordResetTokenRepository, refreshTokenRepository } = await import('.')
+const { authCredentialRepository, passwordResetTokenRepository, refreshTokenRepository } = await import('.')
 
 const expiresAt = new Date('2026-07-01T00:00:00.000Z')
 const createdAt = new Date('2026-06-18T00:00:00.000Z')
@@ -83,6 +84,7 @@ beforeEach(() => {
   prtTransactionUpdateMany.mockReset()
   prtTransactionDeleteMany.mockReset()
   userTransactionUpdate.mockReset()
+  userTransactionUpdateMany.mockReset()
   prtCreate.mockReset()
   prtFindUnique.mockReset()
   prtUpdateMany.mockReset()
@@ -158,6 +160,35 @@ describe('refreshTokenRepository', () => {
       where: { userId: 1, revokedAt: null },
       data: { revokedAt: expect.any(Date) },
     })
+  })
+})
+
+describe('authCredentialRepository', () => {
+  test('changePasswordでパスワード更新と全refresh失効を原子的に行う', async () => {
+    userTransactionUpdateMany.mockResolvedValue({ count: 1 })
+    transactionUpdateMany.mockResolvedValue({ count: 2 })
+
+    const result = await authCredentialRepository.changePassword(1, 'new-hashed-password')
+
+    expect(result).toBe(true)
+    expect(transaction).toHaveBeenCalledTimes(1)
+    expect(userTransactionUpdateMany).toHaveBeenCalledWith({
+      where: { id: 1 },
+      data: { password: 'new-hashed-password' },
+    })
+    expect(transactionUpdateMany).toHaveBeenCalledWith({
+      where: { userId: 1, revokedAt: null },
+      data: { revokedAt: expect.any(Date) },
+    })
+  })
+
+  test('changePasswordで対象ユーザーが存在しない場合はfalseを返しrefresh失効しない', async () => {
+    userTransactionUpdateMany.mockResolvedValue({ count: 0 })
+
+    const result = await authCredentialRepository.changePassword(1, 'new-hashed-password')
+
+    expect(result).toBe(false)
+    expect(transactionUpdateMany).not.toHaveBeenCalled()
   })
 })
 
