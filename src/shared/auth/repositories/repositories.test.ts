@@ -132,6 +132,22 @@ describe('refreshTokenRepository', () => {
     })
   })
 
+  test('revokeByUserIdAndFamilyId: userIdとfamilyIdの両方に一致する未失効トークンのみ失効させる', async () => {
+    updateMany.mockResolvedValue({ count: 1 })
+
+    await expect(refreshTokenRepository.revokeByUserIdAndFamilyId(1, 'family-id')).resolves.toBe(1)
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { userId: 1, familyId: 'family-id', revokedAt: null },
+      data: { revokedAt: expect.any(Date) },
+    })
+  })
+
+  test('revokeByUserIdAndFamilyId: 対象が無ければ0件を返す', async () => {
+    updateMany.mockResolvedValue({ count: 0 })
+
+    await expect(refreshTokenRepository.revokeByUserIdAndFamilyId(2, 'family-id')).resolves.toBe(0)
+  })
+
   test('旧トークンの失効と新トークン作成を同一トランザクションで行う', async () => {
     const nextToken = { ...refreshToken, id: 11, tokenHash: 'next-token-hash' }
     transactionUpdateMany.mockResolvedValue({ count: 1 })

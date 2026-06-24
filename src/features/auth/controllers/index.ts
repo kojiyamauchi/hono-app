@@ -3,7 +3,14 @@ import type { Context } from 'hono'
 import { clearRefreshTokenCookie, getRefreshTokenCookie, setRefreshTokenCookie } from '@/shared/auth/services'
 import { AppError } from '@/utils/errors'
 
-import type { ChangePasswordSchemaType, ConfirmPasswordResetSchemaType, LoginSchemaType, RequestPasswordResetSchemaType, SignupSchemaType } from '../schemas'
+import type {
+  ChangePasswordSchemaType,
+  ConfirmPasswordResetSchemaType,
+  DeleteSessionParamSchemaType,
+  LoginSchemaType,
+  RequestPasswordResetSchemaType,
+  SignupSchemaType,
+} from '../schemas'
 import { authService } from '../services'
 
 /**
@@ -132,5 +139,13 @@ export const authController = {
   listSessions: async (c: Context, userId: number): Promise<Response> => {
     const sessions = await authService.listSessions(userId)
     return c.json({ sessions }, 200)
+  },
+
+  /**
+   * 認証済みユーザー自身の指定リフレッシュセッションを失効させる。
+   */
+  logoutSession: async (c: Context, userId: number, params: DeleteSessionParamSchemaType): Promise<Response> => {
+    await authService.logoutSession(userId, params.id)
+    return c.body(null, 204)
   },
 }

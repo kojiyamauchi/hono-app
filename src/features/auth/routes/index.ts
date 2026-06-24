@@ -6,7 +6,7 @@ import { originMiddleware } from '@/middlewares/origin'
 import { onValidationError } from '@/utils/validation'
 
 import { authController } from '../controllers'
-import { changePasswordSchema, confirmPasswordResetSchema, loginSchema, requestPasswordResetSchema, signupSchema } from '../schemas'
+import { changePasswordSchema, confirmPasswordResetSchema, deleteSessionParamSchema, loginSchema, requestPasswordResetSchema, signupSchema } from '../schemas'
 
 /**
  * 認証関連のルート（/auth配下）。
@@ -30,3 +30,6 @@ export const authRoutes = new Hono()
   )
   .post('/logout-all', originMiddleware, authMiddleware, (c) => authController.logoutAll(c, c.get('userId')))
   .get('/sessions', authMiddleware, (c) => authController.listSessions(c, c.get('userId')))
+  .delete('/sessions/:id', originMiddleware, authMiddleware, zValidator('param', deleteSessionParamSchema, onValidationError), (c) =>
+    authController.logoutSession(c, c.get('userId'), c.req.valid('param')),
+  )

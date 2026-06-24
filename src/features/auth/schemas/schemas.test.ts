@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { changePasswordSchema, confirmPasswordResetSchema, loginSchema, requestPasswordResetSchema, signupSchema } from '.'
+import { changePasswordSchema, confirmPasswordResetSchema, deleteSessionParamSchema, loginSchema, requestPasswordResetSchema, signupSchema } from '.'
 
 describe('signupSchema', () => {
   test('正しい入力を受け付ける', () => {
@@ -127,6 +127,20 @@ describe('changePasswordSchema', () => {
       currentPassword: 'same-password-123',
       newPassword: 'same-password-123',
     })
+    expect(result.success).toBe(false)
+  })
+})
+
+describe('deleteSessionParamSchema', () => {
+  test('UUID形式のidを受け付ける', () => {
+    const result = deleteSessionParamSchema.safeParse({ id: '550e8400-e29b-41d4-a716-446655440000' })
+
+    expect(result.success).toBe(true)
+  })
+
+  test('UUIDではないidを拒否する', () => {
+    const result = deleteSessionParamSchema.safeParse({ id: 'not-a-uuid' })
+
     expect(result.success).toBe(false)
   })
 })

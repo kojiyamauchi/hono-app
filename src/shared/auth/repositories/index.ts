@@ -58,6 +58,17 @@ export const refreshTokenRepository = {
   },
 
   /**
+   * 指定ユーザーに属する有効なリフレッシュセッションをfamilyIdで失効させる。
+   */
+  revokeByUserIdAndFamilyId: async (userId: number, familyId: string): Promise<number> => {
+    const result = await prisma.refreshToken.updateMany({
+      where: { userId, familyId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    })
+    return result.count
+  },
+
+  /**
    * 旧トークンの失効と新トークン作成を同一トランザクションで行う。
    * 旧トークンが既に失効している場合はfamilyを失効させ、再利用として返す。
    */

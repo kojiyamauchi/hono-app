@@ -15,6 +15,7 @@ const revokeById = mock()
 const revokeFamily = mock()
 const rotate = mock()
 const revokeAllByUserId = mock()
+const revokeByUserIdAndFamilyId = mock()
 const changePassword = mock()
 const findActiveSessionsByUserId = mock()
 
@@ -29,7 +30,16 @@ const createUser = mock()
 
 await mock.module('@/shared/auth/repositories', () => ({
   authCredentialRepository: { changePassword },
-  refreshTokenRepository: { create, findByTokenHash, revokeById, revokeFamily, rotate, revokeAllByUserId, findActiveSessionsByUserId },
+  refreshTokenRepository: {
+    create,
+    findByTokenHash,
+    revokeById,
+    revokeFamily,
+    rotate,
+    revokeAllByUserId,
+    revokeByUserIdAndFamilyId,
+    findActiveSessionsByUserId,
+  },
   passwordResetTokenRepository: {
     create: prtCreate,
     findByTokenHash: prtFindByTokenHash,
@@ -92,6 +102,7 @@ beforeEach(() => {
   revokeFamily.mockReset()
   rotate.mockReset()
   revokeAllByUserId.mockReset()
+  revokeByUserIdAndFamilyId.mockReset()
   changePassword.mockReset()
   findActiveSessionsByUserId.mockReset()
   prtCreate.mockReset()
@@ -587,6 +598,73 @@ describe('GET /auth/sessions', () => {
 
     expect(response.status).toBe(401)
     expect(findActiveSessionsByUserId).not.toHaveBeenCalled()
+  })
+})
+
+describe('DELETE /auth/sessions/:id', () => {
+  const sessionId = '550e8400-e29b-41d4-a716-446655440000'
+
+  test('認証済みかつ有効なUUIDなら指定セッションを失効して204を返す', async () => {
+    const token = await createAccessToken(1)
+    findById.mockResolvedValue(user)
+    revokeByUserIdAndFamilyId.mockResolvedValue(1)
+
+    const response = await app.request(`/auth/sessions/${sessionId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(response.status).toBe(204)
+    expect(await response.text()).toBe('')
+    expect(revokeByUserIdAndFamilyId).toHaveBeenCalledWith(1, sessionId)
+  })
+
+  test('未認証なら401を返し、失効処理を呼ばない', async () => {
+    const response = await app.request(`/auth/sessions/${sessionId}`, { method: 'DELETE' })
+
+    expect(response.status).toBe(401)
+    expect(revokeByUserIdAndFamilyId).not.toHaveBeenCalled()
+  })
+
+  test('不正なidなら400を返す', async () => {
+    const token = await createAccessToken(1)
+    findById.mockResolvedValue(user)
+
+    const response = await app.request('/auth/sessions/not-a-uuid', {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(response.status).toBe(400)
+    expect(revokeByUserIdAndFamilyId).not.toHaveBeenCalled()
+  })
+
+  test('存在しない・他ユーザー・失効済みのidなら404を返す', async () => {
+    const token = await createAccessToken(1)
+    findById.mockResolvedValue(user)
+    revokeByUserIdAndFamilyId.mockResolvedValue(0)
+
+    const response = await app.request(`/auth/sessions/${sessionId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(response.status).toBe(404)
+  })
+
+  test('Originが許可リストに一致しない場合に403を返す', async () => {
+    const token = await createAccessToken(1)
+
+    const response = await app.request(`/auth/sessions/${sessionId}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Origin: 'http://evil.com',
+      },
+    })
+
+    expect(response.status).toBe(403)
+    expect(revokeByUserIdAndFamilyId).not.toHaveBeenCalled()
   })
 })
 
