@@ -15,6 +15,7 @@ const revokeFamily = mock()
 const rotate = mock()
 const revokeAllByUserId = mock()
 const changePassword = mock()
+const findActiveSessionsByUserId = mock()
 
 const prtCreate = mock()
 const prtFindByTokenHash = mock()
@@ -32,6 +33,7 @@ await mock.module('@/shared/auth/repositories', () => ({
     revokeFamily,
     rotate,
     revokeAllByUserId,
+    findActiveSessionsByUserId,
   },
   passwordResetTokenRepository: {
     create: prtCreate,
@@ -103,6 +105,7 @@ beforeEach(() => {
   rotate.mockReset()
   revokeAllByUserId.mockReset()
   changePassword.mockReset()
+  findActiveSessionsByUserId.mockReset()
   findById.mockReset()
   prtCreate.mockReset()
   prtFindByTokenHash.mockReset()
@@ -524,6 +527,56 @@ describe('authService.logoutAll', () => {
     revokeAllByUserId.mockResolvedValue(0)
 
     await expect(authService.logoutAll(1)).resolves.toBeUndefined()
+  })
+})
+
+describe('authService.listSessions', () => {
+  const createdAt = new Date('2026-06-01T00:00:00.000Z')
+  const expiresAt = new Date('2026-07-01T00:00:00.000Z')
+  const lastUsedAt = new Date('2026-06-20T00:00:00.000Z')
+
+  test('repositoryから取得したRefreshSession配列をDTOへ変換して返すこと（id=familyId）', async () => {
+    findActiveSessionsByUserId.mockResolvedValue([{ familyId: 'family-uuid-1', createdAt, expiresAt, lastUsedAt }])
+
+    const sessions = await authService.listSessions(1)
+
+    expect(sessions).toHaveLength(1)
+    expect(sessions[0].id).toBe('family-uuid-1')
+    expect(sessions[0].createdAt).toEqual(createdAt)
+    expect(sessions[0].expiresAt).toEqual(expiresAt)
+    expect(sessions[0].lastUsedAt).toEqual(lastUsedAt)
+  })
+
+  test('レスポンスにtokenHash等の内部値を含まないこと（各要素のキーがid/createdAt/expiresAt/lastUsedAtのみ）', async () => {
+    findActiveSessionsByUserId.mockResolvedValue([{ familyId: 'family-uuid-1', createdAt, expiresAt, lastUsedAt }])
+
+    const sessions = await authService.listSessions(1)
+
+    expect(sessions[0]).not.toHaveProperty('tokenHash')
+    expect(sessions[0]).not.toHaveProperty('familyId')
+    expect(sessions[0]).not.toHaveProperty('revokedAt')
+    const keys = Object.keys(sessions[0])
+    expect(keys).toHaveLength(4)
+    expect(keys).toContain('id')
+    expect(keys).toContain('createdAt')
+    expect(keys).toContain('expiresAt')
+    expect(keys).toContain('lastUsedAt')
+  })
+
+  test('repositoryが空配列なら空配列を返すこと', async () => {
+    findActiveSessionsByUserId.mockResolvedValue([])
+
+    const sessions = await authService.listSessions(1)
+
+    expect(sessions).toEqual([])
+  })
+
+  test('findActiveSessionsByUserId が渡したuserIdでcallされること', async () => {
+    findActiveSessionsByUserId.mockResolvedValue([])
+
+    await authService.listSessions(42)
+
+    expect(findActiveSessionsByUserId).toHaveBeenCalledWith(42)
   })
 })
 
