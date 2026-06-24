@@ -125,4 +125,12 @@ export const authController = {
     clearRefreshTokenCookie(c)
     return c.body(null, 204)
   },
+
+  /**
+   * 認証済みユーザーのactiveなリフレッシュセッション一覧を返す。
+   */
+  listSessions: async (c: Context, userId: number): Promise<Response> => {
+    const sessions = await authService.listSessions(userId)
+    return c.json({ sessions }, 200)
+  },
 }

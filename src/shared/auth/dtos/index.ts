@@ -15,3 +15,14 @@ export type AuthResult = {
 export type IssuedAuthTokens = AuthResult & {
   refreshToken: string
 }
+
+/**
+ * リフレッシュセッションの公開HTTPレスポンス表現。
+ * tokenHashなどの内部値は含めない。idはfamilyId（rotationで変わらない安定した識別子）。
+ */
+export type SessionResponse = {
+  id: string
+  createdAt: Date
+  expiresAt: Date
+  lastUsedAt: Date
+}

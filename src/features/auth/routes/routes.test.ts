@@ -16,6 +16,7 @@ const revokeFamily = mock()
 const rotate = mock()
 const revokeAllByUserId = mock()
 const changePassword = mock()
+const findActiveSessionsByUserId = mock()
 
 const prtCreate = mock()
 const prtFindByTokenHash = mock()
@@ -28,7 +29,7 @@ const createUser = mock()
 
 await mock.module('@/shared/auth/repositories', () => ({
   authCredentialRepository: { changePassword },
-  refreshTokenRepository: { create, findByTokenHash, revokeById, revokeFamily, rotate, revokeAllByUserId },
+  refreshTokenRepository: { create, findByTokenHash, revokeById, revokeFamily, rotate, revokeAllByUserId, findActiveSessionsByUserId },
   passwordResetTokenRepository: {
     create: prtCreate,
     findByTokenHash: prtFindByTokenHash,
@@ -92,6 +93,7 @@ beforeEach(() => {
   rotate.mockReset()
   revokeAllByUserId.mockReset()
   changePassword.mockReset()
+  findActiveSessionsByUserId.mockReset()
   prtCreate.mockReset()
   prtFindByTokenHash.mockReset()
   prtDeleteById.mockReset()
@@ -527,6 +529,64 @@ describe('POST /auth/logout-all', () => {
 
     expect(response.status).toBe(403)
     expect(revokeAllByUserId).not.toHaveBeenCalled()
+  })
+})
+
+describe('GET /auth/sessions', () => {
+  test('認証済みなら200を返し、{ sessions: [...] }を返すこと', async () => {
+    const token = await createAccessToken(1)
+    findById.mockResolvedValue(user)
+    const createdAt = new Date('2026-06-01T00:00:00.000Z')
+    const expiresAt = new Date('2026-07-01T00:00:00.000Z')
+    const lastUsedAt = new Date('2026-06-20T00:00:00.000Z')
+    findActiveSessionsByUserId.mockResolvedValue([{ familyId: 'family-uuid-1', createdAt, expiresAt, lastUsedAt }])
+
+    const response = await app.request('/auth/sessions', {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as { sessions?: Array<{ id?: string; createdAt?: string; expiresAt?: string; lastUsedAt?: string }> }
+    expect(Array.isArray(body.sessions)).toBe(true)
+    expect(body.sessions).toHaveLength(1)
+    // 各セッションにid/createdAt/expiresAt/lastUsedAtが含まれること
+    const session = body.sessions?.[0]
+    expect(session?.id).toBe('family-uuid-1')
+    expect(session?.createdAt).toBeDefined()
+    expect(session?.expiresAt).toBeDefined()
+    expect(session?.lastUsedAt).toBeDefined()
+  })
+
+  test('レスポンスにtokenHashやrefreshToken値などの内部値を含まないこと', async () => {
+    const token = await createAccessToken(1)
+    findById.mockResolvedValue(user)
+    findActiveSessionsByUserId.mockResolvedValue([
+      {
+        familyId: 'family-uuid-1',
+        createdAt: new Date('2026-06-01T00:00:00.000Z'),
+        expiresAt: new Date('2026-07-01T00:00:00.000Z'),
+        lastUsedAt: new Date('2026-06-20T00:00:00.000Z'),
+      },
+    ])
+
+    const response = await app.request('/auth/sessions', {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(response.status).toBe(200)
+    const bodyText = await response.text()
+    expect(bodyText).not.toContain('tokenHash')
+    expect(bodyText).not.toContain('familyId')
+    expect(bodyText).not.toContain('revokedAt')
+  })
+
+  test('未認証なら401を返し、findActiveSessionsByUserIdが呼ばれないこと', async () => {
+    const response = await app.request('/auth/sessions', { method: 'GET' })
+
+    expect(response.status).toBe(401)
+    expect(findActiveSessionsByUserId).not.toHaveBeenCalled()
   })
 })
 

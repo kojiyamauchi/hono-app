@@ -1,6 +1,6 @@
 import type { Prisma } from '@/generated/prisma/client'
 import { prisma } from '@/libs/prisma'
-import type { PasswordResetToken, RefreshToken } from '@/shared/auth/entities'
+import type { PasswordResetToken, RefreshSession, RefreshToken } from '@/shared/auth/entities'
 
 /**
  * リフレッシュトークン作成時の入力値。
@@ -79,6 +79,44 @@ export const refreshTokenRepository = {
       const refreshToken = await tx.refreshToken.create({ data: input })
       return { status: 'ROTATED', refreshToken }
     })
+  },
+
+  /**
+   * 指定ユーザーのactiveなリフレッシュセッション一覧を取得する。
+   * active行（未失効・未期限切れ）を取得し、対象family群のmin(createdAt)を別クエリで取得して
+   * アプリ側で結合する。セッション開始日時(createdAt)はrevoked行を含むfamily内の最初のcreatedAt。
+   * active行はfamilyあたり1行である前提（rotation/reuse検出のinvariant）。
+   */
+  findActiveSessionsByUserId: async (userId: number): Promise<RefreshSession[]> => {
+    const now = new Date()
+    // active行（未失効・未期限切れ）を取得する
+    const activeRows = await prisma.refreshToken.findMany({
+      where: { userId, revokedAt: null, expiresAt: { gt: now } },
+      select: { familyId: true, expiresAt: true, createdAt: true },
+    })
+
+    if (activeRows.length === 0) {
+      return []
+    }
+
+    const familyIds = activeRows.map((row) => row.familyId)
+    // 対象family群の最初のcreatedAt（revoked行を含む）をgroupByで取得する。
+    // familyIdはschema上uniqueではないため、集約側もuserIdで絞り、
+    // 別ユーザーのcreatedAtが_min.createdAtへ混ざらないようユーザー境界を明確にする。
+    const grouped = await prisma.refreshToken.groupBy({
+      by: ['familyId'],
+      where: { userId, familyId: { in: familyIds } },
+      _min: { createdAt: true },
+    })
+    const minCreatedAtByFamily = new Map(grouped.map((group) => [group.familyId, group._min.createdAt]))
+
+    return activeRows.map((row) => ({
+      familyId: row.familyId,
+      // family内の最初のcreatedAt。万一取得できない場合はactive行のcreatedAtへフォールバックする
+      createdAt: minCreatedAtByFamily.get(row.familyId) ?? row.createdAt,
+      expiresAt: row.expiresAt,
+      lastUsedAt: row.createdAt,
+    }))
   },
 
   /**
