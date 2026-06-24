@@ -29,3 +29,4 @@ export const authRoutes = new Hono()
     authController.confirmPasswordReset(c, c.req.valid('json')),
   )
   .post('/logout-all', originMiddleware, authMiddleware, (c) => authController.logoutAll(c, c.get('userId')))
+  .get('/sessions', authMiddleware, (c) => authController.listSessions(c, c.get('userId')))
