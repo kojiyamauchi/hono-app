@@ -100,10 +100,12 @@ export const refreshTokenRepository = {
     }
 
     const familyIds = activeRows.map((row) => row.familyId)
-    // 対象family群の最初のcreatedAt（revoked行を含む）をgroupByで取得する
+    // 対象family群の最初のcreatedAt（revoked行を含む）をgroupByで取得する。
+    // familyIdはschema上uniqueではないため、集約側もuserIdで絞り、
+    // 別ユーザーのcreatedAtが_min.createdAtへ混ざらないようユーザー境界を明確にする。
     const grouped = await prisma.refreshToken.groupBy({
       by: ['familyId'],
-      where: { familyId: { in: familyIds } },
+      where: { userId, familyId: { in: familyIds } },
       _min: { createdAt: true },
     })
     const minCreatedAtByFamily = new Map(grouped.map((group) => [group.familyId, group._min.createdAt]))

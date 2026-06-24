@@ -179,6 +179,12 @@ describe('refreshTokenRepository', () => {
       where: { userId: 1, revokedAt: null, expiresAt: { gt: expect.any(Date) } },
       select: { familyId: true, expiresAt: true, createdAt: true },
     })
+    // familyIdはschema上uniqueではないため、集約側もuserIdで絞り別ユーザーのcreatedAt混入を防ぐ
+    expect(groupBy).toHaveBeenCalledWith({
+      by: ['familyId'],
+      where: { userId: 1, familyId: { in: ['family-1'] } },
+      _min: { createdAt: true },
+    })
   })
 
   test('findActiveSessionsByUserId: familyIdごとに1セッションとして返すこと', async () => {
