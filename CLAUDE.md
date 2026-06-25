@@ -259,44 +259,19 @@ AIエージェントがコミットする場合は、誰が作業したか分か
 
 ### コミットの粒度
 
-コミットは、変更内容を追いやすくするため細かい粒度で分割すること:
+コミットは、変更内容を追いやすくするため細かい粒度で分割すること。詳細な分解手順・feature実装時の標準レイヤー順・粒度チェックリストは、コミット粒度Skill（[`.claude/skills/commit-granularity/SKILL.md`](.claude/skills/commit-granularity/SKILL.md)）に集約する。ここでは常に守る共通原則だけを示す。
 
 - 1つの作業 = 1コミットの粒度で分割すること（PR本文の作業項目リストの1項目が、おおむね1コミットの目安）
-- テストは、対応する実装コミットの直後にコミットすること
-  - 例: スキーマ実装 → スキーマテスト → サービス実装 → サービステスト
-  - 「実装 → そのテスト → 次の実装 → そのテスト」とレイヤーごとにペアで刻むこと
-- 各コミット時点で `typecheck` が完全に通らなくてもよい（ファイル間の参照のため一時的に通らない瞬間が出るため）。最終的にpush後のCIで全チェックを通すこと
-- 各コミット時点でも、プレコミットフック（lint-staged の prettier / eslint / cspell）は通すこと
+- 実装コミットと、その振る舞いを確認するテストコミットを隣接させること（「実装 → そのテスト」をレイヤーごとにペアで刻む）
+- 役割の異なるレイヤーを1コミットへ混ぜないこと。特に controller と routes は別コミットにすること
+- review対応コミットは、指摘ごと、または関心事ごとに分けること
+- 各コミット時点で `typecheck` が完全に通らなくてもよい（ファイル間の参照のため一時的に通らない瞬間が出るため）が、プレコミットフック（lint-staged の prettier / eslint / cspell）は通すこと。最終的にpush後のCIで全チェックを通すこと
 
 #### feature実装時の標準コミット粒度
 
-feature配下にAPIやユースケースを追加する場合は、原則としてレイヤー単位で実装とテストを分けること。1コミット内で複数レイヤーの実装を混ぜないこと。
+feature配下にAPIやユースケースを追加する場合は、レイヤー単位で「実装 → そのテスト」を分けて刻むこと。DTO / mapper / repository / service / schema / controller / routes / top-level route登録を1コミットへ混ぜないこと。
 
-標準的な順序:
-
-1. DTO追加
-2. mapper追加
-3. mapperテスト追加
-4. repository追加
-5. repositoryテスト追加
-6. service追加
-7. serviceテスト追加
-8. schema追加
-9. schemaテスト追加
-10. controller追加
-11. controllerテスト追加
-12. routes追加
-13. routesテスト追加
-14. top-level route登録
-15. route統合テスト追加
-
-この順序は依存関係に沿っている。`service` はリクエストスキーマに依存せず素の値（id・token等）で入力を受けるため、`schema` より先に実装・テストできる。`schema`（zod）はHTTP入力バリデーションで `routes`（`zValidator`）と `controller`（`***SchemaType` の型注釈）が使うHTTPエッジの関心事のため、`controller`/`routes` の直前に置く。「実装 → そのテスト」は必ず隣接させ、間に別レイヤーのコミットを挟まないこと。
-
-特に `DTO + mapper + repository` や `service + schema + controller + routes` のように、役割の異なる変更を1コミットへまとめないこと。
-
-薄いcontrollerや単純なrepositoryなど、単体テストの効果が低い場合はテストを省略してよい。ただし、省略した場合でもserviceテストまたはroute統合テストで振る舞いを担保すること。
-
-review対応コミットは、指摘ごと、または関心事ごとに分けること。
+番号付きの標準順序とその依存関係の根拠、テスト省略の判断は、コミット粒度Skill（[`.claude/skills/commit-granularity/SKILL.md`](.claude/skills/commit-granularity/SKILL.md)）を正本とする。
 
 ### ブランチ命名
 
