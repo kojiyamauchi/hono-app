@@ -423,6 +423,7 @@ Skill化した運用ルールは、詳細手順を `SKILL.md` に集約するこ
 
 - PRレビューの詳細な手順は [`.codex/skills/pr-review/SKILL.md`](.codex/skills/pr-review/SKILL.md) を参照すること
 - Issue作成・整理・本文レビューの詳細な手順は [`.codex/skills/issue-management/SKILL.md`](.codex/skills/issue-management/SKILL.md) を参照すること
+- レビュー対応の手順は [`.codex/skills/review-response/SKILL.md`](.codex/skills/review-response/SKILL.md) を参照すること
 - コミット粒度の確認手順は [`.codex/skills/commit-granularity/SKILL.md`](.codex/skills/commit-granularity/SKILL.md) を参照すること
 - Codex 用のプロジェクト内Skillは `.codex/skills/` に置くこと
 
