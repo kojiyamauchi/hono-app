@@ -64,6 +64,7 @@ bun run build
 レビュー指摘へ対応する追加コミットは、[CLAUDE.md](../../../CLAUDE.md) の `#### レビュー指摘への対応コミット` の形式に従う。
 
 - 指摘が複数ある場合は、指摘ごと、または関心事ごとにコミットを分ける
+- 各コミット直前に `.claude/skills/commit-granularity/SKILL.md` をSkillとしてinvokeし、「コミット直前チェック」でステージ済み差分の粒度を確認する
 
 ### 6. PR本文の更新
 

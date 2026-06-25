@@ -509,6 +509,21 @@ gh pr view <PR番号> --json commits
 
 PR本文の更新は、コード修正とは別の補助作業ではなく、レビュー対応フローの一部として扱うこと。
 
+### Skill運用方針
+
+`AGENTS.md` と `CLAUDE.md`、`.codex/skills/` と `.claude/skills/` は、Codex / Claude 向けの並行版として同期運用すること。片方だけにルールを追加して、期待値がズレないようにする。
+
+各Skillは、ルールの正本を長く再掲しないこと。正本は `AGENTS.md` / `CLAUDE.md` などのドキュメントに置き、Skill側は正本への参照と、作業中に実行するチェックリストに徹すること。
+
+例: コミット粒度Skillでは、コミット粒度ルール全文を再掲せず、正本として `AGENTS.md` / `CLAUDE.md` の該当セクションを参照する。そのうえで「このコミットは1つの関心事に閉じているか」「複数レイヤーが混ざっていないか」「対応テストのコミットが隣接しているか」など、実行時に確認する項目へ落とし込む。
+
+### Claude Skill
+
+- PRレビューの詳細な手順は [`.claude/skills/pr-review/SKILL.md`](.claude/skills/pr-review/SKILL.md) を参照すること
+- レビュー対応の手順は [`.claude/skills/review-response/SKILL.md`](.claude/skills/review-response/SKILL.md) を参照すること
+- コミット粒度の確認手順は [`.claude/skills/commit-granularity/SKILL.md`](.claude/skills/commit-granularity/SKILL.md) を参照すること
+- Claude 用のプロジェクト内Skillは `.claude/skills/` に置くこと
+
 ### 変数名と関数名
 
 - 英語のキャメルケースまたはパスカルケースを使用

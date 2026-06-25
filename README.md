@@ -32,13 +32,11 @@ Hono / Bun / TypeScript / Prisma / PostgreSQL をベースにした、バック�
 |   |-- hooks/
 |   |-- rules/
 |   `-- skills/
-|       |-- pr-review/
-|       |   `-- SKILL.md
-|       `-- review-response/
+|       `-- <skill>/
 |           `-- SKILL.md
 |-- .codex/                          # Codex のプロジェクト内Skill
 |   `-- skills/
-|       `-- pr-review/
+|       `-- <skill>/
 |           `-- SKILL.md
 |-- .github/
 |   |-- pull_request_template.md     # PRテンプレート
