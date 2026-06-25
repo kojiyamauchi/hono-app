@@ -7,6 +7,13 @@ description: Use when reviewing a GitHub Pull Request for this repository, espec
 
 このSkillは、GitHub Pull Requestをレビューするときに使う。
 
+## 正本と責務分担
+
+- PRレビューの実行手順・レビューコメントの見出し/出力フォーマット・inline suggestion comment の投稿手順は、このSkillを正本とする。`AGENTS.md` / `CLAUDE.md`「AIエージェント間レビュー」には、レビュー担当の割り当てなど常に守る共通原則だけが置かれている。
+- コミット粒度の詳細・標準レイヤー順は、コミット粒度Skill（`.codex/skills/commit-granularity/SKILL.md`）を正本とする。レビューではそのチェックリストを使う。
+- migration検証・コーディング規約など、本Skillで扱わない（Skill化していない）ルールは、引き続き `AGENTS.md` / `CLAUDE.md` を正本とし、必要な箇所で参照する。
+- Codex版とClaude版（`.claude/skills/pr-review/SKILL.md`）のSkillで、方針・確認項目がずれないようにする。
+
 ## Trigger
 
 - ユーザーが「PRをレビューして」と依頼したとき
@@ -57,7 +64,7 @@ description: Use when reviewing a GitHub Pull Request for this repository, espec
 
 ## Commit Granularity Review
 
-コミット粒度の正本は `AGENTS.md` / `CLAUDE.md` の「コミットの粒度」「feature実装時の標準コミット粒度」とし、必要に応じて `.codex/skills/commit-granularity/SKILL.md` のチェックリストを使う。
+コミット粒度の詳細・標準レイヤー順は コミット粒度Skill（`.codex/skills/commit-granularity/SKILL.md`）を正本とし、そのチェックリストを使う。`AGENTS.md` / `CLAUDE.md`「コミットの粒度」には常に守る共通原則がある。
 
 - `git log --oneline <base>..HEAD` でコミット一覧を確認する。
 - `git show --stat <commit>` で、各コミットが1つの関心事に閉じているか確認する。
