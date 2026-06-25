@@ -376,62 +376,20 @@ git fetch https://github.com/kojiyamauchi/hono-app.git main:refs/remotes/origin/
 
 ### AIエージェント間レビュー
 
+AIエージェント間レビューの共通原則を示す。レビュー実行手順・レビューコメントの見出し/出力フォーマット・inline suggestion comment の投稿手順は、PRレビューSkill（[`.claude/skills/pr-review/SKILL.md`](.claude/skills/pr-review/SKILL.md)）に集約する。
+
 - AIエージェントが実装した変更は、原則としてPRでレビューすること
-- Codex が実装したPRは Claude がレビューすること
-- Claude が実装したPRは Codex がレビューすること
+- Codex が実装したPRは Claude が、Claude が実装したPRは Codex がレビューすること
 - ユーザーが作成したPRは Claude と Codex がレビューすること
 - AIエージェントが作成したPRは、他のAIエージェントに加えてユーザーもレビューすること
-- レビューを開始する前に、対象PRのCIが通っていることを確認すること
-- CIが未完了または失敗している場合は、レビュー結果にCI状態を明記し、問題なしの通常コメントはCI通過後に投稿すること
-- PR本文の `関連Issue` や `Closes #...` / `Fixes #...` / `Resolves #...` を確認し、対象Issueがある場合はレビュー前にIssue本文・コメント・受け入れ条件・完了条件・未完了TODOを読むこと
-- 対象IssueがあるのにPR本文から参照されていない場合は、レビュー結果でPR本文更新を指摘すること
-- 対象Issueに受け入れ条件または完了条件としてチェック項目が明記されている場合は、PR差分・テスト・動作確認により満たしたと判断できる項目のみ、レビュアーがIssue側のチェックを更新すること。作業メモや実装TODOのチェック項目は、受け入れ条件・完了条件として明確でない限り更新しないこと
-- コミット履歴がレビュー可能な粒度になっているか確認すること。明らかに複数の関心事が混ざり、レビューや将来の追跡が難しい場合は指摘すること
+- レビューを開始する前に、対象PRのCIが通っていることを確認すること（CIが未完了・失敗なら、その状態をレビュー結果へ明記し、問題なしの通常コメントはCI通過後に投稿する）
+- 対象Issueがある場合は、レビュー前にIssue本文・コメント・受け入れ条件・完了条件・未完了TODOを読み、PR差分・テスト・動作確認と整合するか確認すること。対象IssueがあるのにPR本文から参照されていない場合はPR本文更新を指摘すること
 - レビューでは、バグ、設計リスク、テスト不足、セキュリティ、運用上の問題を優先すること
+- コミット履歴がレビュー可能な粒度になっているか確認し、明らかに複数の関心事が混ざる場合は指摘すること
 - migrationを含むPRのレビューでは、[### migrationを含む変更の実DB検証](#migrationを含む変更の実db検証) に従い、PRの検証証跡を確認し、必要なときのみ実DB適用＋smokeを再実行すること
 - レビュー指摘への修正は、PR上で追加コミットとして行うこと
-- 初回レビュー、再レビュー、修正後レビューを問わず、レビュー結果をGitHub上へコメントとして投稿すること
-- Codex がレビュー結果を投稿する場合は、コメント冒頭に`## Review by Codex`を記載すること
-- Claude がレビュー結果を投稿する場合は、コメント冒頭に`## レビュー結果（Claude）`を記載すること
-- 問題がない場合は、レビュー結果とは別の通常コメントとして`Approve by エージェント名 <メールアドレス> :octocat:`を投稿すること
-- 修正コミット追加後は、過去の承認に依存せず最新HEADを確認して再レビューすること
-- 指摘事項が残っている場合は、重大度に応じて`COMMENT`または`REQUEST_CHANGES`を投稿すること
-
-#### inline suggestion comment の運用
-
-レビューで指摘を行う際、変更内容が明確で、該当箇所へ直接適用できるものについては、可能な範囲で inline suggestion comment を併用すること。
-
-- 変更内容が明確で、その場で置き換え案を提示できる場合は、先に該当箇所へ inline suggestion comment を投稿すること
-- inline suggestion comment では、必要に応じて GitHub の suggestion ブロックで変更案を提示すること
-- inline suggestion comment は対象PRのdiffに含まれる行にのみ投稿できる。差分外の既存行に対する指摘は、suggestionを付けず通常のレビュー本文で行うこと
-- 発行された inline suggestion comment のURLを取得し、レビュー本文の該当指摘に `comment: コメントURL` の形式で記載すること
-- `comment:` が指すのは inline suggestion comment（`#discussion_r...` のレビューコメント）のURLであり、そのコメント本文に含める GitHub の suggestion ブロックとは別物として扱うこと
-- suggestion は、そのまま適用しても意図が崩れない最小単位にすること
-- suggestion を出した場合でも、レビュー本文側には問題の内容・影響・修正方針を残すこと
-- 複数ファイルにまたがる修正、設計判断、テスト追加、責務分離など、単一suggestionで表現しづらい内容は無理に suggestion 化しないこと
-- GitHub APIやツール制約で inline suggestion comment のURL取得が難しい場合は、通常のレビュー本文のみで指摘してよい
-
-Codex が `Findings` に指摘を記載する場合、該当Findingに対して inline suggestion comment がある場合は、以下の形式でリンクを記載すること:
-
-```md
-[P1] 指摘内容
-
-`path/to/file.ts:123`
-
-問題の内容、影響、修正方針を記載する。
-
-comment: https://github.com/owner/repo/pull/xx#discussion_rxxxxxxxx
-```
-
-Claude が `Suggestions` または `Issues` に指摘を記載する場合、該当指摘に対して inline suggestion comment がある場合は、各指摘の本文内に以下の形式でリンクを記載すること:
-
-```md
-### 指摘内容
-
-問題の内容、影響、修正方針を記載する。
-
-comment: https://github.com/owner/repo/pull/xx#discussion_rxxxxxxxx
-```
+- 初回・再レビュー・修正後レビューを問わず、レビュー結果をGitHub上へコメントとして投稿すること。問題がない場合は、レビュー結果とは別の通常コメントとして`Approve by エージェント名 <メールアドレス> :octocat:`を投稿すること
+- 修正コミット追加後は、過去の承認に依存せず最新HEADを確認して再レビューすること。指摘事項が残っている場合は、重大度に応じて`COMMENT`または`REQUEST_CHANGES`を投稿すること
 
 #### レビュー指摘への対応コミット
 
