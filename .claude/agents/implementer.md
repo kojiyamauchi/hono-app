@@ -15,20 +15,20 @@ permissionMode: acceptEdits
 3. 委譲元から渡された設計・スコープ・完了定義を確認し、不明点があれば実装を始める前に要約して質問すること（勝手にスコープを広げない）。
 4. 実装を始める前に、今回の変更をコミット単位へ分解し、`.claude/skills/commit-granularity/SKILL.md` の「作業開始時チェック」を使って粒度を点検すること。
 
-## 設計の遵守事項（CLAUDE.mdの要点）
+## 設計の遵守事項
 
-- **features独立**: `src/features/*` 同士の相互importは禁止。feature間で共有する処理・型・ドメインは `src/shared/*` に置く。依存方向は `features -> shared` の一方向。
-- **features設計**: 公開URLのトップレベルは `src/routes/`、feature内部のルート詳細は `src/features/<feature>/routes/`。URLはkebab-case、featureディレクトリはcamelCase可。
-- **標準ディレクトリ**: `src/features/<feature>/` と `src/shared/<domain>/` は CLAUDE.md「features設計」の標準ディレクトリ（`controllers`/`dtos`/`entities`/`mappers`/`repositories`/`routes`/`schemas`/`services`）に揃える。`tokens/`・`handlers/`・`clients/` のような**新しい責務名のディレクトリを増やさない**こと。新しい処理はまず既存の標準ディレクトリのどれに属するかを判断し、置き場所に迷う責務が出たら実装前に設計方針を確認すること。
+設計・命名規則の正本はリポジトリ直下の `CLAUDE.md` / `AGENTS.md`。以下は特に外せないガードレールと、詳細の参照先を示す（コールドスタートでの取りこぼしを防ぐため最小限を再掲する）。
+
+- **features独立（外せない）**: `src/features/*` 同士の相互importは禁止。feature間で共有する処理・型・ドメインは `src/shared/*` に置き、依存方向は `features -> shared` の一方向に保つ。
+- **標準ディレクトリを増やさない（外せない）**: `src/features/<feature>/` と `src/shared/<domain>/` は標準ディレクトリ（`controllers`/`dtos`/`entities`/`mappers`/`repositories`/`routes`/`schemas`/`services`）に揃える。`tokens/`・`handlers/`・`clients/` のような新しい責務名のディレクトリを勝手に増やさない。置き場所に迷う責務が出たら実装前に設計方針を確認すること。
 - **レイヤード**: controller → service → repository。リクエスト/レスポンスはHonoの `c`、バリデーションはzod + `@hono/zod-validator`、エラーは `AppError` + `app.onError`。DBアクセスはrepository層に閉じる（`@/libs/prisma`）。
-- **Zod schema命名**: schemaは `***Schema`、`z.infer` 由来の型は `***SchemaType`（param系は `***ParamSchemaType`）。`***Input` / `***Param` などの別接尾語は使わない。
-- **コメント・ドキュメントは日本語**。JSDocも日本語。変数名・関数名は英語のcamelCase/PascalCase。
-- APIを追加・変更・削除した場合は、同じPRで `docs/endpoints.md`（公開APIの正本）も更新すること。
-- **migrationを伴う実装は実DBで一次検証する**: `prisma migrate dev` でローカルDBへ適用し、非自明なデータ層（transaction・条件付き更新・一意制約・外部キー等）は実DB smoke（実APIへのHTTPリクエスト / repository・serviceを呼ぶ使い捨てスクリプト / `psql` 等）で挙動を確認して結果を報告すること。使い捨てスクリプトはコミットせず、検証データは削除する。詳細はCLAUDE.md「migrationを含む変更の実DB検証」を参照。
+- **命名・ドキュメント**: コメント・JSDocは日本語、変数名・関数名は英語のcamelCase/PascalCase。Zod schemaは `***Schema`、`z.infer` 由来の型は `***SchemaType`（param系は `***ParamSchemaType`）。命名規則とfeatures設計（公開URLは `src/routes/`、feature内部は `src/features/<feature>/routes/` など）の詳細は CLAUDE.md「Zod schema と型定義の命名」「features設計」を参照。
+- **公開APIの正本**: APIを追加・変更・削除した場合は、同じPRで `docs/endpoints.md` も更新すること。
+- **migration検証**: migrationを伴う実装はローカル実DBで一次検証する（`prisma migrate dev` で適用、非自明なデータ層は実DB smokeで挙動を確認して結果を報告、使い捨てスクリプトはコミットせず検証データは削除）。詳細は CLAUDE.md「migrationを含む変更の実DB検証」を参照。
 
 ## 実装の進め方
 
-レイヤード順で「実装 → そのテスト」をペアで刻むこと。コミットの標準順は CLAUDE.md「feature実装時の標準コミット粒度」に従う（順序の正本は CLAUDE.md。番号付きの順序はそちらを参照すること）。
+レイヤード順で「実装 → そのテスト」をペアで刻むこと。番号付きの標準コミット順とその根拠は、`.claude/skills/commit-granularity/SKILL.md`「feature実装時の標準コミット順」を正本とする（実装計画時とコミット直前に必ずこのSkillを参照すること）。
 
 - 「実装 → そのテスト」は必ず隣接させ、間に別レイヤーのコミットを挟まないこと。
 - 役割の異なる変更（`DTO + mapper + repository` や `service + schema + controller + routes`）を1コミットに混ぜないこと。**特に controller と routes は必ず別コミットにする**（同一コミットへまとめない）。
