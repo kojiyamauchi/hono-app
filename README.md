@@ -2,11 +2,11 @@
 
 <!-- cspell:ignore lintstagedrc -->
 
-Hono を使ったバックエンド API の実装用プロジェクトです。
+Hono / Bun / TypeScript / Prisma / PostgreSQL をベースにした、バックエンド API の実装用プロジェクトです。
 
-薄い Web フレームワークである Hono をベースに、実務で使いやすいバックエンド構成を試せるようにしています。現在はルーティング、ヘルスチェック、Prisma、ローカル Supabase、Lint / Format / Spell Check / CI の土台を入れています。
+薄い Web フレームワークである Hono を使い、認証、ユーザー、組織、メンバー、招待、パスワードリセットなどの API を実装しています。ローカル開発では Supabase CLI による PostgreSQL を使い、Lint / Format / Spell Check / Test / CI の確認フローも整えています。
 
-## Tech Stack
+## 技術スタック
 
 - Hono
 - TypeScript
@@ -22,13 +22,13 @@ Hono を使ったバックエンド API の実装用プロジェクトです。
 - Bun Test
 - GitHub Actions
 
-## Project Structure
+## ディレクトリ構成
 
 ```txt
 .
-|-- .claude/                         # Claude Code settings and skills
+|-- .claude/                         # Claude Code の設定とSkill
 |   |-- agents/
-|   |   `-- implementer.md           # implementation sub-agent (Sonnet)
+|   |   `-- implementer.md           # 実装担当サブエージェント（Sonnet）
 |   |-- hooks/
 |   |-- rules/
 |   `-- skills/
@@ -36,83 +36,68 @@ Hono を使ったバックエンド API の実装用プロジェクトです。
 |       |   `-- SKILL.md
 |       `-- review-response/
 |           `-- SKILL.md
-|-- .codex/                          # Codex project-local skills
+|-- .codex/                          # Codex のプロジェクト内Skill
 |   `-- skills/
 |       `-- pr-review/
 |           `-- SKILL.md
 |-- .github/
-|   |-- pull_request_template.md     # PR template
+|   |-- pull_request_template.md     # PRテンプレート
 |   `-- workflows/
 |       |-- ci.yml                   # GitHub Actions CI
-|       `-- comment-ops.yml          # PR comment operations
+|       `-- comment-ops.yml          # PRコメント操作
 |-- .husky/
 |   `-- pre-commit                   # pre-commit hook
-|-- Dockerfile                       # Bun runtime container for deployment
+|-- Dockerfile                       # デプロイ用のBun実行コンテナ
 |-- prisma/
-|   |-- schema.prisma                # Prisma schema
-|   `-- migrations/                  # Prisma migrations
+|   |-- schema.prisma                # Prismaスキーマ
+|   `-- migrations/                  # Prisma migration
 |-- src/
-|   |-- app.ts                       # Hono app instance
-|   |-- server.ts                    # local server entrypoint
+|   |-- app.ts                       # Honoアプリインスタンス
+|   |-- server.ts                    # ローカルサーバーのエントリーポイント
 |   |-- routes/
-|   |   `-- index.ts                 # top-level route registry
+|   |   `-- index.ts                 # トップレベルroute登録
 |   |-- libs/
-|   |   |-- prisma.ts                # Prisma Client setup
-|   |   `-- supabase.ts              # Supabase client setup
+|   |   |-- prisma.ts                # Prisma Client設定
+|   |   `-- supabase.ts              # Supabase client設定
 |   |-- features/
-|   |   |-- auth/                    # custom auth feature
-|   |   |   |-- controllers/
-|   |   |   |-- dtos/
-|   |   |   |-- entities/
-|   |   |   |-- mappers/
-|   |   |   |-- repositories/
-|   |   |   |-- routes/
-|   |   |   |-- schemas/
-|   |   |   `-- services/
-|   |   |-- supabaseAuth/            # Supabase Auth feature
-|   |   |   |-- controllers/
-|   |   |   |-- dtos/
-|   |   |   |-- entities/
-|   |   |   |-- mappers/
-|   |   |   |-- repositories/
-|   |   |   |-- routes/
-|   |   |   |-- schemas/
-|   |   |   `-- services/
-|   |   `-- users/                   # users feature scaffold
+|   |   `-- <feature>/               # 公開URLのトップレベルに対応する機能境界
 |   |       |-- controllers/
 |   |       |-- dtos/
 |   |       |-- entities/
 |   |       |-- mappers/
 |   |       |-- repositories/
+|   |       |-- routes/
 |   |       |-- schemas/
 |   |       `-- services/
 |   |-- middlewares/
-|   |   |-- auth/
-|   |   `-- supabaseAuth/
 |   |-- shared/
-|   |   `-- user/                    # shared User domain
+|   |   `-- <domain>/                # 複数featureで共有するドメイン・処理
+|   |       |-- controllers/
 |   |       |-- dtos/
 |   |       |-- entities/
 |   |       |-- mappers/
-|   |       `-- repositories/
+|   |       |-- repositories/
+|   |       |-- routes/
+|   |       |-- schemas/
+|   |       `-- services/
 |   |-- types/
 |   `-- utils/
 |-- supabase/
-|   |-- config.toml                  # local Supabase config
-|   |-- seed.sql                     # local seed file
+|   |-- config.toml                  # ローカルSupabase設定
+|   |-- seed.sql                     # ローカルseed
 |   `-- snippets/
-|-- .env.example                     # environment variable example
-|-- .lintstagedrc.yml                # lint-staged config
-|-- .prettierrc.yml                  # Prettier config
-|-- CLAUDE.md                        # AI agent operating rules
-|-- cspell.yml                       # spell check config
-|-- eslint.config.mjs                # ESLint config
-|-- package.json                     # Bun scripts and dependencies
-|-- prisma.config.ts                 # Prisma CLI config
-`-- tsconfig.json                    # TypeScript config
+|-- .env.example                     # 環境変数の例
+|-- .lintstagedrc.yml                # lint-staged設定
+|-- .prettierrc.yml                  # Prettier設定
+|-- CLAUDE.md                        # AIエージェント向け運用ルール
+|-- cspell.yml                       # spell check設定
+|-- eslint.config.mjs                # ESLint設定
+|-- package.json                     # Bun scriptsと依存関係
+|-- prisma.config.ts                 # Prisma CLI設定
+`-- tsconfig.json                    # TypeScript設定
 ```
 
-## Features Architecture
+## Features設計
 
 このプロジェクトでは、公開URLのトップレベルroutingを機能境界として扱います。
 
@@ -133,7 +118,7 @@ Hono を使ったバックエンド API の実装用プロジェクトです。
 - `src/shared/` から `src/features/` をimportすることは禁止です。
   - 依存方向は `features -> shared` の一方向に保ちます。
 
-### Standard Directories
+### 標準ディレクトリ
 
 `src/features/<feature>/` と `src/shared/<domain>/` 配下の構成は、以下の標準ディレクトリに揃えます。
 
@@ -155,7 +140,7 @@ services/
 - 標準ディレクトリでは表現しづらい責務が出た場合は、実装前に設計方針を確認し、必要に応じてこのドキュメントを更新してから追加します。
 - 現時点で実装がない標準ディレクトリには `.gitkeep` を置き、構成の一貫性を保ちます。
 
-## Schema Naming
+## Schema命名
 
 `src/features/**/schemas/` および `src/shared/**/schemas/` 配下では、Zod schemaとそこから推論する型の対応が分かる命名に揃えます。
 
@@ -167,39 +152,39 @@ services/
   - 例: `UserIdParamSchemaType`、`OrganizationIdParamSchemaType`
 - schema由来の型には `***Input` や `***Param` のような別接尾語を使いません。
 
-## Getting Started
+## はじめに
 
-Install dependencies.
+依存関係をインストールします。
 
 ```bash
 bun install
 ```
 
-Create `.env`.
+`.env` を作成します。
 
 ```bash
 cp .env.example .env
 ```
 
-Start local Supabase.
+ローカルSupabaseを起動します。
 
 ```bash
 bun run db:start
 ```
 
-Apply Prisma migrations.
+Prisma migrationを適用します。
 
 ```bash
 bun run prisma:migrate:dev
 ```
 
-Start the development server.
+開発サーバーを起動します。
 
 ```bash
 bun run dev
 ```
 
-The API runs on:
+APIは以下で起動します。
 
 ```txt
 http://localhost:3000
@@ -230,9 +215,9 @@ await fetch('/auth/login', {
 - `COOKIE_SECURE` は未設定なら有効（本番では必ず有効）。HTTP のローカル開発でのみ `COOKIE_SECURE=false` にしてください。
 - フロントエンドとAPIが**cross-site**になる構成では `COOKIE_SAMESITE=None` を設定します。`SameSite=None` はブラウザ仕様上 Secure が必須のため、その場合 Secure は自動的に有効化されます。あわせて `ALLOWED_ORIGINS` に許可するフロントエンドのOriginを設定してください。
 
-## Local Database
+## ローカルデータベース
 
-Local development uses Supabase CLI and Docker.
+ローカル開発では Supabase CLI と Docker を使います。
 
 ```txt
 Supabase Studio: http://127.0.0.1:54323
@@ -240,19 +225,19 @@ API URL:         http://127.0.0.1:54321
 Database URL:    postgresql://postgres:postgres@127.0.0.1:54322/postgres
 ```
 
-Check local Supabase status.
+ローカルSupabaseの状態を確認します。
 
 ```bash
 bun run db:status
 ```
 
-Stop local Supabase.
+ローカルSupabaseを停止します。
 
 ```bash
 bun run db:stop
 ```
 
-Open Prisma Studio.
+Prisma Studioを開きます。
 
 ```bash
 bun run prisma:studio
