@@ -365,6 +365,14 @@ git commit --allow-empty -m "initial commit."
 
 これにより、PRの起点が明確になり、以降の変更を追いやすくなる。
 
+### PR本文の関連Issue
+
+対象IssueがあるPRでは、PRがマージされたときに対象Issueが自動でcloseされるよう、PR本文の `関連Issue` セクションに `Closes #<issue番号>` / `Fixes #<issue番号>` / `Resolves #<issue番号>` のいずれかを明記すること。
+
+- 対象Issueがない場合は `なし` と記載すること
+- 空の `Closes #` を残さないこと
+- PR本文の `概要` / `変更内容` / `確認内容` は、対象Issueの受け入れ条件・完了条件と矛盾しないように更新すること
+
 ### PR作成時の公開状態
 
 PRを作成する際、ユーザーから特段の指定がない場合は **draftではなくready/open状態** で作成すること。
@@ -409,6 +417,10 @@ git fetch https://github.com/kojiyamauchi/hono-app.git main:refs/remotes/origin/
 - AIエージェントが作成したPRは、他のAIエージェントに加えてユーザーもレビューすること
 - レビューを開始する前に、対象PRのCIが通っていることを確認すること
 - CIが未完了または失敗している場合は、レビュー結果にCI状態を明記し、問題なしの通常コメントはCI通過後に投稿すること
+- PR本文の `関連Issue` や `Closes #...` / `Fixes #...` / `Resolves #...` を確認し、対象Issueがある場合はレビュー前にIssue本文・コメント・受け入れ条件・完了条件・未完了TODOを読むこと
+- 対象IssueがあるのにPR本文から参照されていない場合は、レビュー結果でPR本文更新を指摘すること
+- 対象Issueに受け入れ条件または完了条件としてチェック項目が明記されている場合は、PR差分・テスト・動作確認により満たしたと判断できる項目のみ、レビュアーがIssue側のチェックを更新すること。作業メモや実装TODOのチェック項目は、受け入れ条件・完了条件として明確でない限り更新しないこと
+- コミット履歴がレビュー可能な粒度になっているか確認すること。明らかに複数の関心事が混ざり、レビューや将来の追跡が難しい場合は指摘すること
 - レビューでは、バグ、設計リスク、テスト不足、セキュリティ、運用上の問題を優先すること
 - migrationを含むPRのレビューでは、[### migrationを含む変更の実DB検証](#migrationを含む変更の実db検証) に従い、PRの検証証跡を確認し、必要なときのみ実DB適用＋smokeを再実行すること
 - レビュー指摘への修正は、PR上で追加コミットとして行うこと
@@ -497,9 +509,18 @@ gh pr view <PR番号> --json commits
 
 PR本文の更新は、コード修正とは別の補助作業ではなく、レビュー対応フローの一部として扱うこと。
 
+### Skill運用方針
+
+`AGENTS.md` と `CLAUDE.md`、`.codex/skills/` と `.claude/skills/` は、Codex / Claude 向けの並行版として同期運用すること。片方だけにルールを追加して、期待値がズレないようにする。
+
+各Skillは、ルールの正本を長く再掲しないこと。正本は `AGENTS.md` / `CLAUDE.md` などのドキュメントに置き、Skill側は正本への参照と、作業中に実行するチェックリストに徹すること。
+
+例: コミット粒度Skillでは、コミット粒度ルール全文を再掲せず、正本として `AGENTS.md` / `CLAUDE.md` の該当セクションを参照する。そのうえで「このコミットは1つの関心事に閉じているか」「複数レイヤーが混ざっていないか」「対応テストのコミットが隣接しているか」など、実行時に確認する項目へ落とし込む。
+
 ### Codex Skill
 
 - PRレビューの詳細な手順は [`.codex/skills/pr-review/SKILL.md`](.codex/skills/pr-review/SKILL.md) を参照すること
+- コミット粒度の確認手順は [`.codex/skills/commit-granularity/SKILL.md`](.codex/skills/commit-granularity/SKILL.md) を参照すること
 - Codex 用のプロジェクト内Skillは `.codex/skills/` に置くこと
 
 ### 変数名と関数名

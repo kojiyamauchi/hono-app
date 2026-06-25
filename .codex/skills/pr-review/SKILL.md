@@ -18,14 +18,18 @@ description: Use when reviewing a GitHub Pull Request for this repository, espec
 
 1. PRの対象リポジトリ、PR番号、base/head branchを確認する。
 2. GitHub connectorが使える場合は、PR本文、差分、コメント、レビュー状態をconnectorで取得する。
-3. 差分レビューを始める前に、`gh pr checks` やGitHub connectorで対象PRのCIが通っていることを確認する。
-4. CIが未完了または失敗している場合は、その状態をレビュー結果に明記し、問題なしの通常コメントはCI通過後に投稿する。
-5. `gh` が必要な場合は、`gh pr view`, `gh pr diff`, `gh pr checks` を使って補足する。
-6. 差分を読み、バグ、設計リスク、テスト不足、セキュリティ、運用上の問題を優先して確認する。
-7. 必要に応じて `CLAUDE.md` の規約、CI設定、package scripts、Prisma/Supabase設定も確認する。
-8. 変更内容が明確で、該当箇所へ直接適用できる指摘がある場合は、レビュー本文を投稿する前に inline suggestion comment を投稿し、発行されたURLを取得する。
-9. レビュー結果は問題点を先に出し、重大度順に並べる。
-10. 最新HEADに対するレビュー結果を、GitHub上へPR reviewとして投稿する。
+3. PR本文の `関連Issue`、または `Closes #...` / `Fixes #...` / `Resolves #...` を確認する。
+4. 対象Issueがある場合は、レビュー前にIssue本文・コメント・受け入れ条件・完了条件・未完了TODOを取得して、PR差分が意図を満たしているか確認する。対象IssueがあるのにPR本文から参照されていない場合は指摘する。
+5. 差分レビューを始める前に、`gh pr checks` やGitHub connectorで対象PRのCIが通っていることを確認する。
+6. CIが未完了または失敗している場合は、その状態をレビュー結果に明記し、問題なしの通常コメントはCI通過後に投稿する。
+7. `gh` が必要な場合は、`gh pr view`, `gh pr diff`, `gh pr checks` を使って補足する。
+8. 差分を読み、バグ、設計リスク、テスト不足、セキュリティ、運用上の問題を優先して確認する。
+9. コミット履歴がレビュー可能な粒度か確認し、複数の関心事が明らかに混ざる場合は指摘する。
+10. 必要に応じて `CLAUDE.md` の規約、CI設定、package scripts、Prisma/Supabase設定も確認する。
+11. 変更内容が明確で、該当箇所へ直接適用できる指摘がある場合は、レビュー本文を投稿する前に inline suggestion comment を投稿し、発行されたURLを取得する。
+12. 対象Issueに受け入れ条件または完了条件としてチェック項目がある場合は、満たしたと判断できる項目のみIssue側のチェック更新を検討する。
+13. レビュー結果は問題点を先に出し、重大度順に並べる。
+14. 最新HEADに対するレビュー結果を、GitHub上へPR reviewとして投稿する。
 
 ## Review Priorities
 
@@ -35,9 +39,31 @@ description: Use when reviewing a GitHub Pull Request for this repository, espec
 - Hono route、controller、service、repositoryの責務混在
 - 入力検証、エラーハンドリング、HTTP statusの不備
 - テスト不足、CIで検出できないリスク
+- 対象Issueの受け入れ条件・完了条件との不整合
+- コミット履歴の粒度が粗すぎてレビューや追跡が難しい状態
 - migrationを含む場合の実DB検証（`Migration DB Verification` を参照）
 - `CLAUDE.md` の規約違反
 - 不要な大規模リファクタリングや責務外の変更
+
+## Related Issue Review
+
+対象Issueの確認は `AGENTS.md` / `CLAUDE.md` の「PR本文の関連Issue」「AIエージェント間レビュー」を正本とし、ここでは実行手順だけを示す。
+
+1. PR本文の `関連Issue` セクションと closing keyword を確認する。
+2. 対象Issueがある場合は、Issue本文とコメントを読む。
+3. 受け入れ条件・完了条件・未完了TODOがある場合は、PR差分、テスト、動作確認結果と照合する。
+4. 対象IssueがあるのにPR本文から参照されていない場合は、PR本文更新をFindingに含める。
+5. Issue側のチェック更新は、受け入れ条件または完了条件として明確で、PR差分・テスト・動作確認により満たしたと判断できる項目だけに限定する。
+
+## Commit Granularity Review
+
+コミット粒度の正本は `AGENTS.md` / `CLAUDE.md` の「コミットの粒度」「feature実装時の標準コミット粒度」とし、必要に応じて `.codex/skills/commit-granularity/SKILL.md` のチェックリストを使う。
+
+- `git log --oneline <base>..HEAD` でコミット一覧を確認する。
+- `git show --stat <commit>` で、各コミットが1つの関心事に閉じているか確認する。
+- feature実装では、DTO / mapper / repository / service / schema / controller / routes などの標準レイヤーが不自然に混ざっていないか確認する。
+- 実装コミットと対応するテストコミットが隣接しているか確認する。
+- review対応コミットは、指摘ごと、または関心事ごとに分かれているか確認する。
 
 ## Output Format
 
