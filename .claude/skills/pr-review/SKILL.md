@@ -4,6 +4,12 @@
 
 GitHubのPull Requestをレビューし、コメントを投稿するスキルです。
 
+## 正本と責務分担
+
+- PRレビューの実行手順・レビューコメントの見出し/出力フォーマット・inline suggestion comment の投稿手順は、このSkillを正本とする。[CLAUDE.md](../../CLAUDE.md)「AIエージェント間レビュー」には、レビュー担当の割り当てなど常に守る共通原則だけが置かれている。
+- コミット粒度の詳細・標準レイヤー順は、コミット粒度Skill（`.claude/skills/commit-granularity/SKILL.md`）を正本とする。レビューではそのチェックリストを使う。
+- migration検証・コーディング規約など、本Skillで扱わない（Skill化していない）ルールは、引き続き [CLAUDE.md](../../CLAUDE.md) を正本とし、必要な箇所で参照する。
+
 ## 使用タイミング
 
 - ユーザーが「PRをレビューして」と依頼した時
@@ -91,7 +97,7 @@ gh pr diff <PR番号>
 
 #### コミット粒度の確認（レビュー時・必須）
 
-CLAUDE.md「コミットの粒度」「feature実装時の標準コミット粒度」に従っているかを、`git log --oneline <base>..HEAD` と `git show --stat <commit>` で**1コミットずつ**確認する。詳細・原則はCLAUDE.mdを正本とし、必要に応じて `.claude/skills/commit-granularity/SKILL.md` のチェックリストを使う。
+コミット粒度ルールに従っているかを、`git log --oneline <base>..HEAD` と `git show --stat <commit>` で**1コミットずつ**確認する。詳細・標準レイヤー順は コミット粒度Skill（`.claude/skills/commit-granularity/SKILL.md`）を正本とし、そのチェックリストを使う。CLAUDE.md「コミットの粒度」には常に守る共通原則がある。
 
 - **レイヤー混在がないか**: 1コミットが複数の標準レイヤーを跨いでいないか（特に `controllers/` と `routes/` を同一コミットに混ぜていないか、`DTO + mapper + repository` をまとめていないか）。
 - **実装→テストの隣接**: 新規実装コミットに対応するテストが同一または隣接コミットにあるか。middleware・`app.ts`（CORS等）の横断的な追加にもテストがあるか。
