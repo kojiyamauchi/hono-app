@@ -2,7 +2,7 @@ import type { Context, ContextManager, TracerProvider } from '@opentelemetry/api
 import { ROOT_CONTEXT } from '@opentelemetry/api'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 
-import { initializeTelemetry, parseOtelHeaders, resetTelemetryForTest, resolveTelemetryConfig } from './telemetry'
+import { initializeTelemetry, parseOtelHeaders, resetTelemetryForTest, resolveTelemetryConfig } from './index'
 
 type Dependencies = Parameters<typeof initializeTelemetry>[1]
 
