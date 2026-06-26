@@ -1,12 +1,18 @@
 import type { Context, ContextManager, TracerProvider } from '@opentelemetry/api'
 import { ROOT_CONTEXT } from '@opentelemetry/api'
-import { afterEach, describe, expect, test } from 'bun:test'
+import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 
 import { initializeTelemetry, parseOtelHeaders, resetTelemetryForTest, resolveTelemetryConfig } from './telemetry'
 
 type Dependencies = Parameters<typeof initializeTelemetry>[1]
 
-const createTestDependencies = (): {
+const createTestDependencies = (
+  options: {
+    createProviderError?: Error
+    isContextManagerRegistered?: boolean
+    isTracerProviderRegistered?: boolean
+  } = {},
+): {
   calls: string[]
   dependencies: Dependencies
   receivedConfig: ReturnType<typeof resolveTelemetryConfig> | undefined
@@ -48,6 +54,9 @@ const createTestDependencies = (): {
       createProvider: (config) => {
         calls.push('createProvider')
         receivedConfig = config
+        if (options.createProviderError) {
+          throw options.createProviderError
+        }
         return provider
       },
       disableContext: () => {
@@ -58,11 +67,11 @@ const createTestDependencies = (): {
       },
       registerContextManager: () => {
         calls.push('registerContextManager')
-        return true
+        return options.isContextManagerRegistered ?? true
       },
       registerTracerProvider: () => {
         calls.push('registerTracerProvider')
-        return true
+        return options.isTracerProviderRegistered ?? true
       },
     },
     get receivedConfig() {
@@ -116,6 +125,19 @@ describe('resolveTelemetryConfig', () => {
     ).toEqual({
       enabled: false,
       reason: 'missing-headers',
+    })
+  })
+
+  test('endpointのURL形式が不正な場合は外部送信を有効にしない', () => {
+    expect(
+      resolveTelemetryConfig({
+        OTEL_EXPORTER_OTLP_HEADERS: 'api-key=test-key',
+        OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: 'not-a-url',
+        OTEL_TRACES_ENABLED: 'true',
+      }),
+    ).toEqual({
+      enabled: false,
+      reason: 'invalid-endpoint',
     })
   })
 
@@ -202,5 +224,55 @@ describe('initializeTelemetry', () => {
       'disableContext',
       'disableTrace',
     ])
+  })
+
+  test('global登録に失敗した場合はログに残す', async () => {
+    const consoleError = spyOn(console, 'error').mockImplementation(() => {})
+    const telemetry = createTestDependencies({
+      isTracerProviderRegistered: false,
+    })
+
+    const state = initializeTelemetry(
+      {
+        OTEL_EXPORTER_OTLP_HEADERS: 'api-key=test-key',
+        OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: 'https://otlp.nr-data.net:4318/v1/traces',
+        OTEL_TRACES_ENABLED: 'true',
+      },
+      telemetry.dependencies,
+    )
+
+    expect(state.enabled).toBe(true)
+    expect(consoleError).toHaveBeenCalledWith('OpenTelemetryのglobal登録に失敗しました', {
+      contextManager: true,
+      tracerProvider: false,
+    })
+
+    consoleError.mockRestore()
+    await state.shutdown()
+  })
+
+  test('provider生成に失敗した場合は無効状態へフォールバックしglobal状態を解除する', () => {
+    const consoleError = spyOn(console, 'error').mockImplementation(() => {})
+    const telemetry = createTestDependencies({
+      createProviderError: new Error('provider failed'),
+    })
+
+    const state = initializeTelemetry(
+      {
+        OTEL_EXPORTER_OTLP_HEADERS: 'api-key=test-key',
+        OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: 'https://otlp.nr-data.net:4318/v1/traces',
+        OTEL_TRACES_ENABLED: 'true',
+      },
+      telemetry.dependencies,
+    )
+
+    expect(state).toMatchObject({
+      enabled: false,
+      reason: 'startup-error',
+    })
+    expect(telemetry.calls).toEqual(['createProvider', 'disableContext', 'disableTrace'])
+    expect(consoleError).toHaveBeenCalled()
+
+    consoleError.mockRestore()
   })
 })

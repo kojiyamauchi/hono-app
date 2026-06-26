@@ -134,8 +134,15 @@ export const initializeTelemetry = (
     const provider = dependencies.createProvider(config)
     const contextManager = dependencies.createContextManager()
 
-    dependencies.registerContextManager(contextManager)
-    dependencies.registerTracerProvider(provider)
+    const isContextManagerRegistered = dependencies.registerContextManager(contextManager)
+    const isTracerProviderRegistered = dependencies.registerTracerProvider(provider)
+
+    if (!isContextManagerRegistered || !isTracerProviderRegistered) {
+      console.error('OpenTelemetryのglobal登録に失敗しました', {
+        contextManager: isContextManagerRegistered,
+        tracerProvider: isTracerProviderRegistered,
+      })
+    }
 
     telemetryState = {
       enabled: true,

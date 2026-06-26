@@ -26,8 +26,8 @@ const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
   console.info(`${signal} received. Shutting down server.`)
 
   try {
-    await shutdownTelemetry()
     await server.stop(true)
+    await shutdownTelemetry()
     process.exit(0)
   } catch (error) {
     console.error('Server shutdown failed.', error)
