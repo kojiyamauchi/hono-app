@@ -1,5 +1,6 @@
 import type { Context, ContextManager, TracerProvider } from '@opentelemetry/api'
 import { ROOT_CONTEXT } from '@opentelemetry/api'
+import type { Instrumentation } from '@opentelemetry/instrumentation'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 
 import { initializeTelemetry, parseOtelHeaders, resetTelemetryForTest, resolveTelemetryConfig } from './index'
@@ -19,6 +20,7 @@ const createTestDependencies = (
 } => {
   const calls: string[] = []
   let receivedConfig: ReturnType<typeof resolveTelemetryConfig> | undefined
+  const instrumentations: Instrumentation[] = []
 
   const contextManager: ContextManager = {
     active: () => ROOT_CONTEXT,
@@ -51,6 +53,10 @@ const createTestDependencies = (
         calls.push('createContextManager')
         return contextManager
       },
+      createDatabaseSpanInstrumentations: () => {
+        calls.push('createDatabaseSpanInstrumentations')
+        return instrumentations
+      },
       createProvider: (config) => {
         calls.push('createProvider')
         receivedConfig = config
@@ -68,6 +74,13 @@ const createTestDependencies = (
       registerContextManager: () => {
         calls.push('registerContextManager')
         return options.isContextManagerRegistered ?? true
+      },
+      registerInstrumentations: (receivedInstrumentations) => {
+        calls.push('registerInstrumentations')
+        expect(receivedInstrumentations).toBe(instrumentations)
+        return () => {
+          calls.push('unregisterInstrumentations')
+        }
       },
       registerTracerProvider: () => {
         calls.push('registerTracerProvider')
@@ -210,16 +223,26 @@ describe('initializeTelemetry', () => {
       },
       serviceName: 'hono-app-test',
     })
-    expect(telemetry.calls).toEqual(['createProvider', 'createContextManager', 'registerContextManager', 'registerTracerProvider'])
+    expect(telemetry.calls).toEqual([
+      'createProvider',
+      'createContextManager',
+      'createDatabaseSpanInstrumentations',
+      'registerInstrumentations',
+      'registerContextManager',
+      'registerTracerProvider',
+    ])
 
     await state.shutdown()
 
     expect(telemetry.calls).toEqual([
       'createProvider',
       'createContextManager',
+      'createDatabaseSpanInstrumentations',
+      'registerInstrumentations',
       'registerContextManager',
       'registerTracerProvider',
       'forceFlush',
+      'unregisterInstrumentations',
       'providerShutdown',
       'disableContext',
       'disableTrace',
