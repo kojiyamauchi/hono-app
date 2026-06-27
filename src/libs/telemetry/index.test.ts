@@ -12,6 +12,7 @@ const createTestDependencies = (
     createProviderError?: Error
     isContextManagerRegistered?: boolean
     isTracerProviderRegistered?: boolean
+    registerTracerProviderError?: Error
   } = {},
 ): {
   calls: string[]
@@ -84,6 +85,9 @@ const createTestDependencies = (
       },
       registerTracerProvider: () => {
         calls.push('registerTracerProvider')
+        if (options.registerTracerProviderError) {
+          throw options.registerTracerProviderError
+        }
         return options.isTracerProviderRegistered ?? true
       },
     },
@@ -294,6 +298,41 @@ describe('initializeTelemetry', () => {
       reason: 'startup-error',
     })
     expect(telemetry.calls).toEqual(['createProvider', 'disableContext', 'disableTrace'])
+    expect(consoleError).toHaveBeenCalled()
+
+    consoleError.mockRestore()
+  })
+
+  test('instrumentation登録後に初期化失敗した場合は登録を解除する', () => {
+    const consoleError = spyOn(console, 'error').mockImplementation(() => {})
+    const telemetry = createTestDependencies({
+      registerTracerProviderError: new Error('register failed'),
+    })
+
+    const state = initializeTelemetry(
+      {
+        OTEL_EXPORTER_OTLP_HEADERS: 'api-key=test-key',
+        OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: 'https://otlp.nr-data.net:4318/v1/traces',
+        OTEL_TRACES_ENABLED: 'true',
+      },
+      telemetry.dependencies,
+    )
+
+    expect(state).toMatchObject({
+      enabled: false,
+      reason: 'startup-error',
+    })
+    expect(telemetry.calls).toEqual([
+      'createProvider',
+      'createContextManager',
+      'createDatabaseSpanInstrumentations',
+      'registerInstrumentations',
+      'registerContextManager',
+      'registerTracerProvider',
+      'unregisterInstrumentations',
+      'disableContext',
+      'disableTrace',
+    ])
     expect(consoleError).toHaveBeenCalled()
 
     consoleError.mockRestore()

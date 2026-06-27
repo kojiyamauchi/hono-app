@@ -2,6 +2,7 @@ import { initializeTelemetry, shutdownTelemetry } from './libs/telemetry'
 
 initializeTelemetry()
 
+// DB span計測はpgが読み込まれる前にinstrumentation登録が必要なため、appは初期化後に読み込む。
 const { app } = await import('./app')
 const port = Number(process.env.PORT ?? 3000)
 

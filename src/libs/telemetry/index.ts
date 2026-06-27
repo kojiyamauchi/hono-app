@@ -142,10 +142,12 @@ export const initializeTelemetry = (
     return telemetryState
   }
 
+  let unregisterInstrumentations: (() => void) | undefined
+
   try {
     const provider = dependencies.createProvider(config)
     const contextManager = dependencies.createContextManager()
-    const unregisterInstrumentations = dependencies.registerInstrumentations(dependencies.createDatabaseSpanInstrumentations(), provider)
+    unregisterInstrumentations = dependencies.registerInstrumentations(dependencies.createDatabaseSpanInstrumentations(), provider)
 
     const isContextManagerRegistered = dependencies.registerContextManager(contextManager)
     const isTracerProviderRegistered = dependencies.registerTracerProvider(provider)
@@ -157,11 +159,12 @@ export const initializeTelemetry = (
       })
     }
 
+    const unregister = unregisterInstrumentations
     telemetryState = {
       enabled: true,
       shutdown: async () => {
         await provider.forceFlush()
-        unregisterInstrumentations()
+        unregister()
         await provider.shutdown()
         dependencies.disableContext()
         dependencies.disableTrace()
@@ -171,6 +174,7 @@ export const initializeTelemetry = (
     return telemetryState
   } catch (error) {
     console.error('OpenTelemetryの初期化に失敗しました', error)
+    unregisterInstrumentations?.()
     dependencies.disableContext()
     dependencies.disableTrace()
 
