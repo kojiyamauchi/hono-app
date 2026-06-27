@@ -1,4 +1,4 @@
-import { SpanStatusCode } from '@opentelemetry/api'
+import { SpanKind, SpanStatusCode } from '@opentelemetry/api'
 import { BasicTracerProvider, InMemorySpanExporter, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base'
 import { describe, expect, test } from 'bun:test'
 import { Hono } from 'hono'
@@ -34,7 +34,7 @@ describe('createHttpRequestTracingMiddleware', () => {
 
     expect(response.status).toBe(200)
     expect(span.name).toBe('GET /users/:id')
-    expect(span.kind).toBe(1)
+    expect(span.kind).toBe(SpanKind.SERVER)
     expect(span.attributes['http.route']).toBe('/users/:id')
     expect(span.attributes['http.request.method']).toBe('GET')
     expect(span.attributes['http.response.status_code']).toBe(200)
