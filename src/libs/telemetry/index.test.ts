@@ -1,5 +1,6 @@
 import type { Context, ContextManager, TracerProvider } from '@opentelemetry/api'
 import { ROOT_CONTEXT } from '@opentelemetry/api'
+import type { Instrumentation } from '@opentelemetry/instrumentation'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 
 import { initializeTelemetry, parseOtelHeaders, resetTelemetryForTest, resolveTelemetryConfig } from './index'
@@ -11,6 +12,7 @@ const createTestDependencies = (
     createProviderError?: Error
     isContextManagerRegistered?: boolean
     isTracerProviderRegistered?: boolean
+    registerTracerProviderError?: Error
   } = {},
 ): {
   calls: string[]
@@ -19,6 +21,7 @@ const createTestDependencies = (
 } => {
   const calls: string[] = []
   let receivedConfig: ReturnType<typeof resolveTelemetryConfig> | undefined
+  const instrumentations: Instrumentation[] = []
 
   const contextManager: ContextManager = {
     active: () => ROOT_CONTEXT,
@@ -51,6 +54,10 @@ const createTestDependencies = (
         calls.push('createContextManager')
         return contextManager
       },
+      createDatabaseSpanInstrumentations: () => {
+        calls.push('createDatabaseSpanInstrumentations')
+        return instrumentations
+      },
       createProvider: (config) => {
         calls.push('createProvider')
         receivedConfig = config
@@ -69,8 +76,18 @@ const createTestDependencies = (
         calls.push('registerContextManager')
         return options.isContextManagerRegistered ?? true
       },
+      registerInstrumentations: (receivedInstrumentations) => {
+        calls.push('registerInstrumentations')
+        expect(receivedInstrumentations).toBe(instrumentations)
+        return () => {
+          calls.push('unregisterInstrumentations')
+        }
+      },
       registerTracerProvider: () => {
         calls.push('registerTracerProvider')
+        if (options.registerTracerProviderError) {
+          throw options.registerTracerProviderError
+        }
         return options.isTracerProviderRegistered ?? true
       },
     },
@@ -210,16 +227,26 @@ describe('initializeTelemetry', () => {
       },
       serviceName: 'hono-app-test',
     })
-    expect(telemetry.calls).toEqual(['createProvider', 'createContextManager', 'registerContextManager', 'registerTracerProvider'])
+    expect(telemetry.calls).toEqual([
+      'createProvider',
+      'createContextManager',
+      'createDatabaseSpanInstrumentations',
+      'registerInstrumentations',
+      'registerContextManager',
+      'registerTracerProvider',
+    ])
 
     await state.shutdown()
 
     expect(telemetry.calls).toEqual([
       'createProvider',
       'createContextManager',
+      'createDatabaseSpanInstrumentations',
+      'registerInstrumentations',
       'registerContextManager',
       'registerTracerProvider',
       'forceFlush',
+      'unregisterInstrumentations',
       'providerShutdown',
       'disableContext',
       'disableTrace',
@@ -271,6 +298,41 @@ describe('initializeTelemetry', () => {
       reason: 'startup-error',
     })
     expect(telemetry.calls).toEqual(['createProvider', 'disableContext', 'disableTrace'])
+    expect(consoleError).toHaveBeenCalled()
+
+    consoleError.mockRestore()
+  })
+
+  test('instrumentation登録後に初期化失敗した場合は登録を解除する', () => {
+    const consoleError = spyOn(console, 'error').mockImplementation(() => {})
+    const telemetry = createTestDependencies({
+      registerTracerProviderError: new Error('register failed'),
+    })
+
+    const state = initializeTelemetry(
+      {
+        OTEL_EXPORTER_OTLP_HEADERS: 'api-key=test-key',
+        OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: 'https://otlp.nr-data.net:4318/v1/traces',
+        OTEL_TRACES_ENABLED: 'true',
+      },
+      telemetry.dependencies,
+    )
+
+    expect(state).toMatchObject({
+      enabled: false,
+      reason: 'startup-error',
+    })
+    expect(telemetry.calls).toEqual([
+      'createProvider',
+      'createContextManager',
+      'createDatabaseSpanInstrumentations',
+      'registerInstrumentations',
+      'registerContextManager',
+      'registerTracerProvider',
+      'unregisterInstrumentations',
+      'disableContext',
+      'disableTrace',
+    ])
     expect(consoleError).toHaveBeenCalled()
 
     consoleError.mockRestore()

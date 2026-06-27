@@ -2,8 +2,12 @@ import type { ContextManager, TracerProvider } from '@opentelemetry/api'
 import { context, trace } from '@opentelemetry/api'
 import { AsyncLocalStorageContextManager } from '@opentelemetry/context-async-hooks'
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-proto'
+import type { Instrumentation } from '@opentelemetry/instrumentation'
+import { registerInstrumentations } from '@opentelemetry/instrumentation'
 import { resourceFromAttributes } from '@opentelemetry/resources'
 import { BasicTracerProvider, BatchSpanProcessor } from '@opentelemetry/sdk-trace-base'
+
+import { createDatabaseSpanInstrumentations } from './db'
 
 type TelemetryDisabledReason = 'invalid-endpoint' | 'missing-endpoint' | 'missing-headers' | 'sdk-disabled' | 'startup-error' | 'traces-disabled'
 
@@ -28,9 +32,11 @@ type TelemetryContextManager = ContextManager
 
 type TelemetryDependencies = {
   createContextManager: () => TelemetryContextManager
+  createDatabaseSpanInstrumentations: () => Instrumentation[]
   createProvider: (config: TelemetryConfig & { enabled: true }) => TelemetryProvider
   disableContext: () => void
   disableTrace: () => void
+  registerInstrumentations: (instrumentations: Instrumentation[], provider: TelemetryProvider) => () => void
   registerContextManager: (manager: TelemetryContextManager) => boolean
   registerTracerProvider: (provider: TelemetryProvider) => boolean
 }
@@ -53,6 +59,7 @@ let telemetryState: TelemetryState | undefined
 
 const defaultTelemetryDependencies: TelemetryDependencies = {
   createContextManager: () => new AsyncLocalStorageContextManager(),
+  createDatabaseSpanInstrumentations,
   createProvider: (config) => {
     const exporter = new OTLPTraceExporter({
       headers: config.headers,
@@ -68,6 +75,11 @@ const defaultTelemetryDependencies: TelemetryDependencies = {
   },
   disableContext: () => context.disable(),
   disableTrace: () => trace.disable(),
+  registerInstrumentations: (instrumentations, provider) =>
+    registerInstrumentations({
+      instrumentations,
+      tracerProvider: provider,
+    }),
   registerContextManager: (manager) => context.setGlobalContextManager(manager.enable()),
   registerTracerProvider: (provider) => trace.setGlobalTracerProvider(provider),
 }
@@ -130,9 +142,12 @@ export const initializeTelemetry = (
     return telemetryState
   }
 
+  let unregisterInstrumentations: (() => void) | undefined
+
   try {
     const provider = dependencies.createProvider(config)
     const contextManager = dependencies.createContextManager()
+    unregisterInstrumentations = dependencies.registerInstrumentations(dependencies.createDatabaseSpanInstrumentations(), provider)
 
     const isContextManagerRegistered = dependencies.registerContextManager(contextManager)
     const isTracerProviderRegistered = dependencies.registerTracerProvider(provider)
@@ -144,10 +159,12 @@ export const initializeTelemetry = (
       })
     }
 
+    const unregister = unregisterInstrumentations
     telemetryState = {
       enabled: true,
       shutdown: async () => {
         await provider.forceFlush()
+        unregister()
         await provider.shutdown()
         dependencies.disableContext()
         dependencies.disableTrace()
@@ -157,6 +174,7 @@ export const initializeTelemetry = (
     return telemetryState
   } catch (error) {
     console.error('OpenTelemetryの初期化に失敗しました', error)
+    unregisterInstrumentations?.()
     dependencies.disableContext()
     dependencies.disableTrace()
 
