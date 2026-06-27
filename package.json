@@ -26,6 +26,7 @@
     "prisma:studio": "bunx prisma studio"
   },
   "dependencies": {
+    "@hono/otel": "1.1.2",
     "@hono/zod-validator": "^0.8.0",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/context-async-hooks": "^2.8.0",
