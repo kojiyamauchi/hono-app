@@ -243,6 +243,14 @@ bun run prisma:studio
 
 テストと CI は意図的に DB 非依存（`mock.module` で repository をモック）です。そのため migration の適用や実 DB での挙動（transaction・一意制約・外部キーなど）は CI で検証されません。migration を含む変更は、ローカルで実 DB へ適用し必要に応じて smoke 確認してください。詳細は CLAUDE.md「migrationを含む変更の実DB検証」を参照してください。
 
+## OpenTelemetry
+
+`OTEL_TRACES_ENABLED=true` の場合、OpenTelemetryでHTTP request spanとPostgreSQLのDB spanを作成し、OTLP/HTTP protobuf exporterでNew Relicへ送信します。New Relic Node.js AgentはBun + Hono構成では使わず、OpenTelemetry経由のtrace送信を採用します。
+
+DB spanは `@opentelemetry/instrumentation-pg` で計測します。Prismaは `@prisma/adapter-pg` 経由で `pg` を使うため、実アプリのDBアクセスは `pg` instrumentationで追跡します。DB spanは親spanがある場合だけ作成し、HTTP request spanの子spanとして紐づくことを前提にしています。
+
+DB spanではSQL本文属性（`db.statement` または `db.query.text`）が送信される可能性があります。クエリのパラメータ値は `enhancedDatabaseReporting=false` で送らない設定にしていますが、`$queryRawUnsafe` などで個人情報やsecretをSQL文字列へ直接埋め込まないでください。
+
 ## Scripts
 
 ```bash
