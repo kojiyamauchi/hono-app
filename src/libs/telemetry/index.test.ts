@@ -3,7 +3,7 @@ import { ROOT_CONTEXT } from '@opentelemetry/api'
 import type { Instrumentation } from '@opentelemetry/instrumentation'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 
-import { initializeTelemetry, parseOtelHeaders, resetTelemetryForTest, resolveTelemetryConfig } from './index'
+import { initializeTelemetry, parseOtelHeaders, resetTelemetryForTest, resolveSamplingRatio, resolveTelemetryConfig } from './index'
 
 type Dependencies = Parameters<typeof initializeTelemetry>[1]
 
@@ -172,8 +172,39 @@ describe('resolveTelemetryConfig', () => {
       headers: {
         'api-key': 'test-key',
       },
+      samplingRatio: 0.1,
       serviceName: 'hono-app-test',
     })
+  })
+
+  test('環境変数からtrace sampling ratioを解決する', () => {
+    expect(
+      resolveTelemetryConfig({
+        OTEL_EXPORTER_OTLP_HEADERS: 'api-key=test-key',
+        OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: 'https://otlp.nr-data.net:4318/v1/traces',
+        OTEL_TRACES_ENABLED: 'true',
+        OTEL_TRACES_SAMPLER_RATIO: '0.25',
+      }),
+    ).toMatchObject({
+      enabled: true,
+      samplingRatio: 0.25,
+    })
+  })
+})
+
+describe('resolveSamplingRatio', () => {
+  test('未設定または不正値の場合は安全な既定値にする', () => {
+    expect(resolveSamplingRatio(undefined)).toBe(0.1)
+    expect(resolveSamplingRatio('')).toBe(0.1)
+    expect(resolveSamplingRatio('not-a-number')).toBe(0.1)
+  })
+
+  test('0から1の範囲へ丸める', () => {
+    expect(resolveSamplingRatio('-1')).toBe(0)
+    expect(resolveSamplingRatio('0')).toBe(0)
+    expect(resolveSamplingRatio('0.5')).toBe(0.5)
+    expect(resolveSamplingRatio('1')).toBe(1)
+    expect(resolveSamplingRatio('2')).toBe(1)
   })
 })
 
@@ -225,6 +256,7 @@ describe('initializeTelemetry', () => {
       headers: {
         'api-key': 'test-key',
       },
+      samplingRatio: 0.1,
       serviceName: 'hono-app-test',
     })
     expect(telemetry.calls).toEqual([

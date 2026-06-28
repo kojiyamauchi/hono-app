@@ -17,6 +17,7 @@ const createTelemetryTestApp = (): {
   const app = new Hono()
 
   app.use('*', createHttpRequestTracingMiddleware({ tracer: provider.getTracer('hono-test') }))
+  app.get('/health', (c) => c.json({ ok: true }))
   app.get('/users/:id', (c) => c.json({ ok: true }))
   app.get('/error', (c) => c.text('error', 500))
 
@@ -94,6 +95,40 @@ describe('createHttpRequestTracingMiddleware', () => {
 
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ ok: true })
+    expect(exporter.getFinishedSpans()).toEqual([])
+  })
+
+  test('既定でhealth check requestのspanを作成しない', async () => {
+    const { app, exporter, provider } = createTelemetryTestApp()
+
+    const response = await app.request('/health')
+    await provider.forceFlush()
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ ok: true })
+    expect(exporter.getFinishedSpans()).toEqual([])
+  })
+
+  test('任意のpathを送信対象から除外できる', async () => {
+    const exporter = new InMemorySpanExporter()
+    const provider = new BasicTracerProvider({
+      spanProcessors: [new SimpleSpanProcessor(exporter)],
+    })
+    const app = new Hono()
+
+    app.use(
+      '*',
+      createHttpRequestTracingMiddleware({
+        ignoredPaths: ['/internal/ready'],
+        tracer: provider.getTracer('hono-test'),
+      }),
+    )
+    app.get('/internal/ready', (c) => c.json({ ok: true }))
+
+    const response = await app.request('/internal/ready')
+    await provider.forceFlush()
+
+    expect(response.status).toBe(200)
     expect(exporter.getFinishedSpans()).toEqual([])
   })
 })
