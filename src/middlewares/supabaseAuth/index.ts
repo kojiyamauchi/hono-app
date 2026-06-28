@@ -2,6 +2,7 @@ import type { User } from '@supabase/supabase-js'
 import { createMiddleware } from 'hono/factory'
 
 import { supabase } from '@/libs/supabase'
+import { resolveExternalApiErrorType, resolveExternalApiHost, resolveExternalApiStatusCode, traceExternalApiCall } from '@/libs/telemetry/external'
 import { AppError } from '@/utils/errors'
 
 /**
@@ -18,7 +19,20 @@ export const supabaseAuthMiddleware = createMiddleware<{
   }
 
   const token = authHeader.slice('Bearer '.length)
-  const { data, error } = await supabase.auth.getUser(token)
+  const { data, error } = await traceExternalApiCall(
+    {
+      host: resolveExternalApiHost(process.env.SUPABASE_URL),
+      method: 'GET',
+      operation: 'auth.getUser',
+      resolveResult: (result: Awaited<ReturnType<typeof supabase.auth.getUser>>) => ({
+        errorType: resolveExternalApiErrorType(result.error),
+        statusCode: resolveExternalApiStatusCode(result.error),
+        success: !result.error && Boolean(result.data.user),
+      }),
+      system: 'supabase',
+    },
+    () => supabase.auth.getUser(token),
+  )
   if (error || !data.user) {
     throw new AppError(401, '認証トークンが無効です')
   }
