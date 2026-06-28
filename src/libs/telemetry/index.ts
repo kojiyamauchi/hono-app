@@ -5,7 +5,7 @@ import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-proto'
 import type { Instrumentation } from '@opentelemetry/instrumentation'
 import { registerInstrumentations } from '@opentelemetry/instrumentation'
 import { resourceFromAttributes } from '@opentelemetry/resources'
-import { BasicTracerProvider, BatchSpanProcessor } from '@opentelemetry/sdk-trace-base'
+import { BasicTracerProvider, BatchSpanProcessor, ParentBasedSampler, TraceIdRatioBasedSampler } from '@opentelemetry/sdk-trace-base'
 
 import { createDatabaseSpanInstrumentations } from './db'
 
@@ -20,6 +20,7 @@ type TelemetryConfig =
       enabled: true
       endpoint: string
       headers: Record<string, string>
+      samplingRatio: number
       serviceName: string
     }
 
@@ -53,6 +54,7 @@ type TelemetryState =
     }
 
 const DEFAULT_SERVICE_NAME = 'hono-app'
+const DEFAULT_TRACES_SAMPLING_RATIO = 0.1
 const ENABLED_VALUE = 'true'
 
 let telemetryState: TelemetryState | undefined
@@ -69,6 +71,9 @@ const defaultTelemetryDependencies: TelemetryDependencies = {
     return new BasicTracerProvider({
       resource: resourceFromAttributes({
         'service.name': config.serviceName,
+      }),
+      sampler: new ParentBasedSampler({
+        root: new TraceIdRatioBasedSampler(config.samplingRatio),
       }),
       spanProcessors: [new BatchSpanProcessor(exporter)],
     })
@@ -116,6 +121,7 @@ export const resolveTelemetryConfig = (env: NodeJS.ProcessEnv = process.env): Te
     enabled: true,
     endpoint,
     headers,
+    samplingRatio: resolveSamplingRatio(env.OTEL_TRACES_SAMPLER_RATIO),
     serviceName: env.OTEL_SERVICE_NAME?.trim() || DEFAULT_SERVICE_NAME,
   }
 }
@@ -263,6 +269,23 @@ const isValidUrl = (value: string): boolean => {
   } catch {
     return false
   }
+}
+
+/**
+ * trace全体の送信量を制御するsampling ratioを解決する。
+ */
+export const resolveSamplingRatio = (raw: string | undefined): number => {
+  if (!raw?.trim()) {
+    return DEFAULT_TRACES_SAMPLING_RATIO
+  }
+
+  const ratio = Number(raw)
+
+  if (!Number.isFinite(ratio)) {
+    return DEFAULT_TRACES_SAMPLING_RATIO
+  }
+
+  return Math.min(Math.max(ratio, 0), 1)
 }
 
 const decodeHeaderValue = (value: string): string => {
