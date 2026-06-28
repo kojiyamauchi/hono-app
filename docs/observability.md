@@ -9,6 +9,7 @@
 - HTTP request spanは `@hono/otel` で作成します。
 - DB spanは `@opentelemetry/instrumentation-pg` で作成します。Prismaは `@prisma/adapter-pg` 経由で `pg` を使うため、実アプリのDBアクセスもpg instrumentationで追跡します。
 - 外部API spanは自動計装ではなく、serviceやmiddlewareの境界で手動作成します。対象はResendのメール送信とSupabase Auth呼び出しです。
+- traceはhead-based samplingで送信量を制御します。既定ではroot traceの約10%を送信し、子spanは親traceのsampling判断に従います。
 
 ## 環境変数
 
@@ -21,6 +22,7 @@
 | `OTEL_TRACES_ENABLED`                | はい | `true` のときだけtrace exporterを初期化します。未設定または `false` では外部送信しません。                         |
 | `OTEL_SDK_DISABLED`                  | 任意 | `true` の場合は `OTEL_TRACES_ENABLED=true` でもOpenTelemetry SDK全体を初期化しません。                             |
 | `OTEL_SERVICE_NAME`                  | 任意 | New Relic上の `service.name` です。未設定時は `hono-app` を使います。                                              |
+| `OTEL_TRACES_SAMPLER_RATIO`          | 任意 | root traceのhead-based sampling ratioです。未設定時は `0.1` です。`0` は送信なし、`1` は全送信として扱います。     |
 | `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | はい | New Relicのtrace送信用OTLP endpointです。US regionは `https://otlp.nr-data.net:4318/v1/traces` を使います。        |
 | `OTEL_EXPORTER_OTLP_ENDPOINT`        | 任意 | base endpointだけを指定したい場合に使います。`OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` がある場合はそちらを優先します。 |
 | `OTEL_EXPORTER_OTLP_TRACES_HEADERS`  | はい | trace送信用headerです。New Relicでは `api-key=<license key>` を指定します。                                        |
@@ -32,6 +34,7 @@
 OTEL_TRACES_ENABLED="true"
 OTEL_SDK_DISABLED="false"
 OTEL_SERVICE_NAME="hono-app-local"
+OTEL_TRACES_SAMPLER_RATIO="0.1"
 OTEL_EXPORTER_OTLP_TRACES_ENDPOINT="https://otlp.nr-data.net:4318/v1/traces"
 OTEL_EXPORTER_OTLP_TRACES_HEADERS="api-key=your-new-relic-license-key"
 ```
@@ -91,6 +94,27 @@ server.address = '<your-project>.supabase.co'
 ```
 
 DB spanはHTTP request spanの子spanとして表示されることを確認します。DB spanではSQL本文属性（`db.statement` または `db.query.text`）が送信される可能性があるため、SQLに個人情報やsecretを直接埋め込まないでください。
+
+## Samplingと送信量制御
+
+`OTEL_TRACES_SAMPLER_RATIO` はroot traceに対するhead-based sampling ratioです。`0.1` なら約10%のtraceを送信します。DB spanと外部API spanはHTTP request spanの子spanとして作られるため、親traceがsampledになった場合だけ同じtraceとして送信されます。
+
+初期導入では以下を推奨します。
+
+- local: 通常は `OTEL_TRACES_ENABLED=false` のままにし、New Relic確認時だけ `OTEL_TRACES_SAMPLER_RATIO=1` で短時間確認する
+- staging: `OTEL_TRACES_SAMPLER_RATIO=1` で疎通確認後、継続確認では `0.1` へ下げる
+- production: 継続有効化の開始時は `0.1` を基準にし、New Relic上のingest量を見て調整する
+
+`/health` は高頻度かつ低価値なendpointのため、既定でHTTP request spanの作成対象から除外しています。現時点で他に除外するendpointはありません。外部API spanとDB spanは、HTTP request spanの配下で必要最小限の属性だけを送る方針です。
+
+error traceも初期導入では同じhead-based samplingに従います。errorを必ず保存するtail-based sampling、alert、logs連携は初期導入の非対象です。障害調査で一時的にerror traceを厚く見たい場合は、対象環境の `OTEL_TRACES_SAMPLER_RATIO` を短時間だけ `1` に上げ、確認後に戻してください。
+
+New Relic無料枠を意識した送信量確認では、以下をservice名で絞り込んで確認します。
+
+- `service.name` ごとのtrace ingest量
+- `http.route` ごとのtrace件数と高頻度endpoint
+- `external.system` ごとの外部API span件数
+- DB spanの件数と、SQL本文属性に機微情報が含まれていないこと
 
 ## 確認時の注意
 
