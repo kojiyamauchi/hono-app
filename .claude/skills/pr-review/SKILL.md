@@ -202,7 +202,7 @@ gh pr review <PR番号> --comment -b "レビューコメント内容"
      gh issue comment <issue番号> -b "$(cat <<'EOF'
      ## PRレビュー完了 (Claude)
 
-     PR #<PR番号> のレビュー結果に基づき、全ての受け入れ条件・完了条件の更新を更新しました。
+     PR #<PR番号> のレビュー結果に基づき、全ての受け入れ条件・完了条件の更新を完了しました。
      EOF
      )"
      ````

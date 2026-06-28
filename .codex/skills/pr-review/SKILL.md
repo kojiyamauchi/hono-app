@@ -78,7 +78,7 @@ description: Use when reviewing a GitHub Pull Request for this repository, espec
      gh issue comment <issue番号> -b "$(cat <<'EOF'
      ## PRレビュー完了 (Codex)
 
-     PR #<PR番号> のレビュー結果に基づき、全ての受け入れ条件・完了条件の更新を更新しました。
+     PR #<PR番号> のレビュー結果に基づき、全ての受け入れ条件・完了条件の更新を完了しました。
      EOF
      )"
      ````
