@@ -151,6 +151,11 @@ gh api --method POST \
 
 ## Migration DB Verification
 
+PR本文の `## 実DB検証` セクションは、migrationの有無にかかわらず必須記載とする運用になっている。まず全PR共通で、このセクションが存在し記載漏れになっていないかを確認する。
+
+- migrationを含まないPRでは、同セクションに `- migrationを含まないため検証なし` が記載されていることを確認する。セクション自体が無い、または空欄のままの場合はPR本文更新を指摘する。
+- migrationを含むPRでは、同セクションに以下の証跡が記載されていることを確認する。
+
 テスト/CIはDB非依存のため、migrationの適用や実DB挙動（transaction・一意制約・外部キー等）はCIで検証されない。migrationを含むPRのレビューでは、`AGENTS.md` / `CLAUDE.md`「migrationを含む変更の実DB検証」に従う。詳細・原則は `AGENTS.md` を正本とし、ここでは手順の要点のみ示す。
 
 1. まずPR本文/コメントの**実DB検証証跡**（commit SHA・適用migration・確認内容と結果・データ削除・DB起動状態）を確認する。
