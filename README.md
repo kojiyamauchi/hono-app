@@ -259,6 +259,8 @@ DB spanではSQL本文属性（`db.statement` または `db.query.text`）が送
 
 環境変数、secret管理、環境別の有効化方針、New Relic UIでの確認手順は [docs/observability.md](docs/observability.md) を参照してください。初期導入対象はtracesのみで、Datadog、logs、metrics、alert、dashboardは対象外です。
 
+送信量は `OTEL_TRACES_SAMPLER_RATIO` で制御します。未設定時はroot traceの約10%を送信し、`/health` は既定でHTTP request spanの対象から除外します。
+
 ## Scripts
 
 ```bash
