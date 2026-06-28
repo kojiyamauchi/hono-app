@@ -1,6 +1,7 @@
 import type { User } from '@supabase/supabase-js'
 
 import { supabase } from '@/libs/supabase'
+import { resolveExternalApiErrorType, resolveExternalApiHost, resolveExternalApiStatusCode, traceExternalApiCall } from '@/libs/telemetry/external'
 import { AppError } from '@/utils/errors'
 
 import type { LoginSchemaType, SignupSchemaType } from '../schemas'
@@ -23,10 +24,24 @@ export const supabaseAuthService = {
    * メール確認が無効なため、登録と同時にセッション（トークン）が発行される。
    */
   signup: async (input: SignupSchemaType): Promise<AuthResult> => {
-    const { data, error } = await supabase.auth.signUp({
-      email: input.email,
-      password: input.password,
-    })
+    const { data, error } = await traceExternalApiCall(
+      {
+        host: resolveExternalApiHost(process.env.SUPABASE_URL),
+        method: 'POST',
+        operation: 'auth.signUp',
+        resolveResult: (result: Awaited<ReturnType<typeof supabase.auth.signUp>>) => ({
+          errorType: resolveExternalApiErrorType(result.error),
+          statusCode: resolveExternalApiStatusCode(result.error),
+          success: !result.error,
+        }),
+        system: 'supabase',
+      },
+      () =>
+        supabase.auth.signUp({
+          email: input.email,
+          password: input.password,
+        }),
+    )
     if (error) {
       throw new AppError(400, error.message)
     }
@@ -37,10 +52,24 @@ export const supabaseAuthService = {
    * ログイン。Supabase Auth で認証し、アクセストークンを取得する。
    */
   login: async (input: LoginSchemaType): Promise<AuthResult> => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: input.email,
-      password: input.password,
-    })
+    const { data, error } = await traceExternalApiCall(
+      {
+        host: resolveExternalApiHost(process.env.SUPABASE_URL),
+        method: 'POST',
+        operation: 'auth.signInWithPassword',
+        resolveResult: (result: Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>) => ({
+          errorType: resolveExternalApiErrorType(result.error),
+          statusCode: resolveExternalApiStatusCode(result.error),
+          success: !result.error,
+        }),
+        system: 'supabase',
+      },
+      () =>
+        supabase.auth.signInWithPassword({
+          email: input.email,
+          password: input.password,
+        }),
+    )
     if (error) {
       throw new AppError(401, 'メールアドレスまたはパスワードが正しくありません')
     }

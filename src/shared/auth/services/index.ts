@@ -5,6 +5,7 @@ import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import { sign } from 'hono/jwt'
 import { Resend } from 'resend'
 
+import { resolveExternalApiErrorType, resolveExternalApiStatusCode, traceExternalApiCall } from '@/libs/telemetry/external'
 import { AppError } from '@/utils/errors'
 
 /**
@@ -246,31 +247,45 @@ export const passwordResetNotifier: PasswordResetNotifier = {
     const resetUrl = `${urlBase}?token=${params.token}`
     const ttlHours = PASSWORD_RESET_TOKEN_TTL_MS / (60 * 60 * 1000)
 
-    const { error } = await resend.emails.send({
-      from,
-      to: params.email,
-      subject: 'パスワード再設定のご案内',
-      text: [
-        'パスワードの再設定が申請されました。',
-        '',
-        '以下のURLからパスワードを再設定してください。',
-        resetUrl,
-        '',
-        `このURLの有効期限は${ttlHours}時間です。`,
-        '',
-        'このメールに心当たりがない場合は、操作は不要です。このメールを無視してください。',
-        'パスワードやリセット用URLを他者へ共有・返信しないでください。',
-      ].join('\n'),
-      html: [
-        '<p>パスワードの再設定が申請されました。</p>',
-        '<p>以下のURLからパスワードを再設定してください。</p>',
-        `<p><a href="${resetUrl}">${resetUrl}</a></p>`,
-        `<p>このURLの有効期限は${ttlHours}時間です。</p>`,
-        '<hr>',
-        '<p>このメールに心当たりがない場合は、操作は不要です。このメールを無視してください。</p>',
-        '<p>パスワードやリセット用URLを他者へ共有・返信しないでください。</p>',
-      ].join('\n'),
-    })
+    const { error } = await traceExternalApiCall(
+      {
+        host: 'api.resend.com',
+        method: 'POST',
+        operation: 'emails.send',
+        resolveResult: (result: Awaited<ReturnType<typeof resend.emails.send>>) => ({
+          errorType: resolveExternalApiErrorType(result.error),
+          statusCode: resolveExternalApiStatusCode(result.error),
+          success: !result.error,
+        }),
+        system: 'resend',
+      },
+      () =>
+        resend.emails.send({
+          from,
+          to: params.email,
+          subject: 'パスワード再設定のご案内',
+          text: [
+            'パスワードの再設定が申請されました。',
+            '',
+            '以下のURLからパスワードを再設定してください。',
+            resetUrl,
+            '',
+            `このURLの有効期限は${ttlHours}時間です。`,
+            '',
+            'このメールに心当たりがない場合は、操作は不要です。このメールを無視してください。',
+            'パスワードやリセット用URLを他者へ共有・返信しないでください。',
+          ].join('\n'),
+          html: [
+            '<p>パスワードの再設定が申請されました。</p>',
+            '<p>以下のURLからパスワードを再設定してください。</p>',
+            `<p><a href="${resetUrl}">${resetUrl}</a></p>`,
+            `<p>このURLの有効期限は${ttlHours}時間です。</p>`,
+            '<hr>',
+            '<p>このメールに心当たりがない場合は、操作は不要です。このメールを無視してください。</p>',
+            '<p>パスワードやリセット用URLを他者へ共有・返信しないでください。</p>',
+          ].join('\n'),
+        }),
+    )
 
     if (error) {
       // Resend APIがエラーを返した場合はthrowし、呼び出し元の補償処理を起動する

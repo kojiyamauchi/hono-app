@@ -251,6 +251,8 @@ DB spanは `@opentelemetry/instrumentation-pg` で計測します。Prismaは `@
 
 DB spanではSQL本文属性（`db.statement` または `db.query.text`）が送信される可能性があります。クエリのパラメータ値は `enhancedDatabaseReporting=false` で送らない設定にしていますが、`$queryRawUnsafe` などで個人情報やsecretをSQL文字列へ直接埋め込まないでください。
 
+外部API呼び出しは、Bun上でfetch / SDK内部の自動計装に寄せず、serviceやmiddlewareの境界で手動spanを作成します。対象はResendのメール送信とSupabase Auth呼び出しです。span属性には依存先名、操作名、HTTP method、host、HTTP status相当、成功/失敗だけを入れ、API key、Authorization header、メール本文、メールアドレス、リセットトークン、パスワードなどの機微情報は入れません。
+
 ## Scripts
 
 ```bash
