@@ -131,6 +131,33 @@ describe('traceExternalApiCall', () => {
     expect(values).not.toContain(secretToken)
     expect(values).not.toContain(`Bearer ${secretToken}`)
   })
+
+  test('prototypeなしオブジェクトがthrowされてもERROR状態にする', async () => {
+    const { exporter, provider } = createExternalApiSpanTest()
+    const tracer = trace.getTracer('external-test')
+    const error = Object.create(null)
+
+    await expect(
+      traceExternalApiCall(
+        {
+          host: 'api.resend.com',
+          method: 'POST',
+          operation: 'emails.send',
+          system: 'resend',
+          tracer,
+        },
+        async () => {
+          throw error
+        },
+      ),
+    ).rejects.toBe(error)
+    await provider.forceFlush()
+
+    const [span] = exporter.getFinishedSpans()
+
+    expect(span.attributes['error.type']).toBe('Error')
+    expect(span.status.code).toBe(SpanStatusCode.ERROR)
+  })
 })
 
 describe('resolveExternalApiStatusCode', () => {

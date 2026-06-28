@@ -127,7 +127,7 @@ const resolveErrorType = (error: unknown): string | undefined => {
     if (typeof name === 'string' && name) {
       return name
     }
-    return error.constructor.name || 'Error'
+    return (error as { constructor?: { name?: string } }).constructor?.name ?? 'Error'
   }
 
   return typeof error
