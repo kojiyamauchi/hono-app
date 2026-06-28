@@ -17,6 +17,8 @@
 
 推奨設定はtrace専用の `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` / `OTEL_EXPORTER_OTLP_TRACES_HEADERS` です。`.env.example` には推奨のtrace専用変数だけを記載し、fallback用の共通OTLP変数は下表で挙動だけを説明します。
 
+`OTEL_TRACES_SAMPLER_RATIO` はこのアプリケーションがOpenTelemetry providerへ手動で渡す独自設定です。OpenTelemetry SDKの自動設定で使う標準の `OTEL_TRACES_SAMPLER` / `OTEL_TRACES_SAMPLER_ARG` とは別の設定として扱ってください。
+
 | 環境変数                             | 必須 | 説明                                                                                                               |
 | ------------------------------------ | ---- | ------------------------------------------------------------------------------------------------------------------ |
 | `OTEL_TRACES_ENABLED`                | はい | `true` のときだけtrace exporterを初期化します。未設定または `false` では外部送信しません。                         |
