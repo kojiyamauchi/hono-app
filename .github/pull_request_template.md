@@ -40,11 +40,12 @@ PRタイトルは「[作業者]: 関心事」の形式にしてください。
   - `bun run test`
   - `bun run build`
 
-## 実DB検証（migrationを含むPRのみ）
+## 実DB検証
 
 <!--
-migrationを含まないPRではこのセクションを削除してよい。
-詳細は CLAUDE.md「migrationを含む変更の実DB検証」を参照。
+このセクションはmigrationの有無にかかわらず必ず記載すること。
+migrationを含まないPRでは、以下の各項目を削除し `- migrationを含まないため検証なし` とリスト形式で記載すること。
+詳細は AGENTS.md「migrationを含む変更の実DB検証」を参照。
 -->
 
 - 検証対象commit SHA:
