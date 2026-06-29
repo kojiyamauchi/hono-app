@@ -5,6 +5,7 @@ words:
   - datasource
   - dotenv
   - dtos
+  - extname
   - bun
   - Bun
   - bunx
