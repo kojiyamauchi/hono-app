@@ -427,6 +427,7 @@ Skill化した運用ルールは、詳細手順を `SKILL.md` に集約するこ
 - Issue作成・整理・本文レビューの詳細な手順は [`.claude/skills/issue-management/SKILL.md`](.claude/skills/issue-management/SKILL.md) を参照すること
 - レビュー対応の手順は [`.claude/skills/review-response/SKILL.md`](.claude/skills/review-response/SKILL.md) を参照すること
 - コミット粒度の確認手順は [`.claude/skills/commit-granularity/SKILL.md`](.claude/skills/commit-granularity/SKILL.md) を参照すること
+- DB性能調査（遅い/多いSQLの調査）の手順は [`.claude/skills/db-performance/SKILL.md`](.claude/skills/db-performance/SKILL.md) を参照すること
 - Claude 用のプロジェクト内Skillは `.claude/skills/` に置くこと
 
 ### 変数名と関数名
