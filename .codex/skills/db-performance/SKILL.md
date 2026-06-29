@@ -10,8 +10,8 @@ DBパフォーマンス（遅いクエリ・多いクエリ）を調査するた
 
 ## 正本と責務分担
 
-- DB性能調査の手順・各手段の役割分担・local / staging / production の実行可否は、このSkillを正本とする。[CLAUDE.md](../../CLAUDE.md) / [AGENTS.md](../../AGENTS.md) には、このSkillへの導線だけを置く。
-- index追加・カラム変更など **migrationを伴う改善へ進む場合の検証**は、[CLAUDE.md](../../CLAUDE.md) / [AGENTS.md](../../AGENTS.md) の「migrationを含む変更の実DB検証」セクションを正本とする。本Skillはそこへ接続する（[後述](#6-改善migration-を伴う場合の接続)）。
+- DB性能調査の手順・各手段の役割分担・local / staging / production の実行可否は、このSkillを正本とする。[CLAUDE.md](../../../CLAUDE.md) / [AGENTS.md](../../../AGENTS.md) には、このSkillへの導線だけを置く。
+- index追加・カラム変更など **migrationを伴う改善へ進む場合の検証**は、[CLAUDE.md](../../../CLAUDE.md) / [AGENTS.md](../../../AGENTS.md) の「migrationを含む変更の実DB検証」セクションを正本とする。本Skillはそこへ接続する（[後述](#6-改善migration-を伴う場合の接続)）。
 - migration適用・smoke・PR検証証跡の具体ルールは、上記「migrationを含む変更の実DB検証」に従う。本Skillでは再掲しない。
 
 ## 使用タイミング
@@ -119,11 +119,11 @@ LIMIT 20;
 
 ### 2. New Relic trace（DB span）でAPIリクエストと紐づける
 
-「どのAPIリクエストで遅いDBアクセスが発生したか」を見る。本リポジトリでは `@opentelemetry/instrumentation-pg`（[src/libs/telemetry/db.ts](../../src/libs/telemetry/db.ts)）でPostgreSQLアクセスをDB spanとして計測し、OTLP経由でNew Relicへ送信している（[src/libs/telemetry/index.ts](../../src/libs/telemetry/index.ts)）。
+「どのAPIリクエストで遅いDBアクセスが発生したか」を見る。本リポジトリでは `@opentelemetry/instrumentation-pg`（[src/libs/telemetry/db.ts](../../../src/libs/telemetry/db.ts)）でPostgreSQLアクセスをDB spanとして計測し、OTLP経由でNew Relicへ送信している（[src/libs/telemetry/index.ts](../../../src/libs/telemetry/index.ts)）。
 
 #### 2-1. trace送信の有効化前提
 
-DB spanはroot span（HTTP request span）の子として計測される（`requireParentSpan: true`）。trace送信には以下の環境変数が必要（[.env.example](../../.env.example) 参照）:
+DB spanはroot span（HTTP request span）の子として計測される（`requireParentSpan: true`）。trace送信には以下の環境変数が必要（[.env.example](../../../.env.example) 参照）:
 
 - `OTEL_TRACES_ENABLED="true"`（未設定・falseだとexporterを作らず外部送信しない）
 - `OTEL_SDK_DISABLED` が `true` でないこと
@@ -154,7 +154,7 @@ EXPLAIN (ANALYZE, BUFFERS) SELECT ...; -- 対象SQL
 - `rows`（推定）と `actual rows`（実測）の乖離（統計のズレ・カーディナリティ誤推定）
 - `Sort` / `Hash` / `Join` のコストとメモリ（`work_mem` あふれによる外部ソート）
 - `Buffers`（shared hit/read。読み取り量とキャッシュ効き）
-- 本リポジトリのschema上のindex（[prisma/schema.prisma](../../prisma/schema.prisma) の `@unique` / `@@unique` / `@@index`）が、対象クエリのWHERE/JOIN/ORDER BYに対応しているか
+- 本リポジトリのschema上のindex（[prisma/schema.prisma](../../../prisma/schema.prisma) の `@unique` / `@@unique` / `@@index`）が、対象クエリのWHERE/JOIN/ORDER BYに対応しているか
 
 注意:
 
@@ -173,7 +173,7 @@ EXPLAIN (ANALYZE, BUFFERS) SELECT ...; -- 対象SQL
 
 repositoryメソッドが実際にどのSQLを発行しているか（N+1や想定外のクエリ）を local で確認するデバッグ用途。常設の計測基盤にはしない。
 
-本リポジトリのPrismaクライアントは [src/libs/prisma/index.ts](../../src/libs/prisma/index.ts) で `adapter-pg` を使って生成している。query logを見たい場合は、調査時だけ一時的に `log` オプションを付ける（恒久的にコミットしない）:
+本リポジトリのPrismaクライアントは [src/libs/prisma/index.ts](../../../src/libs/prisma/index.ts) で `adapter-pg` を使って生成している。query logを見たい場合は、調査時だけ一時的に `log` オプションを付ける（恒久的にコミットしない）:
 
 ```typescript
 // 調査時のみ一時的に付与する。コミットしないこと。
@@ -193,13 +193,13 @@ export const prisma = new PrismaClient({
 
 - SQL本文・パラメータ・query log・trace属性には、email・token・個人情報が含まれ得る。
 - PR・Issue・レビューコメント・チャットへ貼るときは、`WHERE email = 'xxx@example.com'` のような具体値や token を `<masked>` 等へ置き換える。
-- production の license key やcredentialは貼らない（[.env.example](../../.env.example) の `OTEL_EXPORTER_OTLP_TRACES_HEADERS` の実値など）。
+- production の license key やcredentialは貼らない（[.env.example](../../../.env.example) の `OTEL_EXPORTER_OTLP_TRACES_HEADERS` の実値など）。
 
 ### 6. 改善（migration を伴う場合）の接続
 
 調査の結果、index追加・カラム変更・クエリ修正などで **migrationを伴う改善**へ進む場合は、ここで本Skillの調査フェーズを抜け、実DB検証ルールへ接続する。
 
-- migrationの作成・適用・`prisma generate`・smoke・PR検証証跡は、[CLAUDE.md](../../CLAUDE.md) / [AGENTS.md](../../AGENTS.md) の **「migrationを含む変更の実DB検証」** セクションを正本とする。
+- migrationの作成・適用・`prisma generate`・smoke・PR検証証跡は、[CLAUDE.md](../../../CLAUDE.md) / [AGENTS.md](../../../AGENTS.md) の **「migrationを含む変更の実DB検証」** セクションを正本とする。
 - index追加は、追加前後の `EXPLAIN (ANALYZE, BUFFERS)` を取り、`Seq Scan` → `Index Scan` への変化や実行時間・`Buffers` の改善を smoke として記録すると、検証証跡に使える。
 - migrationを伴わない調査だけで完結した場合（設定変更・クエリ呼び出し側の修正のみ等）は、その旨をPR本文の `## 実DB検証` セクションへ記載する（migrationを含まない場合のリスト形式記載に従う）。
 
