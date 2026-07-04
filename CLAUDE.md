@@ -86,7 +86,7 @@ types                          （型宣言のみ・最下層）
 ##### 各層の責務
 
 - `types/`: アプリ全体で使う型宣言専用（Honoの型拡張、環境変数の型など）。ランタイムコードは置かないこと
-- `utils/`: 特定の外部サービスに依存しない汎用ユーティリティ（errors / rateLimit / timing / validationなど）。`libs` へのimportは禁止する
+- `utils/`: 特定サービスのクライアント実体に依存しない汎用ユーティリティ（errors / rateLimit / timing / validation / prisma判定ヘルパーなど）。外部パッケージや生成物の型（例: `@/generated/prisma/client` の `Prisma` 型）の利用は可だが、`libs` のクライアント実体へのimportは禁止する
 - `libs/`: 外部サービス・インフラのクライアント（prisma / supabase / telemetry）。`utils` のimportは許可する
 - `shared/`: 複数featureで使う共有ドメイン（前述の定義どおり）。`middlewares`・`features` へのimportは禁止する（HTTP層の関心事をsharedへ持ち込まない。ミドルウェアが設定した値はcontroller/feature側で取り出して引数として渡すこと）
 - `middlewares/`: Hono横断ミドルウェア。`shared` のrepositoryの利用は許可する。`features` へのimportは禁止する
