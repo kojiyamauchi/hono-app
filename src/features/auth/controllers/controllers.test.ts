@@ -7,6 +7,8 @@ import { AppError } from '@/utils/errors'
 process.env.JWT_SECRET = 'test-secret'
 process.env.REFRESH_TOKEN_SECRET = 'test-refresh-secret'
 
+const signup = mock()
+const login = mock()
 const refresh = mock()
 const logout = mock()
 const requestPasswordReset = mock()
@@ -16,7 +18,7 @@ const listSessions = mock()
 const logoutSession = mock()
 
 await mock.module('../services', () => ({
-  authService: { refresh, logout, requestPasswordReset, changePassword, logoutAll, listSessions, logoutSession },
+  authService: { signup, login, refresh, logout, requestPasswordReset, changePassword, logoutAll, listSessions, logoutSession },
 }))
 
 const { authController } = await import('.')
@@ -27,6 +29,8 @@ const { authController } = await import('.')
  * AppErrorをstatusCodeへ変換するonErrorを追加する。
  */
 const app = new Hono()
+  .post('/signup', (c) => authController.signup(c, { name: 'Taro', email: 'taro@example.com', password: 'password123' }))
+  .post('/login', (c) => authController.login(c, { email: 'taro@example.com', password: 'password123' }))
   .post('/refresh', (c) => authController.refresh(c))
   .post('/logout', (c) => authController.logout(c))
   .post('/change-password', (c) =>
@@ -47,6 +51,8 @@ const app = new Hono()
   })
 
 beforeEach(() => {
+  signup.mockReset()
+  login.mockReset()
   refresh.mockReset()
   logout.mockReset()
   requestPasswordReset.mockReset()
@@ -57,6 +63,64 @@ beforeEach(() => {
 })
 
 describe('authController', () => {
+  test('signupはx-forwarded-forの先頭IPをserviceの第2引数へ渡す', async () => {
+    signup.mockResolvedValue({
+      token: 'access-token',
+      refreshToken: 'next-refresh-token',
+      user: { id: 1, name: 'Taro', email: 'taro@example.com' },
+    })
+
+    const response = await app.request('/signup', {
+      method: 'POST',
+      headers: { 'x-forwarded-for': '203.0.113.10, 198.51.100.20' },
+    })
+
+    expect(response.status).toBe(201)
+    expect(signup).toHaveBeenCalledWith({ name: 'Taro', email: 'taro@example.com', password: 'password123' }, '203.0.113.10')
+  })
+
+  test('signupはIPヘッダが無い場合にundefinedをserviceの第2引数へ渡す', async () => {
+    signup.mockResolvedValue({
+      token: 'access-token',
+      refreshToken: 'next-refresh-token',
+      user: { id: 1, name: 'Taro', email: 'taro@example.com' },
+    })
+
+    const response = await app.request('/signup', { method: 'POST' })
+
+    expect(response.status).toBe(201)
+    expect(signup).toHaveBeenCalledWith({ name: 'Taro', email: 'taro@example.com', password: 'password123' }, undefined)
+  })
+
+  test('loginはx-forwarded-forの先頭IPをserviceの第2引数へ渡す', async () => {
+    login.mockResolvedValue({
+      token: 'access-token',
+      refreshToken: 'next-refresh-token',
+      user: { id: 1, name: 'Taro', email: 'taro@example.com' },
+    })
+
+    const response = await app.request('/login', {
+      method: 'POST',
+      headers: { 'x-forwarded-for': '203.0.113.10, 198.51.100.20' },
+    })
+
+    expect(response.status).toBe(200)
+    expect(login).toHaveBeenCalledWith({ email: 'taro@example.com', password: 'password123' }, '203.0.113.10')
+  })
+
+  test('loginはIPヘッダが無い場合にundefinedをserviceの第2引数へ渡す', async () => {
+    login.mockResolvedValue({
+      token: 'access-token',
+      refreshToken: 'next-refresh-token',
+      user: { id: 1, name: 'Taro', email: 'taro@example.com' },
+    })
+
+    const response = await app.request('/login', { method: 'POST' })
+
+    expect(response.status).toBe(200)
+    expect(login).toHaveBeenCalledWith({ email: 'taro@example.com', password: 'password123' }, undefined)
+  })
+
   test('refreshはCookieからトークンを取得し、serviceの認証結果のうちアクセストークンとユーザーを200で返す', async () => {
     const result = {
       token: 'access-token',
