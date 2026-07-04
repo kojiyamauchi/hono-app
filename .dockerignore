@@ -1,6 +1,35 @@
+# 依存・生成物（イメージ内でインストール/生成する）
 node_modules
 src/generated
+
+# テストファイル（実行イメージへ含めない）
+**/*.test.ts
+
+# 環境変数・シークレット
 .env
+.env.*
+!.env.example
+
+# バージョン管理・履歴
 .git
+.gitignore
 .history
 .DS_Store
+
+# CI・エージェント・エディタ設定
+.github
+.claude
+.codex
+.husky
+.vscode
+
+# ドキュメント・ローカルDB（実行に不要）
+docs
+README.md
+AGENTS.md
+CLAUDE.md
+supabase
+
+# Docker関連（ビルドコンテキストへ含めない）
+Dockerfile
+.dockerignore
