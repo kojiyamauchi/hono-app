@@ -65,7 +65,7 @@ await mock.module('@/utils/timing', () => ({
 }))
 
 const { app } = await import('@/app')
-const { passwordResetRequestRateLimiter } = await import('../services')
+const { passwordResetRequestRateLimiter, loginRateLimiter, signupRateLimiter } = await import('../services')
 
 const user: User = {
   id: 1,
@@ -116,6 +116,8 @@ beforeEach(() => {
   passwordResetRequestDelayMs.mockReset()
   passwordResetRequestDelayMs.mockImplementation(() => 0)
   passwordResetRequestRateLimiter.reset()
+  loginRateLimiter.reset()
+  signupRateLimiter.reset()
 })
 
 const createAccessToken = async (userId: number): Promise<string> => {
@@ -172,6 +174,83 @@ describe('auth signup/login routes（Cookie設定）', () => {
 
     const body = (await response.json()) as { token?: string; refreshToken?: string }
     expect(body.refreshToken).toBeUndefined()
+  })
+
+  test('POST /auth/loginは同一IPからのレート制限超過時に429を返す', async () => {
+    const hashed = await Bun.password.hash('password123')
+    findByEmail.mockResolvedValue({ ...user, password: hashed })
+    const infoSpy = spyOn(console, 'info').mockImplementation(() => {})
+
+    try {
+      for (let i = 0; i < 5; i++) {
+        const response = await app.request('/auth/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-forwarded-for': '203.0.113.50',
+          },
+          body: JSON.stringify({ email: `user-${i}@example.com`, password: 'password123' }),
+        })
+        expect(response.status).toBe(200)
+      }
+
+      const limited = await app.request('/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-forwarded-for': '203.0.113.50',
+        },
+        body: JSON.stringify({ email: 'user-overflow@example.com', password: 'password123' }),
+      })
+
+      expect(limited.status).toBe(429)
+      const body = (await limited.json()) as { error?: { message?: string } }
+      expect(body.error?.message).toBe('リクエストが多すぎます。しばらくしてから再試行してください')
+    } finally {
+      infoSpy.mockRestore()
+    }
+  })
+
+  test('POST /auth/signupは同一IPからのレート制限超過時に429を返す', async () => {
+    findByEmail.mockResolvedValue(null)
+    createUser.mockImplementation(async (input: { name: string; email: string; password: string }) => ({
+      id: 1,
+      name: input.name,
+      email: input.email,
+      password: input.password,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }))
+    const infoSpy = spyOn(console, 'info').mockImplementation(() => {})
+
+    try {
+      for (let i = 0; i < 5; i++) {
+        const response = await app.request('/auth/signup', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-forwarded-for': '203.0.113.60',
+          },
+          body: JSON.stringify({ name: 'Taro', email: `user-${i}@example.com`, password: 'password123' }),
+        })
+        expect(response.status).toBe(201)
+      }
+
+      const limited = await app.request('/auth/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-forwarded-for': '203.0.113.60',
+        },
+        body: JSON.stringify({ name: 'Taro', email: 'user-overflow@example.com', password: 'password123' }),
+      })
+
+      expect(limited.status).toBe(429)
+      const body = (await limited.json()) as { error?: { message?: string } }
+      expect(body.error?.message).toBe('リクエストが多すぎます。しばらくしてから再試行してください')
+    } finally {
+      infoSpy.mockRestore()
+    }
   })
 })
 
