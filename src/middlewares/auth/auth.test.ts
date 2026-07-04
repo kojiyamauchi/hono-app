@@ -93,4 +93,28 @@ describe('authMiddleware', () => {
 
     expect(response.status).toBe(401)
   })
+
+  test('subがboolean(true)のトークンは401を返す', async () => {
+    const response = await requestWithPayload({ sub: true })
+
+    expect(response.status).toBe(401)
+  })
+
+  test('subが配列のトークンは401を返す', async () => {
+    const response = await requestWithPayload({ sub: [1] })
+
+    expect(response.status).toBe(401)
+  })
+
+  test('subが指数表記文字列のトークンは401を返す', async () => {
+    const response = await requestWithPayload({ sub: '1e2' })
+
+    expect(response.status).toBe(401)
+  })
+
+  test('subが小数表記文字列のトークンは401を返す', async () => {
+    const response = await requestWithPayload({ sub: '1.0' })
+
+    expect(response.status).toBe(401)
+  })
 })
