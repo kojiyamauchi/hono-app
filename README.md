@@ -272,6 +272,7 @@ bun run start               # サーバーを起動
 bun run build               # TypeScriptの型チェック
 bun run typecheck           # TypeScriptの型チェック
 bun run lint                # ESLintによる自動修正
+bun run lint:check          # ESLintによるチェックのみ（--fixなし・CIで使用）
 bun run format              # Prettierによるフォーマット
 bun run spellcheck          # cspellによるスペルチェック
 bun test --isolate          # Bun Testを分離実行
