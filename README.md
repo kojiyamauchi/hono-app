@@ -145,6 +145,40 @@ services/
 - 標準ディレクトリでは表現しづらい責務が出た場合は、実装前に設計方針を確認し、必要に応じてこのドキュメントを更新してから追加します。
 - 現時点で実装がない標準ディレクトリには `.gitkeep` を置き、構成の一貫性を保ちます。
 
+### src配下のレイヤー依存ルール
+
+`src/` 配下の全層を以下の線形レイヤーとして整理し、importは図の下方向のみ許可します。
+
+```txt
+routes / app.ts / server.ts   （配線層・最上位）
+  ↓
+features                       （機能）
+  ↓
+middlewares                    （Hono横断ミドルウェア）
+  ↓
+shared                         （共有ドメイン）
+  ↓
+libs                           （外部サービス・インフラのクライアント）
+  ↓
+utils                          （汎用ユーティリティ）
+  ↓
+types                          （型宣言のみ・最下層）
+```
+
+- 各層は自分より下のすべての層をimport可（隣接層に限定しません）。上方向のimportは禁止です。
+- `src/generated/` は自動生成物として全層から参照可（最下層扱い）です。
+- 外部パッケージは全層から参照可です。
+
+#### 各層の責務
+
+- `types/`: アプリ全体で使う型宣言専用（Honoの型拡張、環境変数の型など）です。ランタイムコードは置きません。
+- `utils/`: 特定サービスのクライアント実体に依存しない汎用ユーティリティ（errors / rateLimit / timing / validation / prisma判定ヘルパーなど）です。外部パッケージや生成物の型（例: `@/generated/prisma/client` の `Prisma` 型）の利用は可ですが、`libs` のクライアント実体へのimportは禁止です。
+- `libs/`: 外部サービス・インフラのクライアント（prisma / supabase / telemetry）です。`utils` のimportは許可します。
+- `shared/`: 複数featureで使う共有ドメイン（前述の定義どおり）です。`middlewares`・`features` へのimportは禁止です（HTTP層の関心事をsharedへ持ち込まず、ミドルウェアが設定した値はcontroller/feature側で取り出して引数として渡します）。
+- `middlewares/`: Hono横断ミドルウェアです。`shared` のrepositoryの利用は許可します。`features` へのimportは禁止です。
+- `features/`: `shared` 以下の層に加え `middlewares` もimport可（feature内routesでのミドルウェア適用）です。feature間の相互importは前述のとおり禁止です。
+- `routes/` / `app.ts` / `server.ts`: 配線層です。全層をimport可（例: `app.ts` でのグローバルミドルウェア適用・CORS設定・telemetry初期化）です。
+
 ## Schema命名
 
 `src/features/**/schemas/` および `src/shared/**/schemas/` 配下では、Zod schemaとそこから推論する型の対応が分かる命名に揃えます。
