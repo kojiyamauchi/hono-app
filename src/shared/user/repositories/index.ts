@@ -1,6 +1,6 @@
 import { prisma } from '@/libs/prisma'
 import type { User } from '@/shared/user/entities'
-import { isPrismaNotFoundError } from '@/utils/prisma'
+import { isPrismaNotFoundError, isPrismaUniqueConstraintError } from '@/utils/prisma'
 
 /**
  * Userの新規作成時に必要な入力値。
@@ -38,10 +38,20 @@ export const userRepository = {
   },
 
   /**
-   * ユーザーを新規作成する。
+   * ユーザーを新規作成する。メールの一意制約違反（同時signupの競合）の場合はnullを返す。
+   * 事前のfindByEmailチェックをすり抜けた競合の最終防衛をDB制約に委ねるため、
+   * P2002をnullへ畳み込みinvitation/membershipリポジトリの流儀に揃える。
    */
-  create: async (input: CreateUserInput): Promise<User> => {
-    return prisma.user.create({ data: input })
+  create: async (input: CreateUserInput): Promise<User | null> => {
+    try {
+      return await prisma.user.create({ data: input })
+    } catch (error) {
+      if (isPrismaUniqueConstraintError(error)) {
+        return null
+      }
+
+      throw error
+    }
   },
 
   /**

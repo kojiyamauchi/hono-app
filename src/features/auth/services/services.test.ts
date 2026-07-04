@@ -180,6 +180,18 @@ describe('authService.signup', () => {
     await expect(authService.signup({ name: 'Taro', email: 'taro@example.com', password: 'password123' })).rejects.toThrow('既に登録')
   })
 
+  test('findByEmailをすり抜けたcreateの一意制約違反（null）は409へ変換する', async () => {
+    // findByEmailは未登録を返すが、同時signupの競合でcreateがP2002によりnullを返すケース
+    findByEmail.mockResolvedValue(null)
+    create.mockResolvedValue(null)
+
+    await expect(authService.signup({ name: 'Taro', email: 'taro@example.com', password: 'password123' })).rejects.toMatchObject({
+      statusCode: 409,
+    })
+    // 認証トークンは発行されない
+    expect(createRefreshToken).not.toHaveBeenCalled()
+  })
+
   test('同一IPからSIGNUP_IP_RATE_LIMIT回の後、次の試行は429エラーを投げる', async () => {
     findByEmail.mockResolvedValue(null)
     create.mockImplementation(async (input: { name: string; email: string; password: string }) => ({

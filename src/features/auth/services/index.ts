@@ -172,6 +172,12 @@ export const authService = {
       password: hashedPassword,
     })
 
+    if (!user) {
+      // 事前のfindByEmailをすり抜けた同時signupの競合。DBの一意制約違反（P2002）は
+      // repositoryでnullへ畳み込まれるため、ここで409へ変換する（最終防衛はDB制約）。
+      throw new AppError(409, 'このメールアドレスは既に登録されています')
+    }
+
     return issueAuthentication(user)
   },
 
