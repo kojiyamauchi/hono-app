@@ -42,9 +42,10 @@ export const authController = {
   /**
    * サインアップ。201でアクセストークンとユーザー情報を返す。
    * リフレッシュトークンはCookieへセットする。
+   * IP単位のレート制限超過時は429を返す。
    */
   signup: async (c: Context, input: SignupSchemaType): Promise<Response> => {
-    const result = await authService.signup(input)
+    const result = await authService.signup(input, getClientIp(c))
     setRefreshTokenCookie(c, result.refreshToken)
     return c.json({ token: result.token, user: result.user }, 201)
   },
@@ -52,9 +53,10 @@ export const authController = {
   /**
    * ログイン。200でアクセストークンとユーザー情報を返す。
    * リフレッシュトークンはCookieへセットする。
+   * IP単位・email単位のレート制限超過時は429を返す。
    */
   login: async (c: Context, input: LoginSchemaType): Promise<Response> => {
-    const result = await authService.login(input)
+    const result = await authService.login(input, getClientIp(c))
     setRefreshTokenCookie(c, result.refreshToken)
     return c.json({ token: result.token, user: result.user }, 200)
   },
