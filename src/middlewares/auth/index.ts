@@ -1,6 +1,7 @@
 import { createMiddleware } from 'hono/factory'
 import { verify } from 'hono/jwt'
 
+import { authSubjectSchema } from '@/shared/auth/schemas'
 import { AppError } from '@/utils/errors'
 
 /**
@@ -28,14 +29,15 @@ export const authMiddleware = createMiddleware<{
     throw new AppError(401, '認証トークンが無効です')
   }
 
-  // 許容する`sub`は正の整数のみ。
-  // `sub`の欠落・非数値文字列・空文字・`0`・負数・小数はすべて不正として扱い、
-  // 署名検証失敗と同じ401へ畳む（`NaN`が後続クエリへ渡り500になるのを防ぐ）。
-  const userId = Number(payload.sub)
-  if (!Number.isInteger(userId) || userId <= 0) {
+  // 許容する`sub`は正の整数のみ（詳細な許容範囲はauthSubjectSchemaに集約）。
+  // 欠落・非数値・空文字・`0`・負数・小数に加え、boolean・配列・指数/小数/16進表記の
+  // 文字列もすべて不正として扱い、署名検証失敗と同じ401へ畳む
+  // （`NaN`や想定外の値が後続のPrismaクエリへ渡り500になるのを防ぐ）。
+  const parsedSubject = authSubjectSchema.safeParse(payload.sub)
+  if (!parsedSubject.success) {
     throw new AppError(401, '認証トークンが無効です')
   }
-  c.set('userId', userId)
+  c.set('userId', parsedSubject.data)
 
   await next()
 })
