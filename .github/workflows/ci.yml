@@ -33,7 +33,7 @@ jobs:
           - job_name: Spell Check
             script: spellcheck
           - job_name: ESLint
-            script: lint
+            script: lint:check
           - job_name: Type Check
             script: typecheck
           - job_name: Unit Test
