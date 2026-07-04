@@ -69,7 +69,18 @@ await mock.module('@/shared/user/repositories', () => ({
   userRepository: { findByEmail, create, findById },
 }))
 
-const { authService, passwordResetRequestRateLimiter } = await import('.')
+const {
+  authService,
+  passwordResetRequestRateLimiter,
+  loginRateLimiter,
+  signupRateLimiter,
+  LOGIN_IP_RATE_LIMIT,
+  LOGIN_IP_RATE_LIMIT_WINDOW_MS,
+  LOGIN_EMAIL_RATE_LIMIT,
+  LOGIN_EMAIL_RATE_LIMIT_WINDOW_MS,
+  SIGNUP_IP_RATE_LIMIT,
+  SIGNUP_IP_RATE_LIMIT_WINDOW_MS,
+} = await import('.')
 
 const user: User = {
   id: 1,
@@ -118,6 +129,8 @@ beforeEach(() => {
   passwordResetRequestDelayMs.mockReset()
   passwordResetRequestDelayMs.mockImplementation(() => 0)
   passwordResetRequestRateLimiter.reset()
+  loginRateLimiter.reset()
+  signupRateLimiter.reset()
 })
 
 describe('authService.signup', () => {
@@ -166,6 +179,47 @@ describe('authService.signup', () => {
 
     await expect(authService.signup({ name: 'Taro', email: 'taro@example.com', password: 'password123' })).rejects.toThrow('既に登録')
   })
+
+  test('同一IPからSIGNUP_IP_RATE_LIMIT回の後、次の試行は429エラーを投げる', async () => {
+    findByEmail.mockResolvedValue(null)
+    create.mockImplementation(async (input: { name: string; email: string; password: string }) => ({
+      id: 1,
+      name: input.name,
+      email: input.email,
+      password: input.password,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }))
+    const infoSpy = spyOn(console, 'info').mockImplementation(() => {})
+
+    try {
+      for (let i = 0; i < SIGNUP_IP_RATE_LIMIT; i++) {
+        await expect(authService.signup({ name: 'Taro', email: `user-${i}@example.com`, password: 'password123' }, '203.0.113.20')).resolves.toBeDefined()
+      }
+
+      await expect(authService.signup({ name: 'Taro', email: 'user-overflow@example.com', password: 'password123' }, '203.0.113.20')).rejects.toMatchObject({
+        statusCode: 429,
+      })
+    } finally {
+      infoSpy.mockRestore()
+    }
+  })
+
+  test('clientIp未指定の場合はIP単位の制限がかからない', async () => {
+    findByEmail.mockResolvedValue(null)
+    create.mockImplementation(async (input: { name: string; email: string; password: string }) => ({
+      id: 1,
+      name: input.name,
+      email: input.email,
+      password: input.password,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }))
+
+    for (let i = 0; i < SIGNUP_IP_RATE_LIMIT + 1; i++) {
+      await expect(authService.signup({ name: 'Taro', email: `user-${i}@example.com`, password: 'password123' })).resolves.toBeDefined()
+    }
+  })
 })
 
 describe('authService.login', () => {
@@ -210,6 +264,113 @@ describe('authService.login', () => {
     findByEmail.mockResolvedValue(null)
 
     await expect(authService.login({ email: 'none@example.com', password: 'password123' })).rejects.toThrow('正しくありません')
+  })
+
+  test('同一IPからLOGIN_IP_RATE_LIMIT回成功した後、同一IPの次の試行は429エラーを投げる', async () => {
+    const hashed = await Bun.password.hash('password123')
+    findByEmail.mockResolvedValue({ ...user, password: hashed })
+    const infoSpy = spyOn(console, 'info').mockImplementation(() => {})
+
+    try {
+      for (let i = 0; i < LOGIN_IP_RATE_LIMIT; i++) {
+        await expect(authService.login({ email: `user-${i}@example.com`, password: 'password123' }, '203.0.113.30')).resolves.toBeDefined()
+      }
+
+      await expect(authService.login({ email: 'user-overflow@example.com', password: 'password123' }, '203.0.113.30')).rejects.toMatchObject({
+        statusCode: 429,
+      })
+    } finally {
+      infoSpy.mockRestore()
+    }
+  })
+
+  test('email単位でLOGIN_EMAIL_RATE_LIMIT回試行後、異なるIP（またはclientIp未指定）からでも同一emailの次の試行は429エラーを投げる', async () => {
+    findByEmail.mockResolvedValue(null)
+    const infoSpy = spyOn(console, 'info').mockImplementation(() => {})
+
+    try {
+      for (let i = 0; i < LOGIN_EMAIL_RATE_LIMIT; i++) {
+        await expect(authService.login({ email: 'taro@example.com', password: 'wrong-password' }, `203.0.113.${40 + i}`)).rejects.toMatchObject({
+          statusCode: 401,
+        })
+      }
+
+      await expect(authService.login({ email: 'taro@example.com', password: 'password123' })).rejects.toMatchObject({
+        statusCode: 429,
+      })
+    } finally {
+      infoSpy.mockRestore()
+    }
+  })
+
+  test('email単位の制限超過時はuserRepository.findByEmailが呼ばれない（ユーザー存在確認より前に適用される）', async () => {
+    findByEmail.mockResolvedValue(null)
+    const infoSpy = spyOn(console, 'info').mockImplementation(() => {})
+
+    try {
+      for (let i = 0; i < LOGIN_EMAIL_RATE_LIMIT; i++) {
+        await expect(authService.login({ email: 'taro@example.com', password: 'wrong-password' })).rejects.toMatchObject({
+          statusCode: 401,
+        })
+      }
+      findByEmail.mockClear()
+
+      await expect(authService.login({ email: 'taro@example.com', password: 'password123' })).rejects.toMatchObject({
+        statusCode: 429,
+      })
+      expect(findByEmail).not.toHaveBeenCalled()
+    } finally {
+      infoSpy.mockRestore()
+    }
+  })
+
+  test('emailは正規化される（大文字/前後空白の違いは同一キー扱い）', async () => {
+    findByEmail.mockResolvedValue(null)
+    const infoSpy = spyOn(console, 'info').mockImplementation(() => {})
+
+    try {
+      await authService.login({ email: ' TARO@example.com ', password: 'wrong-password' }).catch(() => {})
+      await authService.login({ email: 'taro@example.com', password: 'wrong-password' }).catch(() => {})
+      await authService.login({ email: 'Taro@Example.com', password: 'wrong-password' }).catch(() => {})
+      await authService.login({ email: 'taro@example.com', password: 'wrong-password' }).catch(() => {})
+      await authService.login({ email: 'taro@example.com', password: 'wrong-password' }).catch(() => {})
+
+      await expect(authService.login({ email: 'TARO@EXAMPLE.COM', password: 'password123' })).rejects.toMatchObject({
+        statusCode: 429,
+      })
+    } finally {
+      infoSpy.mockRestore()
+    }
+  })
+
+  test('clientIp未指定の場合はIP単位の制限がかからない（email制限のみ適用される）', async () => {
+    const hashed = await Bun.password.hash('password123')
+
+    for (let i = 0; i < LOGIN_IP_RATE_LIMIT + 1; i++) {
+      findByEmail.mockResolvedValue({ ...user, email: `user-${i}@example.com`, password: hashed })
+      await expect(authService.login({ email: `user-${i}@example.com`, password: 'password123' })).resolves.toBeDefined()
+    }
+  })
+
+  test('異なるIPは互いの制限に影響しない', async () => {
+    const hashed = await Bun.password.hash('password123')
+    findByEmail.mockResolvedValue({ ...user, password: hashed })
+
+    for (let i = 0; i < LOGIN_IP_RATE_LIMIT; i++) {
+      await expect(authService.login({ email: `user-a-${i}@example.com`, password: 'password123' }, '203.0.113.100')).resolves.toBeDefined()
+    }
+
+    // 別IPからは制限に影響されず成功する
+    await expect(authService.login({ email: 'user-b@example.com', password: 'password123' }, '203.0.113.200')).resolves.toBeDefined()
+  })
+
+  test('定数値の検証（5回・15分=900000ms）', () => {
+    expect(LOGIN_IP_RATE_LIMIT).toBe(5)
+    expect(LOGIN_IP_RATE_LIMIT_WINDOW_MS).toBe(900000)
+    expect(LOGIN_EMAIL_RATE_LIMIT).toBe(5)
+    expect(LOGIN_EMAIL_RATE_LIMIT_WINDOW_MS).toBe(900000)
+    expect(SIGNUP_IP_RATE_LIMIT).toBe(5)
+    expect(SIGNUP_IP_RATE_LIMIT_WINDOW_MS).toBe(900000)
   })
 })
 
