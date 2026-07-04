@@ -10,6 +10,7 @@
     "start": "bun src/server.ts",
     "build": "tsc --noEmit",
     "lint": "eslint --fix --max-warnings 0",
+    "lint:check": "eslint --max-warnings 0",
     "format": "prettier --write .",
     "spellcheck": "cspell --dot --no-must-find-files '**/*'",
     "test": "bun test --isolate",
