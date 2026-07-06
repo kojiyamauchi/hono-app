@@ -190,6 +190,20 @@ types                          （型宣言のみ・最下層）
 - param系schemaの型も同じ規則で `***ParamSchemaType` とします。
   - 例: `UserIdParamSchemaType`、`OrganizationIdParamSchemaType`
 - schema由来の型には `***Input` や `***Param` のような別接尾語を使いません。
+- `dtos/` 配下のZod DTO定義とその型はこの規則の対象外とし、後述の `***Dto` / `***DtoType` 命名に従います。
+
+## DTOとOpenAPI schemaの配置
+
+OpenAPI導入を見据えて、入力検証用schemaとレスポンスDTOの責務を分離します。
+
+- `schemas/` はrequest body / query / paramなどの入力検証用Zod schemaに寄せます。
+- `dtos/` はAPIレスポンスDTOに寄せます。
+- レスポンスDTOはZodで定義し、OpenAPI response schemaとDTO型の正本にします。
+- DTO定義名は `***Dto`、そこから `z.infer` でexportする型名は `***DtoType` とします。
+  - 例: `userDto`、`UserDtoType`
+- レスポンスDTOのZodは通常の本番レスポンスで毎回parseせず、mapperテストで `safeParse` して実装との整合を担保します。
+- OpenAPI JSONは `/doc` で動的生成し、手書きの `openapi.yml` を正本にしません。
+- `/doc` と `/scalar` は `ENABLE_API_DOCS=true` のときだけ登録し、staging / prodでは原則非公開にします。
 
 ## はじめに
 

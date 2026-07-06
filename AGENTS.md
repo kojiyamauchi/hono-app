@@ -277,6 +277,21 @@ import { prisma } from '../libs/prisma'
   - 例: `UserIdParamSchemaType`、`OrganizationIdParamSchemaType`
 - schema由来の型に `***Input` や `***Param` のような別接尾語を使わないこと
 - repository内部など、`schemas/` 配下のZod schema由来ではない入出力型はこの規則の対象外とする
+- `dtos/` 配下のZod DTO定義とその型もこの規則の対象外とし、[### DTOとOpenAPI schemaの配置](#dtoとopenapi-schemaの配置) の `***Dto` / `***DtoType` 命名に従うこと
+
+### DTOとOpenAPI schemaの配置
+
+OpenAPI導入を見据えて、入力検証用schemaとレスポンスDTOの責務を以下のとおり分離すること:
+
+- `schemas/` はrequest body / query / paramなどの入力検証用Zod schemaに寄せること
+- `dtos/` はAPIレスポンスDTOに寄せること
+- レスポンスDTOはZodで定義し、OpenAPI response schemaとDTO型の正本にすること
+- DTO定義名は `***Dto`、そこから `z.infer` でexportする型名は `***DtoType` とすること
+  - 例: `userDto`、`UserDtoType`
+- `dtos/` 配下のZod DTO定義は、`schemas/` 配下の `***Schema` / `***SchemaType` 命名規則の対象外とする
+- レスポンスDTOのZodは通常の本番レスポンスで毎回parseせず、mapperテストで `safeParse` して実装との整合を担保すること
+- OpenAPI JSONは `/doc` で動的生成し、手書きの `openapi.yml` を正本にしないこと
+- `/doc` と `/scalar` は `ENABLE_API_DOCS=true` のときだけ登録し、staging / prodでは原則非公開にすること
 
 ### コミットメッセージ
 
