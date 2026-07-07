@@ -58,7 +58,7 @@ gh pr diff <PR番号>
 bun run spellcheck
 bun run lint
 bun run typecheck
-bun test
+bun test --isolate
 bun run build
 ```
 
