@@ -11,9 +11,8 @@ permissionMode: acceptEdits
 ## 最初に必ず行うこと
 
 1. リポジトリ直下の `CLAUDE.md`（および同一内容の `AGENTS.md`）を読むこと。コーディング規約・命名規則・コミット粒度・push方法の正本です。
-2. `.claude/projects/**/memory/MEMORY.md`（プロジェクトmemory）が参照可能なら読み、進行中タスクの文脈・既存の合意事項を把握すること。
-3. 委譲元から渡された設計・スコープ・完了定義を確認し、不明点があれば実装を始める前に要約して質問すること（勝手にスコープを広げない）。
-4. 実装を始める前に、今回の変更をコミット単位へ分解し、`.claude/skills/commit-granularity/SKILL.md` の「作業開始時チェック」を使って粒度を点検すること。
+2. 委譲元から渡された設計・スコープ・完了定義を確認し、不明点があれば実装を始める前に要約して質問すること（勝手にスコープを広げない）。
+3. 実装を始める前に、今回の変更をコミット単位へ分解し、Skillツールで `commit-granularity` を起動して「作業開始時チェック」で粒度を点検すること。
 
 ## 設計の遵守事項
 
@@ -33,7 +32,7 @@ permissionMode: acceptEdits
 - 「実装 → そのテスト」は必ず隣接させ、間に別レイヤーのコミットを挟まないこと。
 - 役割の異なる変更（`DTO + mapper + repository` や `service + schema + controller + routes`）を1コミットに混ぜないこと。**特に controller と routes は必ず別コミットにする**（同一コミットへまとめない）。
 - 新規に追加する実装には、その振る舞いを確認するテストを**同じ流れで隣接コミット**すること。これは feature のレイヤーだけでなく、**middleware・`app.ts` の CORS などの横断的な追加にも適用**する（実装だけ先にコミットしてテストを後回しにしない）。
-- **コミット前の自己点検**: 各コミット直前に必ず `.claude/skills/commit-granularity/SKILL.md` をSkillとしてinvokeし、ステージ済み差分が1つの関心事に閉じているか、実装コミットに対応テストが隣接しているかを点検してからコミットすること。
+- **コミット前の自己点検**: 各コミット直前に必ずSkillツールで `commit-granularity` を起動し、ステージ済み差分が1つの関心事に閉じているか、実装コミットに対応テストが隣接しているかを点検してからコミットすること。
 - 薄いcontrollerや単純なrepositoryなど単体テストの効果が低い箇所はテストを省略してよいが、その場合はserviceテストまたはroute統合テストで振る舞いを担保すること。
 - テストはDB非依存にする（`mock.module` でrepository/clientをモックし、CIがDBなしで通るようにする）。
 
@@ -44,7 +43,7 @@ permissionMode: acceptEdits
 - コミットメッセージは CLAUDE.md の規約に従う（英語接頭辞＋日本語説明、例: `add:` / `fix:` / `modify:` / `refactor:` / `remove:`）。
 - 1作業＝1コミットの粒度で分割し、「実装 → そのテスト」をレイヤーごとにペアで刻む。
 - AIエージェントによるコミットなので、本文末尾に必ずトレーラーを付与する: `Co-authored-by: Claude <claude@anthropic.com>`
-- `git commit` を実行する直前に、毎回必ず `.claude/skills/commit-granularity/SKILL.md` をSkillとしてinvokeし、「コミット直前チェック」を実行すること。これは読むだけではなく、Skill呼び出しとして実行する必須ステップです。
+- `git commit` を実行する直前に、毎回必ずSkillツールで `commit-granularity` を起動し、「コミット直前チェック」を実行すること。これは読むだけではなく、Skill呼び出しとして実行する必須ステップです（SKILL.mdのパスではなくSkill名で起動する）。
 - 各コミット時点でプレコミットフック（lint-staged の prettier / eslint / cspell）は通すこと。各コミット単体で `typecheck` が一時的に通らなくてもよいが、最終的に全チェックを通す。
 - **pushとPR作成はメイン（委譲元）に任せ、このエージェントは行わないこと**（誤って `git push` しない）。
 
@@ -56,7 +55,7 @@ permissionMode: acceptEdits
 bun run spellcheck
 bun run lint
 bun run typecheck
-bun test
+bun test --isolate
 bun run build
 ```
 
