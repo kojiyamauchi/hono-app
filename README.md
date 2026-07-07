@@ -143,6 +143,9 @@ services/
   - 例: JWT発行のような認証の共通処理は `src/shared/auth/services/` に置きます。
 - 標準ディレクトリでは表現しづらい責務が出た場合は、実装前に設計方針を確認し、必要に応じてこのドキュメントを更新してから追加します。
 - 現時点で実装がない標準ディレクトリには `.gitkeep` を置き、構成の一貫性を保ちます。
+- OpenAPIドキュメント公開（`/open-api/doc` / `/open-api/scalar`）は、標準構成に対する例外として次を許容します。
+  - `src/shared/openApi/schemes/`: OpenAPIのsecurity scheme（認証「方式」の定義）を置く標準外の責務ディレクトリです。入力検証用Zod schema（データ構造）を置く `schemas/` とは責務が異なるため分離します。
+  - `src/features/openApi`: OpenAPI仕様は各featureのroute定義がroot app（`OpenAPIHono`）へ集約されて全体が揃うため、`app.route()` でmountせず、root appを受け取って `/open-api/doc`・`/open-api/scalar` を登録する登録関数 `registerOpenApiRoutes(app)` を提供します。
 
 ### src配下のレイヤー依存ルール
 
