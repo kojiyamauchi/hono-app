@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
+import { invitationDetailDto, invitationDto } from '@/shared/invitation/dtos'
 import type { Invitation } from '@/shared/invitation/entities'
 import type { Organization } from '@/shared/organization/entities'
 
@@ -34,8 +35,8 @@ describe('toInvitationResponse', () => {
       role: 'MEMBER',
       status: 'PENDING',
       invitationToken: 'test-token-uuid',
-      expiresAt: invitation.expiresAt,
-      createdAt: invitation.createdAt,
+      expiresAt: invitation.expiresAt.toISOString(),
+      createdAt: invitation.createdAt.toISOString(),
     })
   })
 
@@ -44,6 +45,12 @@ describe('toInvitationResponse', () => {
 
     expect(result.invitationToken).toBe('test-token-uuid')
     expect((result as Record<string, unknown>).token).toBeUndefined()
+  })
+
+  test('返却値がinvitationDto schemaに通る（DTO定義と実装の整合）', () => {
+    const result = toInvitationResponse(invitation)
+
+    expect(invitationDto.safeParse(result).success).toBe(true)
   })
 })
 
@@ -57,9 +64,15 @@ describe('toInvitationDetailResponse', () => {
       email: 'user@example.com',
       role: 'MEMBER',
       status: 'PENDING',
-      expiresAt: invitation.expiresAt,
-      createdAt: invitation.createdAt,
+      expiresAt: invitation.expiresAt.toISOString(),
+      createdAt: invitation.createdAt.toISOString(),
     })
+  })
+
+  test('返却値がinvitationDetailDto schemaに通る（DTO定義と実装の整合）', () => {
+    const result = toInvitationDetailResponse(invitation, organization)
+
+    expect(invitationDetailDto.safeParse(result).success).toBe(true)
   })
 
   test('tokenをレスポンスに含めない', () => {
