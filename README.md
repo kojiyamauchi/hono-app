@@ -295,7 +295,7 @@ Prisma Studioを開きます。
 bun run prisma:studio
 ```
 
-テストと CI は意図的に DB 非依存（`mock.module` で repository をモック）です。そのため migration の適用や実 DB での挙動（transaction・一意制約・外部キーなど）は CI で検証されません。migration を含む変更は、ローカルで実 DB へ適用し必要に応じて smoke 確認してください。詳細は AGENTS.md「migrationを含む変更の実DB検証」を参照してください。
+テストと CI は意図的に DB 非依存（`mock.module` で repository をモック）です。そのため migration の適用や実 DB での挙動（transaction・一意制約・外部キーなど）は CI で検証されません。migration を含む変更は、ローカルで実 DB へ適用し必要に応じて smoke 確認してください。共通原則は CLAUDE.md / AGENTS.md「migrationを含む変更の実DB検証」、詳細手順は migration検証Skill（[.claude/skills/migration-verification/SKILL.md](.claude/skills/migration-verification/SKILL.md)）を参照してください。
 
 ## OpenTelemetry
 
