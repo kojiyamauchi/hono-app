@@ -417,6 +417,8 @@ AIエージェント間レビューの共通原則を示す。レビュー実行
 
 `AGENTS.md` と `CLAUDE.md`、`.codex/skills/` と `.claude/skills/` は、Codex / Claude 向けの並行版として同期運用すること。片方だけにルールを追加して、期待値がズレないようにする。
 
+READMEの「Features設計」「標準ディレクトリ」「src配下のレイヤー依存ルール」「Schema命名」「DTOとOpenAPI schemaの配置」の各セクションは、`AGENTS.md` / `CLAUDE.md` の同名ルールの人間向け副本として扱う。アーキテクチャルールの正本は `AGENTS.md` / `CLAUDE.md` とし、これらのルールを変更する場合は同じPRでREADMEの該当セクションも同期すること。
+
 Skill化した運用ルールは、詳細手順を `SKILL.md` に集約すること。`AGENTS.md` / `CLAUDE.md` には、常に守る共通原則（最小限のガードレール）と、対応するSkillへの導線（参照リンク）だけを残し、手順の全文を再掲しないこと。これにより `AGENTS.md` / `CLAUDE.md` の肥大化とドリフトを防ぐ。
 
 - Skill化済みの運用ルールの詳細（手順・テンプレート・チェックリスト・コマンド例など）は `SKILL.md` を正本とする。
