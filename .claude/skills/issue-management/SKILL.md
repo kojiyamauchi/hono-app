@@ -1,3 +1,8 @@
+---
+name: issue-management
+description: Use when creating, organizing, reviewing, or updating GitHub issues in this repository, including title prefixes, body templates, author attribution, body review flow, and PR linkage. ClaudeがIssueを作成・整理・本文レビューするときの入口Skill。
+---
+
 # Issue Management Skill
 
 ## 概要

@@ -1,3 +1,8 @@
+---
+name: review-response
+description: Use when responding to review feedback on a GitHub Pull Request in this repository, including review-response commits, validation, and keeping the PR description in sync. Claudeがレビュー指摘へ対応するときの入口Skill。
+---
+
 # Review Response Skill
 
 ## 概要

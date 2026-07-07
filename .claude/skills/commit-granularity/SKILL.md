@@ -1,3 +1,8 @@
+---
+name: commit-granularity
+description: Use before planning commits, immediately before each commit, and when reviewing PR history to check that commits follow this repository's granularity rules. コミットの計画時・各コミット直前・PR履歴レビュー時に使う粒度チェックSkill。
+---
+
 # Commit Granularity Skill
 
 ## 概要

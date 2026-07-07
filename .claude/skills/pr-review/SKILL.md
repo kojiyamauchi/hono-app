@@ -1,3 +1,8 @@
+---
+name: pr-review
+description: Use when reviewing a GitHub Pull Request for this repository, especially when the user asks Claude to review a PR created by Codex, the user, or another agent. ClaudeがPRをレビューするときの入口Skill。
+---
+
 # PR Review Skill
 
 ## 概要
