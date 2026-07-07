@@ -16,8 +16,8 @@ DBパフォーマンス（遅いクエリ・多いクエリ）を調査するた
 ## 正本と責務分担
 
 - DB性能調査の手順・各手段の役割分担・local / staging / production の実行可否は、このSkillを正本とする。[CLAUDE.md](../../../CLAUDE.md) / [AGENTS.md](../../../AGENTS.md) には、このSkillへの導線だけを置く。
-- index追加・カラム変更など **migrationを伴う改善へ進む場合の検証**は、[CLAUDE.md](../../../CLAUDE.md) / [AGENTS.md](../../../AGENTS.md) の「migrationを含む変更の実DB検証」セクションを正本とする。本Skillはそこへ接続する（[後述](#6-改善migration-を伴う場合の接続)）。
-- migration適用・smoke・PR検証証跡の具体ルールは、上記「migrationを含む変更の実DB検証」に従う。本Skillでは再掲しない。
+- index追加・カラム変更など **migrationを伴う改善へ進む場合の検証**は、migration検証Skill（[`../migration-verification/SKILL.md`](../migration-verification/SKILL.md)）を正本とする。本Skillはそこへ接続する（[後述](#6-改善migration-を伴う場合の接続)）。
+- migration適用・smoke・PR検証証跡の具体ルールは、migration検証Skillに従う。本Skillでは再掲しない。
 
 ## 使用タイミング
 
@@ -204,7 +204,7 @@ export const prisma = new PrismaClient({
 
 調査の結果、index追加・カラム変更・クエリ修正などで **migrationを伴う改善**へ進む場合は、ここで本Skillの調査フェーズを抜け、実DB検証ルールへ接続する。
 
-- migrationの作成・適用・`prisma generate`・smoke・PR検証証跡は、[CLAUDE.md](../../../CLAUDE.md) / [AGENTS.md](../../../AGENTS.md) の **「migrationを含む変更の実DB検証」** セクションを正本とする。
+- migrationの作成・適用・`prisma generate`・smoke・PR検証証跡は、migration検証Skill（[`../migration-verification/SKILL.md`](../migration-verification/SKILL.md)）を正本とする。
 - index追加は、追加前後の `EXPLAIN (ANALYZE, BUFFERS)` を取り、`Seq Scan` → `Index Scan` への変化や実行時間・`Buffers` の改善を smoke として記録すると、検証証跡に使える。
 - migrationを伴わない調査だけで完結した場合（設定変更・クエリ呼び出し側の修正のみ等）は、その旨をPR本文の `## 実DB検証` セクションへ記載する（migrationを含まない場合のリスト形式記載に従う）。
 
