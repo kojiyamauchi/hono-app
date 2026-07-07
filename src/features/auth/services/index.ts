@@ -1,4 +1,4 @@
-import type { IssuedAuthTokens, SessionResponse } from '@/shared/auth/dtos'
+import type { IssuedAuthTokens, SessionDtoType } from '@/shared/auth/dtos'
 import { toSessionResponse } from '@/shared/auth/mappers'
 import { authCredentialRepository, passwordResetTokenRepository, refreshTokenRepository } from '@/shared/auth/repositories'
 import {
@@ -9,7 +9,7 @@ import {
   issueRefreshToken,
   passwordResetNotifier,
 } from '@/shared/auth/services'
-import type { UserResponse } from '@/shared/user/dtos'
+import type { UserDtoType } from '@/shared/user/dtos'
 import type { User } from '@/shared/user/entities'
 import { toUserResponse } from '@/shared/user/mappers'
 import { userRepository } from '@/shared/user/repositories'
@@ -292,7 +292,7 @@ export const authService = {
   /**
    * IDでユーザー情報を取得する（/auth/me 用）。
    */
-  getById: async (id: number): Promise<UserResponse> => {
+  getById: async (id: number): Promise<UserDtoType> => {
     const user = await userRepository.findById(id)
     if (!user) {
       throw new AppError(404, 'ユーザーが見つかりません')
@@ -445,7 +445,7 @@ export const authService = {
    * ログイン済みユーザーのactiveなリフレッシュセッション一覧を返す。
    * repositoryから取得したセッションをDTOへ変換し、tokenHash等の内部値は含めない。
    */
-  listSessions: async (userId: number): Promise<SessionResponse[]> => {
+  listSessions: async (userId: number): Promise<SessionDtoType[]> => {
     const sessions = await refreshTokenRepository.findActiveSessionsByUserId(userId)
     return sessions.map(toSessionResponse)
   },

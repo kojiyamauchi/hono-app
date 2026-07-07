@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
+import { memberDto } from '@/shared/membership/dtos'
 import type { Membership } from '@/shared/membership/entities'
 
 import { toMemberResponse } from '.'
@@ -21,7 +22,13 @@ describe('toMemberResponse', () => {
       userId: 2,
       organizationId: 3,
       role: 'MEMBER',
-      createdAt: membership.createdAt,
+      createdAt: membership.createdAt.toISOString(),
     })
+  })
+
+  test('返却値がmemberDto schemaに通る（DTO定義と実装の整合）', () => {
+    const result = toMemberResponse(membership)
+
+    expect(memberDto.safeParse(result).success).toBe(true)
   })
 })

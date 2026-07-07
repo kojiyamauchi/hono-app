@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
+import { organizationDto } from '@/shared/organization/dtos'
 import type { Organization } from '@/shared/organization/entities'
 
 import { toOrganizationResponse } from '.'
@@ -18,8 +19,14 @@ describe('toOrganizationResponse', () => {
     expect(result).toEqual({
       id: 1,
       name: 'Acme',
-      createdAt: organization.createdAt,
-      updatedAt: organization.updatedAt,
+      createdAt: organization.createdAt.toISOString(),
+      updatedAt: organization.updatedAt.toISOString(),
     })
+  })
+
+  test('返却値がorganizationDto schemaに通る（DTO定義と実装の整合）', () => {
+    const result = toOrganizationResponse(organization)
+
+    expect(organizationDto.safeParse(result).success).toBe(true)
   })
 })

@@ -36,7 +36,7 @@ const getClientIp = (c: Context): string | undefined => {
 /**
  * 認証エンドポイントのコントローラ。
  * バリデーション済みの入力を受け取り、serviceを呼び出してレスポンスを返す。
- * リフレッシュトークンはHttpOnly CookieとしてセットしbodyにはAuthResultのみ返す。
+ * リフレッシュトークンはHttpOnly Cookieとしてセットし、bodyには認証結果DTO（AuthResultDtoType）のみ返す。
  */
 export const authController = {
   /**

@@ -10,7 +10,7 @@ import { invitationsService } from '../services'
  */
 export const invitationsController = {
   /**
-   * 招待トークンから招待詳細を取得する。200でInvitationDetailResponseを返す。
+   * 招待トークンから招待詳細を取得する。200でInvitationDetailDtoTypeを返す。
    * 認証不要・読み取り専用。
    */
   getDetail: async (c: Context, token: string): Promise<Response> => {
@@ -19,7 +19,7 @@ export const invitationsController = {
   },
 
   /**
-   * 招待を受諾してメンバーになる。201でMemberResponseを返す。
+   * 招待を受諾してメンバーになる。201でMemberDtoTypeを返す。
    */
   accept: async (c: Context, userId: number, input: AcceptInvitationBodySchemaType): Promise<Response> => {
     const result = await invitationsService.accept(userId, input.token)

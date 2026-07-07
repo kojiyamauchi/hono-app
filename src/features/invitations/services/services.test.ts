@@ -101,7 +101,7 @@ describe('invitationsService.accept', () => {
     findByEmail.mockReset()
   })
 
-  test('有効な招待を受諾してMemberResponseを返す', async () => {
+  test('有効な招待を受諾してMemberDtoTypeを返す', async () => {
     findByToken.mockResolvedValue(pendingInvitation)
     findById.mockResolvedValue(inviteeUser)
     findByUserAndOrganization.mockResolvedValue(null)
@@ -281,7 +281,7 @@ describe('invitationsService.signup', () => {
     findByEmail.mockReset()
   })
 
-  test('有効なPENDING招待なら招待メールでユーザー作成しトークンとUserResponseを返す', async () => {
+  test('有効なPENDING招待なら招待メールでユーザー作成しトークンとUserDtoTypeを返す', async () => {
     findByToken.mockResolvedValue(pendingInvitation)
     findByEmail.mockResolvedValue(null)
     signup.mockImplementation(
@@ -394,7 +394,7 @@ describe('invitationsService.getDetailByToken', () => {
     findByEmail.mockReset()
   })
 
-  test('PENDING有効な招待をInvitationDetailResponseで返す', async () => {
+  test('PENDING有効な招待をInvitationDetailDtoTypeで返す', async () => {
     findByTokenWithOrganization.mockResolvedValue(pendingInvitationWithOrg)
 
     const result = await invitationsService.getDetailByToken(TOKEN)

@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
+import { sessionDto } from '@/shared/auth/dtos'
 import type { RefreshSession } from '@/shared/auth/entities'
 
 import { toSessionResponse } from '.'
@@ -16,13 +17,26 @@ const session: RefreshSession = {
 }
 
 describe('toSessionResponse', () => {
-  test('RefreshSessionをSessionResponseへ変換し、idがfamilyIdになること', () => {
+  test('RefreshSessionをSession DTOへ変換し、idがfamilyIdになること', () => {
     const result = toSessionResponse(session)
 
     expect(result.id).toBe('family-uuid-1')
-    expect(result.createdAt).toEqual(createdAt)
-    expect(result.expiresAt).toEqual(expiresAt)
-    expect(result.lastUsedAt).toEqual(lastUsedAt)
+    expect(result.createdAt).toBe(createdAt.toISOString())
+    expect(result.expiresAt).toBe(expiresAt.toISOString())
+    expect(result.lastUsedAt).toBe(lastUsedAt.toISOString())
+  })
+
+  test('日時がISO datetime文字列として返ること', () => {
+    const result = toSessionResponse(session)
+
+    expect(result.createdAt).toBe('2026-06-01T00:00:00.000Z')
+    expect(typeof result.expiresAt).toBe('string')
+  })
+
+  test('返却値がsessionDto schemaに通る（DTO定義と実装の整合）', () => {
+    const result = toSessionResponse(session)
+
+    expect(sessionDto.safeParse(result).success).toBe(true)
   })
 
   test('レスポンスのキーがid/createdAt/expiresAt/lastUsedAtの4つだけであること（内部値を含まない）', () => {
