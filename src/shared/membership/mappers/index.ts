@@ -1,15 +1,16 @@
-import type { MemberResponse } from '@/shared/membership/dtos'
+import type { MemberDtoType } from '@/shared/membership/dtos'
 import type { Membership } from '@/shared/membership/entities'
 
 /**
- * MembershipエンティティをAPIレスポンス用のMemberResponseへ変換する。
+ * MembershipエンティティをAPIレスポンス用のMember DTOへ変換する。
+ * 日時はJSONレスポンス形式に合わせてISO datetime文字列へ変換する。
  */
-export const toMemberResponse = (membership: Membership): MemberResponse => {
+export const toMemberResponse = (membership: Membership): MemberDtoType => {
   return {
     id: membership.id,
     userId: membership.userId,
     organizationId: membership.organizationId,
     role: membership.role,
-    createdAt: membership.createdAt,
+    createdAt: membership.createdAt.toISOString(),
   }
 }
