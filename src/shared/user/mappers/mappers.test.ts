@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
+import { publicUserDto, userDto } from '@/shared/user/dtos'
 import type { User } from '@/shared/user/entities'
 
 import { toPublicUserResponse, toUserResponse } from '.'
@@ -21,10 +22,16 @@ describe('toUserResponse', () => {
       id: 1,
       name: 'Taro',
       email: 'taro@example.com',
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
+      createdAt: user.createdAt.toISOString(),
+      updatedAt: user.updatedAt.toISOString(),
     })
     expect(result).not.toHaveProperty('password')
+  })
+
+  test('返却値がuserDto schemaに通る（DTO定義と実装の整合）', () => {
+    const result = toUserResponse(user)
+
+    expect(userDto.safeParse(result).success).toBe(true)
   })
 })
 
@@ -38,5 +45,11 @@ describe('toPublicUserResponse', () => {
     })
     expect(result).not.toHaveProperty('email')
     expect(result).not.toHaveProperty('password')
+  })
+
+  test('返却値がpublicUserDto schemaに通る（DTO定義と実装の整合）', () => {
+    const result = toPublicUserResponse(user)
+
+    expect(publicUserDto.safeParse(result).success).toBe(true)
   })
 })
