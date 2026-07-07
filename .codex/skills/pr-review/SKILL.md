@@ -45,6 +45,9 @@ description: Use when reviewing a GitHub Pull Request for this repository, espec
 - データ破壊、認証、権限、秘密情報の漏えい
 - Prisma migration、DB schema、DTO、Entity、Responseの不整合
 - Hono route、controller、service、repositoryの責務混在
+- features間の相互import、レイヤー依存方向違反、標準ディレクトリ外の責務ディレクトリ追加
+- `***Schema` / `***SchemaType`、`***Dto` / `***DtoType` の命名・配置違反
+- APIの追加・変更・削除がある場合の `docs/endpoints.md` 更新漏れ
 - 入力検証、エラーハンドリング、HTTP statusの不備
 - テスト不足、CIで検出できないリスク
 - 対象Issueの受け入れ条件・完了条件との不整合
@@ -156,7 +159,7 @@ PR本文の `## 実DB検証` セクションは、migrationの有無にかかわ
 - migrationを含まないPRでは、同セクションに `- migrationを含まないため検証なし` が記載されていることを確認する。セクション自体が無い、または空欄のままの場合はPR本文更新を指摘する。
 - migrationを含むPRでは、同セクションに以下の証跡が記載されていることを確認する。
 
-テスト/CIはDB非依存のため、migrationの適用や実DB挙動（transaction・一意制約・外部キー等）はCIで検証されない。migrationを含むPRのレビューでは、`AGENTS.md` / `CLAUDE.md`「migrationを含む変更の実DB検証」に従う。詳細・原則は `AGENTS.md` を正本とし、ここでは手順の要点のみ示す。
+テスト/CIはDB非依存のため、migrationの適用や実DB挙動（transaction・一意制約・外部キー等）はCIで検証されない。migrationを含むPRのレビューでは、migration検証Skill（[`../migration-verification/SKILL.md`](../migration-verification/SKILL.md)）に従う。詳細はmigration検証Skillを正本とし、ここでは手順の要点のみ示す。
 
 1. まずPR本文/コメントの**実DB検証証跡**（commit SHA・適用migration・確認内容と結果・データ削除・DB起動状態）を確認する。
 2. 次のいずれかのときのみ再実行する: 証跡が無い/不明確、検証後にmigration・repository・transaction等が変更、並行制御や制約など再現確認すべき高リスク箇所がある。

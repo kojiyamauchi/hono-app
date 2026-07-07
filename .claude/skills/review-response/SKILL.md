@@ -1,3 +1,8 @@
+---
+name: review-response
+description: Use when responding to review feedback on a GitHub Pull Request in this repository, including review-response commits, validation, and keeping the PR description in sync. Claudeがレビュー指摘へ対応するときの入口Skill。
+---
+
 # Review Response Skill
 
 ## 概要
@@ -53,7 +58,7 @@ gh pr diff <PR番号>
 bun run spellcheck
 bun run lint
 bun run typecheck
-bun test
+bun test --isolate
 bun run build
 ```
 
@@ -101,8 +106,11 @@ gh pr view <PR番号> --json commits
 
 ### 7. pushと最終確認
 
+push方法は [CLAUDE.md](../../../CLAUDE.md)「GitHubへのpush」を正本とする。AIエージェントは `origin`（SSH）を使わず、HTTPS URLを直接指定してpushし、push直後にリモート追跡参照をfetchで更新する。
+
 ```bash
-git push <push先> <branch>
+git push https://github.com/kojiyamauchi/hono-app.git <branch>
+git fetch https://github.com/kojiyamauchi/hono-app.git <branch>:refs/remotes/origin/<branch>
 gh pr checks <PR番号>
 ```
 

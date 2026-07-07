@@ -1,3 +1,8 @@
+---
+name: pr-review
+description: Use when reviewing a GitHub Pull Request for this repository, especially when the user asks Claude to review a PR created by Codex, the user, or another agent. ClaudeがPRをレビューするときの入口Skill。
+---
+
 # PR Review Skill
 
 ## 概要
@@ -65,6 +70,18 @@ gh pr diff <PR番号>
   - 変数名・関数名が適切な英語になっているか
   - JSDocコメントが日本語で記述されているか
 
+- **features設計・レイヤー依存の遵守**
+  - `src/features/*` 間の相互importがないか
+  - `src/shared/` から `src/features/` / `src/middlewares/` への逆方向importがないか（依存方向はCLAUDE.md「src配下のレイヤー依存ルール」の下方向のみ）
+  - 標準ディレクトリ（`controllers` / `dtos` / `entities` / `mappers` / `repositories` / `routes` / `schemas` / `services`）以外の新しい責務ディレクトリを増やしていないか
+
+- **Schema / DTOの命名・配置**
+  - 入力検証用Zod schemaが `schemas/` にあり、`***Schema` / `***SchemaType`（param系は `***ParamSchemaType`）の命名に従っているか
+  - レスポンスDTOが `dtos/` にあり、`***Dto` / `***DtoType` の命名に従っているか
+
+- **エンドポイント一覧の更新**
+  - APIの追加・変更・削除がある場合、同じPRで `docs/endpoints.md` が更新されているか
+
 - **TypeScript型安全性**
   - 明示的な型定義があるか
   - `any`の使用を避けているか
@@ -111,7 +128,7 @@ PR本文の `## 実DB検証` セクションは、migrationの有無にかかわ
 - migrationを含まないPRでは、同セクションに `- migrationを含まないため検証なし` が記載されていることを確認する。セクション自体が無い、または空欄のままの場合はPR本文更新を指摘する。
 - migrationを含むPRでは、同セクションに以下の証跡が記載されていることを確認する。
 
-テスト/CIはDB非依存のため、migrationの適用や実DB挙動はCIで検証されない。migrationを含むPRでは、CLAUDE.md「migrationを含む変更の実DB検証」に従って確認する。詳細・原則はCLAUDE.mdを正本とし、ここでは手順の要点のみ示す。
+テスト/CIはDB非依存のため、migrationの適用や実DB挙動はCIで検証されない。migrationを含むPRでは、migration検証Skill（[`../migration-verification/SKILL.md`](../migration-verification/SKILL.md)）に従って確認する。詳細はmigration検証Skillを正本とし、ここでは手順の要点のみ示す。
 
 1. まずPR本文/コメントの**実DB検証証跡**（commit SHA・適用migration・確認内容と結果・データ削除・DB起動状態）を確認する。
 2. 次のいずれかのときのみ再実行する: 証跡が無い/不明確、検証後にmigration・repository・transaction等が変更、並行制御や制約など再現確認すべき高リスク箇所がある。
@@ -184,7 +201,7 @@ gh pr review <PR番号> --comment -b "レビューコメント内容"
 ```
 
 - 重大な問題がある場合: `--request-changes`
-- 問題がない場合: レビュー結果を投稿した後、別途`--comment -b "Approve by Claude <claude@anthropic.com> :octocat:"`
+- 問題がない場合: レビュー結果を投稿した後、別途通常コメントとして `gh pr comment <PR番号> -b "Approve by Claude <claude@anthropic.com> :octocat:"` を投稿する（`gh pr review` のレビューコメントではなく、PR Conversationの通常コメントとして投稿する）
 - コメントのみ: `--comment`（デフォルト）
 - 再レビュー時は、前回指摘への対応状況、新規差分、残る任意提案、結論をレビュー結果に記載する
 - 初回レビュー、再レビュー、修正後レビューを問わず、問題がない場合はレビュー結果とは別の通常コメントとして`Approve by Claude <claude@anthropic.com> :octocat:`を投稿する
