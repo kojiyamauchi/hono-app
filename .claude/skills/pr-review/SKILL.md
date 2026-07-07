@@ -70,6 +70,18 @@ gh pr diff <PR番号>
   - 変数名・関数名が適切な英語になっているか
   - JSDocコメントが日本語で記述されているか
 
+- **features設計・レイヤー依存の遵守**
+  - `src/features/*` 間の相互importがないか
+  - `src/shared/` から `src/features/` / `src/middlewares/` への逆方向importがないか（依存方向はCLAUDE.md「src配下のレイヤー依存ルール」の下方向のみ）
+  - 標準ディレクトリ（`controllers` / `dtos` / `entities` / `mappers` / `repositories` / `routes` / `schemas` / `services`）以外の新しい責務ディレクトリを増やしていないか
+
+- **Schema / DTOの命名・配置**
+  - 入力検証用Zod schemaが `schemas/` にあり、`***Schema` / `***SchemaType`（param系は `***ParamSchemaType`）の命名に従っているか
+  - レスポンスDTOが `dtos/` にあり、`***Dto` / `***DtoType` の命名に従っているか
+
+- **エンドポイント一覧の更新**
+  - APIの追加・変更・削除がある場合、同じPRで `docs/endpoints.md` が更新されているか
+
 - **TypeScript型安全性**
   - 明示的な型定義があるか
   - `any`の使用を避けているか
