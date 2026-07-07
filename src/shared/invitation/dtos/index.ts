@@ -1,34 +1,38 @@
-import type { InvitationStatus } from '@/shared/invitation/entities'
-import type { Role } from '@/shared/membership/entities'
+import { z } from 'zod'
 
 /**
- * APIレスポンス用のInvitation表現。
+ * APIレスポンス用のInvitation DTO。
  * DBカラム名 `token` はレスポンスでは `invitationToken` として公開する。
+ * `expiresAt` / `createdAt` はJSONレスポンス上のISO datetime文字列として扱う。
  */
-export type InvitationResponse = {
-  id: number
-  organizationId: number
-  email: string
-  role: Role
-  status: InvitationStatus
-  invitationToken: string
-  expiresAt: Date
-  createdAt: Date
-}
+export const invitationDto = z.object({
+  id: z.number().int(),
+  organizationId: z.number().int(),
+  email: z.email(),
+  role: z.enum(['OWNER', 'ADMIN', 'MEMBER']),
+  status: z.enum(['PENDING', 'ACCEPTED', 'EXPIRED', 'CANCELED', 'DECLINED']),
+  invitationToken: z.string(),
+  expiresAt: z.iso.datetime(),
+  createdAt: z.iso.datetime(),
+})
+
+export type InvitationDtoType = z.infer<typeof invitationDto>
 
 /**
- * 招待詳細取得エンドポイント用の公開レスポンス型。
- * トークンは含めず、organization情報（id・name）を含む。
+ * 招待詳細取得エンドポイント用の公開レスポンスDTO。
+ * トークンは含めず、organization情報（id・name）をネストして含む。
  */
-export type InvitationDetailResponse = {
-  id: number
-  organization: {
-    id: number
-    name: string
-  }
-  email: string
-  role: Role
-  status: InvitationStatus
-  expiresAt: Date
-  createdAt: Date
-}
+export const invitationDetailDto = z.object({
+  id: z.number().int(),
+  organization: z.object({
+    id: z.number().int(),
+    name: z.string(),
+  }),
+  email: z.email(),
+  role: z.enum(['OWNER', 'ADMIN', 'MEMBER']),
+  status: z.enum(['PENDING', 'ACCEPTED', 'EXPIRED', 'CANCELED', 'DECLINED']),
+  expiresAt: z.iso.datetime(),
+  createdAt: z.iso.datetime(),
+})
+
+export type InvitationDetailDtoType = z.infer<typeof invitationDetailDto>
