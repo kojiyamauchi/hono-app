@@ -112,56 +112,15 @@ types                          （型宣言のみ・最下層）
 
 ### migrationを含む変更の実DB検証
 
-テスト/CIは意図的にDB非依存（`mock.module`でrepositoryをモック）のため、migrationの適用や実DBでのSQL/transaction/一意制約/外部キーの挙動はCIで検証されない。以下の確認項目は別物として扱うこと:
+テスト/CIは意図的にDB非依存（`mock.module`でrepositoryをモック）のため、migrationの適用や実DBでのSQL/transaction/一意制約/外部キーの挙動はCIで検証されない。CIがDBを動かさない以上、migration適用と実DB挙動の検証はローカルのどこかで必ず行うこと。
 
-- `prisma generate`: 現在のschemaからPrisma clientを再生成する
-- `typecheck`: 生成済みclientとアプリケーションコードの型整合を確認する（生成済みclientが古くても、変更したmodel/fieldをコードが参照していなければ通るため、clientが最新であることまでは保証しない）
-- migration適用: 実DBとmigration履歴・SQLの整合を確認する
+詳細な手順（基本原則の全文・smokeの手段・タイミング別の責務・PRへの検証証跡の項目・レビュー時の再実行手順）は、migration検証Skill（[`.codex/skills/migration-verification/SKILL.md`](.codex/skills/migration-verification/SKILL.md)）に集約する。ここでは常に守る共通原則だけを示す。
 
-CIがDBを動かさない以上、migration適用と実DB挙動の検証はローカルのどこかで必ず行うこと。
-
-#### 基本原則
-
-- migrationを含む変更は、push（マージ）される最終コミットに対して、実DB検証（適用＋必要ならsmoke）が少なくとも一度ローカルでgreenであることを担保すること。
-- 対象コミット（migration/データ層コード）が変わったら再検証すること。変わっていなければ証跡を流用してよい。
-- 検証の粒度は中身次第:
-  - 非自明なデータ層ロジック（transaction・条件付き更新・一意制約・外部キー等）→ migration適用＋実DB smokeを行う。
-  - 単純なschema変更のみ（nullableカラム追加など）→ migration適用確認＋`prisma generate`/`typecheck`でほぼ十分（smokeは任意）。
-
-#### smokeの手段（変更内容に応じて選ぶ）
-
-- 実APIへのHTTPリクエスト（HTTP層〜DBを縦に確認できる。機能変更の第一候補）
-- repository/serviceを呼ぶ使い捨てTSスクリプト（データ層単体の確認向け）
-- `psql`等によるDB状態・制約・件数の直接確認（cascade後の件数確認など）
-
-使い捨てスクリプトはリポジトリ直下に残さないこと（`/tmp`等を使うか、終了後に`git status`で未追跡ファイルが無いことを確認する）。コミットしない。
-
-#### タイミング別の責務
-
-- **実装時（実装担当=一次検証）**: `prisma migrate dev`は実DBが必要なため、migrationの作成・適用・`prisma generate`の時点でDB起動が前提（適用は自動的に確認される）。非自明なデータ層を追加した場合はsmokeで挙動を確認し結果を報告する。
-- **PR発行（push）時（発行者=最終担保）**: push する最終コミットでmigration適用＋（非自明なら）smokeがgreenであることを担保し、PRへ検証証跡を残す。最終コミットが変わっていなければ実装時の結果を流用してよい。
-- **レビュー時（確認）**: まずPRの検証証跡を確認し、(a)記録が無い/結果が不明確、(b)検証後にmigration・repository・transaction等が変更、(c)並行制御や制約など再現確認すべき高リスク箇所がある、のいずれかのときのみ再実行する。
-  - 再実行手順: `bunx prisma migrate status`で履歴とDB状態を確認（**未適用であることを前提にしない**。`bun run db:start`がバックアップから起動すると対象migrationが適用済みのこともある）→ 未適用なら`bunx prisma migrate deploy`、適用済みなら実装者の証跡を確認 → clean適用そのものの再検証が必要な場合のみ、使い捨てDBまたは**ユーザー承認済みの`bun run db:reset`**を使う（`db:reset`は既存データを削除するため自動実行せず明示的な承認を必須とする）→ 非自明なデータ層はsmokeで確認する。
-- マージ後は各環境で`prisma migrate deploy`を実行して適用する前提（CIは適用しない）。
-
-#### PRへの検証証跡
-
-PR本文の `## 実DB検証` セクションは、migrationの有無にかかわらず必ず記載すること。
-
-- migrationを含むPRは、同セクション（本文またはコメント）へ最低限以下を残すこと（レビュー担当が結果を流用できるか判断するため）:
-  - 検証対象のcommit SHA
-  - 適用・確認したmigration
-  - 実行した確認内容と結果（適用、smokeで確認した制約・transactionの挙動など）
-  - 検証用データを削除したこと
-  - DBを起動状態で残したか停止したか
-- migrationを含まないPRは、同セクションへ `- migrationを含まないため検証なし` のようにリスト形式で記載すること（記載漏れと、migrationが無いため不要な状態を読み手が区別できるようにするため）。
-
-#### 検証データとローカル環境の保護
-
-- 検証用データは既存データと衝突しない値を使うこと
-- 検証後に作成したデータを削除すること
-- cascadeなど削除動作も対象なら、削除後の件数まで確認すること
-- 既存DBのreset・全削除はユーザー承認なしで行わないこと
+- migrationを含む変更は、push（マージ）される最終コミットに対して、実DB検証（適用＋非自明なデータ層ならsmoke）が少なくとも一度ローカルでgreenであることを担保すること
+- PR本文の `## 実DB検証` セクションは、migrationの有無にかかわらず必ず記載すること（migrationを含まないPRは `- migrationを含まないため検証なし` のようにリスト形式で記載する）
+- 検証用データは既存データと衝突しない値を使い、検証後に削除すること
+- 既存DBのreset・全削除（`bun run db:reset` を含む）は、ユーザー承認なしで行わないこと
+- マージ後は各環境で`prisma migrate deploy`を実行して適用する前提（CIは適用しない）
 
 ## 開発コマンド
 
@@ -462,7 +421,7 @@ Skill化した運用ルールは、詳細手順を `SKILL.md` に集約するこ
 
 - Skill化済みの運用ルールの詳細（手順・テンプレート・チェックリスト・コマンド例など）は `SKILL.md` を正本とする。
 - `AGENTS.md` / `CLAUDE.md` には、Skillを起動しなくても外せない共通原則（例: コミットは1作業=1コミット、controllerとroutesは別コミット、レビュー対応はPR上の追加コミットで行う、など）と、Skillへの導線だけを残す。
-- Skill化していない運用ルール（migration検証・branch命名・push方法など）の詳細は、引き続き `AGENTS.md` / `CLAUDE.md` を正本とし、Skill側はそこを参照する。
+- Skill化していない運用ルール（branch命名・push方法など）の詳細は、引き続き `AGENTS.md` / `CLAUDE.md` を正本とし、Skill側はそこを参照する。
 - Codex版（`.codex/skills/`）とClaude版（`.claude/skills/`）のSkillは、方針・確認項目がずれないよう同期する。
 
 サブエージェント定義（`.claude/agents/implementer.md` など）は、コールドスタートでエージェント定義自体が主要な文脈になるため、完全な参照寄せはドリフトを消す代わりに実装の取りこぼしリスクを上げる。そのため折衷を取る。
@@ -477,6 +436,7 @@ Skill化した運用ルールは、詳細手順を `SKILL.md` に集約するこ
 - レビュー対応の手順は [`.codex/skills/review-response/SKILL.md`](.codex/skills/review-response/SKILL.md) を参照すること
 - コミット粒度の確認手順は [`.codex/skills/commit-granularity/SKILL.md`](.codex/skills/commit-granularity/SKILL.md) を参照すること
 - DB性能調査（遅い/多いSQLの調査）の手順は [`.codex/skills/db-performance/SKILL.md`](.codex/skills/db-performance/SKILL.md) を参照すること
+- migrationを含む変更の実DB検証の詳細手順は [`.codex/skills/migration-verification/SKILL.md`](.codex/skills/migration-verification/SKILL.md) を参照すること
 - Codex 用のプロジェクト内Skillは `.codex/skills/` に置くこと
 
 ### 変数名と関数名
