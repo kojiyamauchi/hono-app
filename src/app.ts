@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { OpenAPIHono } from '@hono/zod-openapi'
 import { cors } from 'hono/cors'
 
 import { createHttpRequestTracingMiddleware } from '@/libs/telemetry/hono'
@@ -6,7 +6,8 @@ import { getAllowedOrigins } from '@/middlewares/origin'
 
 import { registerRoutes } from './routes'
 
-export const app = new Hono()
+// OpenAPI仕様を全featureのroute定義から集約するため、root appはOpenAPIHonoにする。
+export const app = new OpenAPIHono()
 
 app.use('*', createHttpRequestTracingMiddleware())
 
