@@ -1,11 +1,11 @@
 import type { IssuedAuthTokens } from '@/shared/auth/dtos'
 import { refreshTokenRepository } from '@/shared/auth/repositories'
 import { issueAuthToken, issueRefreshToken } from '@/shared/auth/services'
-import type { InvitationDetailResponse } from '@/shared/invitation/dtos'
+import type { InvitationDetailDtoType } from '@/shared/invitation/dtos'
 import type { Invitation } from '@/shared/invitation/entities'
 import { toInvitationDetailResponse } from '@/shared/invitation/mappers'
 import { invitationRepository } from '@/shared/invitation/repositories'
-import type { MemberResponse } from '@/shared/membership/dtos'
+import type { MemberDtoType } from '@/shared/membership/dtos'
 import { toMemberResponse } from '@/shared/membership/mappers'
 import { membershipRepository } from '@/shared/membership/repositories'
 import { toUserResponse } from '@/shared/user/mappers'
@@ -58,9 +58,9 @@ export const invitationsService = {
    *
    * 1. トークンとorganizationを一括取得（存在しない場合は404）
    * 2. 実効statusを算出: PENDINGかつexpiresAtが過去なら 'EXPIRED' として扱う（DBは更新しない）
-   * 3. InvitationDetailResponseを返す
+   * 3. InvitationDetailDtoTypeを返す
    */
-  getDetailByToken: async (token: string): Promise<InvitationDetailResponse> => {
+  getDetailByToken: async (token: string): Promise<InvitationDetailDtoType> => {
     // 1. トークンとorganizationを一括取得
     const result = await invitationRepository.findByTokenWithOrganization(token)
     if (!result) {
@@ -84,7 +84,7 @@ export const invitationsService = {
    * 3. 既にメンバーの場合は409
    * 4. トランザクションで招待をACCEPTEDに更新してmembershipを作成（nullなら409）
    */
-  accept: async (userId: number, token: string): Promise<MemberResponse> => {
+  accept: async (userId: number, token: string): Promise<MemberDtoType> => {
     // 1. PENDINGかつ有効な招待を取得
     const invitation = await findPendingValidInvitation(token)
 

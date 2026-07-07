@@ -1,11 +1,11 @@
-import type { InvitationResponse } from '@/shared/invitation/dtos'
+import type { InvitationDtoType } from '@/shared/invitation/dtos'
 import { toInvitationResponse } from '@/shared/invitation/mappers'
 import { invitationRepository } from '@/shared/invitation/repositories'
-import type { MemberResponse } from '@/shared/membership/dtos'
+import type { MemberDtoType } from '@/shared/membership/dtos'
 import type { Role } from '@/shared/membership/entities'
 import { toMemberResponse } from '@/shared/membership/mappers'
 import { membershipRepository } from '@/shared/membership/repositories'
-import type { OrganizationResponse } from '@/shared/organization/dtos'
+import type { OrganizationDtoType } from '@/shared/organization/dtos'
 import { toOrganizationResponse } from '@/shared/organization/mappers'
 import { organizationRepository } from '@/shared/organization/repositories'
 import { userRepository } from '@/shared/user/repositories'
@@ -27,7 +27,7 @@ export const organizationsService = {
   /**
    * 組織を作成する。作成者はOWNERとして登録される。
    */
-  create: async (userId: number, input: CreateOrganizationSchemaType): Promise<OrganizationResponse> => {
+  create: async (userId: number, input: CreateOrganizationSchemaType): Promise<OrganizationDtoType> => {
     const organization = await organizationRepository.createWithOwner(input.name, userId)
     return toOrganizationResponse(organization)
   },
@@ -35,7 +35,7 @@ export const organizationsService = {
   /**
    * 認証済みユーザーが所属する組織の一覧を返す。
    */
-  listMine: async (userId: number): Promise<OrganizationResponse[]> => {
+  listMine: async (userId: number): Promise<OrganizationDtoType[]> => {
     const organizations = await organizationRepository.findByUserId(userId)
     return organizations.map(toOrganizationResponse)
   },
@@ -43,7 +43,7 @@ export const organizationsService = {
   /**
    * 指定IDの組織情報を返す（メンバーであることはミドルウェアで確認済み）。
    */
-  getById: async (organizationId: number): Promise<OrganizationResponse> => {
+  getById: async (organizationId: number): Promise<OrganizationDtoType> => {
     const organization = await organizationRepository.findById(organizationId)
     if (!organization) {
       throw new AppError(404, '組織が見つかりません')
@@ -54,7 +54,7 @@ export const organizationsService = {
   /**
    * 組織を更新する。ADMIN以上のロールが必要。
    */
-  update: async (organizationId: number, input: UpdateOrganizationSchemaType, role: Role): Promise<OrganizationResponse> => {
+  update: async (organizationId: number, input: UpdateOrganizationSchemaType, role: Role): Promise<OrganizationDtoType> => {
     if (role !== 'OWNER' && role !== 'ADMIN') {
       throw new AppError(403, 'この操作には管理者以上の権限が必要です')
     }
@@ -81,7 +81,7 @@ export const organizationsService = {
   /**
    * 組織のメンバー一覧を返す。MEMBER以上であれば閲覧可（ミドルウェアで確認済み）。
    */
-  listMembers: async (organizationId: number): Promise<MemberResponse[]> => {
+  listMembers: async (organizationId: number): Promise<MemberDtoType[]> => {
     const memberships = await membershipRepository.findAllByOrganization(organizationId)
     return memberships.map(toMemberResponse)
   },
@@ -90,7 +90,7 @@ export const organizationsService = {
    * メンバーを追加する。
    * OWNERはMEMBER/ADMINを追加可。ADMINはMEMBERのみ追加可。MEMBERは操作不可。
    */
-  addMember: async (organizationId: number, operatorRole: Role, input: AddMemberBodySchemaType): Promise<MemberResponse> => {
+  addMember: async (organizationId: number, operatorRole: Role, input: AddMemberBodySchemaType): Promise<MemberDtoType> => {
     if (input.role === 'OWNER') {
       throw new AppError(422, 'OWNERは追加できません')
     }
@@ -120,12 +120,7 @@ export const organizationsService = {
    * OWNERはADMIN/MEMBERへ変更可。ADMINはMEMBERのみ操作可でADMINへの昇格不可。MEMBERは操作不可。
    * 対象がOWNERの場合は操作不可（OWNERは自身に対しても含む）。
    */
-  updateMemberRole: async (
-    organizationId: number,
-    membershipId: number,
-    operatorRole: Role,
-    input: UpdateMemberRoleBodySchemaType,
-  ): Promise<MemberResponse> => {
+  updateMemberRole: async (organizationId: number, membershipId: number, operatorRole: Role, input: UpdateMemberRoleBodySchemaType): Promise<MemberDtoType> => {
     if (input.role === 'OWNER') {
       throw new AppError(422, 'OWNERへの変更はできません')
     }
@@ -182,7 +177,7 @@ export const organizationsService = {
    * OWNERはADMIN/MEMBERを招待可。ADMINはMEMBERのみ招待可。MEMBERは操作不可。
    * 既にPENDINGの招待がある場合、または対象メールが既にメンバーの場合は409。
    */
-  createInvitation: async (organizationId: number, operatorRole: Role, input: CreateInvitationBodySchemaType): Promise<InvitationResponse> => {
+  createInvitation: async (organizationId: number, operatorRole: Role, input: CreateInvitationBodySchemaType): Promise<InvitationDtoType> => {
     if (operatorRole === 'MEMBER') {
       throw new AppError(403, 'この操作には管理者以上の権限が必要です')
     }
@@ -215,7 +210,7 @@ export const organizationsService = {
   /**
    * 招待一覧を返す。OWNER/ADMINのみ閲覧可。デフォルトはPENDINGのみ。
    */
-  listInvitations: async (organizationId: number, operatorRole: Role): Promise<InvitationResponse[]> => {
+  listInvitations: async (organizationId: number, operatorRole: Role): Promise<InvitationDtoType[]> => {
     if (operatorRole === 'MEMBER') {
       throw new AppError(403, 'この操作には管理者以上の権限が必要です')
     }
