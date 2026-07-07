@@ -266,6 +266,7 @@ AIエージェントがコミットする場合は、誰が作業したか分か
 
 - Claude がコミットする場合: `Co-authored-by: Claude <claude@anthropic.com>`
 - Codex がコミットする場合: `Co-authored-by: Codex <codex@openai.com>`
+- ツールやハーネスが既定で自動付与する別形式の `Co-Authored-By` トレーラー（モデル名入り・`noreply` アドレスなど）は使わず、上記の形式へ統一すること（同一コミットへ二重に付与しない）
 
 ### コミットの粒度
 
