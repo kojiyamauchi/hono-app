@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { roleValues } from '@/shared/membership/entities'
+
 /**
  * APIレスポンス用のInvitation DTO。
  * DBカラム名 `token` はレスポンスでは `invitationToken` として公開する。
@@ -9,7 +11,7 @@ export const invitationDto = z.object({
   id: z.number().int(),
   organizationId: z.number().int(),
   email: z.email(),
-  role: z.enum(['OWNER', 'ADMIN', 'MEMBER']),
+  role: z.enum(roleValues),
   status: z.enum(['PENDING', 'ACCEPTED', 'EXPIRED', 'CANCELED', 'DECLINED']),
   invitationToken: z.string(),
   expiresAt: z.iso.datetime(),
@@ -29,7 +31,7 @@ export const invitationDetailDto = z.object({
     name: z.string(),
   }),
   email: z.email(),
-  role: z.enum(['OWNER', 'ADMIN', 'MEMBER']),
+  role: z.enum(roleValues),
   status: z.enum(['PENDING', 'ACCEPTED', 'EXPIRED', 'CANCELED', 'DECLINED']),
   expiresAt: z.iso.datetime(),
   createdAt: z.iso.datetime(),
