@@ -108,8 +108,11 @@ gh pr view <PR番号> --json commits
 
 ### 7. pushと最終確認
 
+push方法は `AGENTS.md`「GitHubへのpush」を正本とする。AIエージェントは `origin`（SSH）を使わず、HTTPS URLを直接指定してpushし、push直後にリモート追跡参照をfetchで更新する。
+
 ```bash
-git push <push先> <branch>
+git push https://github.com/kojiyamauchi/hono-app.git <branch>
+git fetch https://github.com/kojiyamauchi/hono-app.git <branch>:refs/remotes/origin/<branch>
 gh pr checks <PR番号>
 ```
 
