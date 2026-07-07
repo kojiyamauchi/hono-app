@@ -1,3 +1,8 @@
+---
+name: db-performance
+description: Use when investigating slow or frequent SQL queries or DB-related API latency, using pg_stat_statements, OpenTelemetry / New Relic DB spans, EXPLAIN (ANALYZE, BUFFERS), and Prisma query logs. DB性能（遅い/多いSQL）調査の入口Skill。
+---
+
 # DB Performance Skill
 
 ## 概要
