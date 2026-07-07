@@ -2,9 +2,15 @@ import type { Role } from '@/shared/membership/entities'
 import type { Organization } from '@/shared/organization/entities'
 
 /**
+ * 招待ステータスの値一覧。
+ * InvitationStatus型・DTOのZod schema（`z.enum`）双方の正本として使い、列挙値の二重管理を防ぐ。
+ */
+export const invitationStatusValues = ['PENDING', 'ACCEPTED', 'EXPIRED', 'CANCELED', 'DECLINED'] as const
+
+/**
  * 招待ステータス。
  */
-export type InvitationStatus = 'PENDING' | 'ACCEPTED' | 'EXPIRED' | 'CANCELED' | 'DECLINED'
+export type InvitationStatus = (typeof invitationStatusValues)[number]
 
 /**
  * Invitationドメインエンティティ。

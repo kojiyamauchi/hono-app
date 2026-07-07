@@ -1,9 +1,11 @@
 import { z } from 'zod'
 
+import { invitationStatusValues } from '@/shared/invitation/entities'
 import { roleValues } from '@/shared/membership/entities'
 
 /**
  * APIレスポンス用のInvitation DTO。
+ * `role` / `status` の列挙値はそれぞれentity側の `roleValues` / `invitationStatusValues` を正本とする。
  * DBカラム名 `token` はレスポンスでは `invitationToken` として公開する。
  * `expiresAt` / `createdAt` はJSONレスポンス上のISO datetime文字列として扱う。
  */
@@ -12,7 +14,7 @@ export const invitationDto = z.object({
   organizationId: z.number().int(),
   email: z.email(),
   role: z.enum(roleValues),
-  status: z.enum(['PENDING', 'ACCEPTED', 'EXPIRED', 'CANCELED', 'DECLINED']),
+  status: z.enum(invitationStatusValues),
   invitationToken: z.string(),
   expiresAt: z.iso.datetime(),
   createdAt: z.iso.datetime(),
@@ -32,7 +34,7 @@ export const invitationDetailDto = z.object({
   }),
   email: z.email(),
   role: z.enum(roleValues),
-  status: z.enum(['PENDING', 'ACCEPTED', 'EXPIRED', 'CANCELED', 'DECLINED']),
+  status: z.enum(invitationStatusValues),
   expiresAt: z.iso.datetime(),
   createdAt: z.iso.datetime(),
 })
