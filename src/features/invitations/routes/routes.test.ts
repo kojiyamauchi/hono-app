@@ -109,7 +109,7 @@ describe('invitations routes', () => {
     createRefreshToken.mockReset()
   })
 
-  test('POST /invitations/accept は有効な招待を受諾して201とMemberResponseを返す', async () => {
+  test('POST /invitations/accept は有効な招待を受諾して201とMemberDtoTypeを返す', async () => {
     findByToken.mockResolvedValue(pendingInvitation)
     findById.mockResolvedValue(inviteeUser)
     findByUserAndOrganization.mockResolvedValue(null)
@@ -343,7 +343,7 @@ describe('invitations routes', () => {
     expect(response.status).toBe(204)
   })
 
-  test('POST /invitations/signup は有効な招待で新規登録して201とAuthResultを返し、Set-CookieヘッダーにリフレッシュトークンCookieをセットする', async () => {
+  test('POST /invitations/signup は有効な招待で新規登録して201とAuthResultDtoTypeを返し、Set-CookieヘッダーにリフレッシュトークンCookieをセットする', async () => {
     findByToken.mockResolvedValue(pendingInvitation)
     findByEmail.mockResolvedValue(null)
     signup.mockImplementation(
@@ -528,7 +528,7 @@ describe('invitations routes', () => {
     expect(response.status).toBe(403)
   })
 
-  test('GET /invitations/:token は認証なしで200とInvitationDetailResponseを返す', async () => {
+  test('GET /invitations/:token は認証なしで200とInvitationDetailDtoTypeを返す', async () => {
     findByTokenWithOrganization.mockResolvedValue(pendingInvitationWithOrg)
 
     const response = await app.request(`/invitations/${TOKEN}`, { method: 'GET' })

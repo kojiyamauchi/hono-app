@@ -35,8 +35,8 @@ describe('usersService.getMe', () => {
       id: 1,
       name: 'Taro',
       email: 'taro@example.com',
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
+      createdAt: user.createdAt.toISOString(),
+      updatedAt: user.updatedAt.toISOString(),
     })
     expect(result).not.toHaveProperty('password')
   })

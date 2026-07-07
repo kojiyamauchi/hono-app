@@ -736,9 +736,9 @@ describe('authService.listSessions', () => {
 
     expect(sessions).toHaveLength(1)
     expect(sessions[0].id).toBe('family-uuid-1')
-    expect(sessions[0].createdAt).toEqual(createdAt)
-    expect(sessions[0].expiresAt).toEqual(expiresAt)
-    expect(sessions[0].lastUsedAt).toEqual(lastUsedAt)
+    expect(sessions[0].createdAt).toBe(createdAt.toISOString())
+    expect(sessions[0].expiresAt).toBe(expiresAt.toISOString())
+    expect(sessions[0].lastUsedAt).toBe(lastUsedAt.toISOString())
   })
 
   test('レスポンスにtokenHash等の内部値を含まないこと（各要素のキーがid/createdAt/expiresAt/lastUsedAtのみ）', async () => {
