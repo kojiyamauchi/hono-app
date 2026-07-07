@@ -201,7 +201,7 @@ gh pr review <PR番号> --comment -b "レビューコメント内容"
 ```
 
 - 重大な問題がある場合: `--request-changes`
-- 問題がない場合: レビュー結果を投稿した後、別途`--comment -b "Approve by Claude <claude@anthropic.com> :octocat:"`
+- 問題がない場合: レビュー結果を投稿した後、別途通常コメントとして `gh pr comment <PR番号> -b "Approve by Claude <claude@anthropic.com> :octocat:"` を投稿する（`gh pr review` のレビューコメントではなく、PR Conversationの通常コメントとして投稿する）
 - コメントのみ: `--comment`（デフォルト）
 - 再レビュー時は、前回指摘への対応状況、新規差分、残る任意提案、結論をレビュー結果に記載する
 - 初回レビュー、再レビュー、修正後レビューを問わず、問題がない場合はレビュー結果とは別の通常コメントとして`Approve by Claude <claude@anthropic.com> :octocat:`を投稿する
