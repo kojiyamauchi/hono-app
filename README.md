@@ -249,6 +249,15 @@ http://localhost:3000
 
 公開エンドポイント一覧は [docs/endpoints.md](docs/endpoints.md) を参照してください。
 
+### OpenAPI / Scalar
+
+`ENABLE_API_DOCS=true` のとき、OpenAPI仕様とAPIリファレンスUIを利用できます。ローカル開発では `.env` に `ENABLE_API_DOCS=true` を設定してください。
+
+- `GET /open-api/doc`: OpenAPI JSON（Zod定義から動的生成）
+- `GET /open-api/scalar`: Scalar UI（`/open-api/doc` を読み込んで表示）
+
+`ENABLE_API_DOCS=false`（既定）のときは両エンドポイントを登録せず404になります。staging / prod では原則 `false` とし、OpenAPI JSONとScalar UIを外部公開しません。
+
 ### ブラウザクライアントからの利用
 
 リフレッシュトークンは `HttpOnly Cookie`（`Path=/auth`）で管理されます。ブラウザからリクエストを送る場合は `credentials: 'include'` を指定してください。
@@ -345,6 +354,7 @@ bun run prisma:studio       # Prisma Studioを起動
 ```txt
 PORT=3000
 DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+ENABLE_API_DOCS=false
 JWT_SECRET="your-jwt-secret"
 REFRESH_TOKEN_SECRET="your-refresh-token-secret"
 PASSWORD_RESET_TOKEN_SECRET="your-password-reset-token-secret"
@@ -352,6 +362,8 @@ SUPABASE_URL="http://127.0.0.1:54321"
 SUPABASE_ANON_KEY="your-supabase-anon-key"
 ALLOWED_ORIGINS="http://localhost:3000"
 ```
+
+`ENABLE_API_DOCS` はOpenAPI JSON(`/open-api/doc`)とScalar UI(`/open-api/scalar`)の公開フラグです。`true` のときだけ登録し、staging / prod では原則 `false` とします。
 
 staging / production では環境ごとに別のSupabase projectを作成し、`DATABASE_URL` や各secretをdeployment platformまたはCI secretsで管理してください。
 
