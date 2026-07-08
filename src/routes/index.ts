@@ -1,4 +1,4 @@
-import type { OpenAPIHono } from '@hono/zod-openapi'
+import { createRoute, type OpenAPIHono, z } from '@hono/zod-openapi'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
 
 import { authRoutes } from '@/features/auth/routes'
@@ -9,13 +9,45 @@ import { supabaseAuthRoutes } from '@/features/supabaseAuth/routes'
 import { usersRoutes } from '@/features/users/routes'
 import { AppError } from '@/utils/errors'
 
+/** GET /: 動作確認用のテキストを返す。 */
+const rootRoute = createRoute({
+  method: 'get',
+  path: '/',
+  tags: ['Common'],
+  summary: '動作確認用のテキストを返す',
+  responses: {
+    200: {
+      content: { 'text/plain': { schema: z.string() } },
+      description: '動作確認用テキスト',
+    },
+  },
+})
+
+/** GET /health: ヘルスチェック結果を返す。 */
+const healthRoute = createRoute({
+  method: 'get',
+  path: '/health',
+  tags: ['Common'],
+  summary: 'ヘルスチェック結果を返す',
+  responses: {
+    200: {
+      content: {
+        'application/json': {
+          schema: z.object({ ok: z.boolean() }).openapi('HealthResponse'),
+        },
+      },
+      description: 'ヘルスチェック結果',
+    },
+  },
+})
+
 export const registerRoutes = (app: OpenAPIHono): void => {
-  app.get('/', (c) => {
-    return c.text('Hello Hono Dev Watch')
+  app.openapi(rootRoute, (c) => {
+    return c.text('Hello Hono Dev Watch', 200)
   })
 
-  app.get('/health', (c) => {
-    return c.json({ ok: true })
+  app.openapi(healthRoute, (c) => {
+    return c.json({ ok: true }, 200)
   })
 
   // 認証関連ルート（/auth配下）をマウントする
