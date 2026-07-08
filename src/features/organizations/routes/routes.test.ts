@@ -242,6 +242,44 @@ describe('organizations routes', () => {
     expect(response.status).toBe(401)
   })
 
+  // route.middleware は param検証より先に走るため、不正IDが404へ退行しないことを確認する（挙動退行の回帰テスト）。
+  test('GET /organizations/:id は不正なID形式なら（membership確認前に）400を返す', async () => {
+    const token = await createToken(1)
+
+    const response = await app.request('/organizations/not-number', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(response.status).toBe(400)
+    // エラー形式 `{ error: { message } }` は移行前（param validator の 400）と不変。
+    const body = (await response.json()) as { error?: { message?: string } }
+    expect(typeof body.error?.message).toBe('string')
+    // 不正IDはDBクエリへ到達しない
+    expect(findByUserAndOrganization).not.toHaveBeenCalled()
+  })
+
+  test('GET /organizations/:id/members は不正なID形式なら400を返す', async () => {
+    const token = await createToken(1)
+
+    const response = await app.request('/organizations/not-number/members', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(response.status).toBe(400)
+    expect(findByUserAndOrganization).not.toHaveBeenCalled()
+  })
+
+  test('GET /organizations/:id/invitations は不正なID形式なら400を返す', async () => {
+    const token = await createToken(1)
+
+    const response = await app.request('/organizations/not-number/invitations', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(response.status).toBe(400)
+    expect(findByUserAndOrganization).not.toHaveBeenCalled()
+  })
+
   // --- メンバー管理ルート ---
 
   test('GET /organizations/:id/members はMEMBERなら200を返す', async () => {
