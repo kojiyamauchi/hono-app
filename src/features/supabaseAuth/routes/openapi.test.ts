@@ -64,8 +64,27 @@ describe('supabaseAuth routes OpenAPI定義', () => {
     const doc = await fetchOpenApiDoc()
 
     expect(doc.components?.schemas?.SupabaseUser).toBeDefined()
+    expect(doc.components?.schemas?.NullableSupabaseUser).toBeDefined()
     expect(doc.components?.schemas?.SupabaseAuthResult).toBeDefined()
     expect(doc.components?.schemas?.SignupRequest).toBeDefined()
     expect(doc.components?.schemas?.LoginRequest).toBeDefined()
+  })
+
+  test('SupabaseUser componentはnullableにならず、null許容はNullableSupabaseUserへ分離されている', async () => {
+    const doc = await fetchOpenApiDoc()
+
+    // null を返さない /me が参照する SupabaseUser にnullableが伝播していないこと
+    const supabaseUser = doc.components?.schemas?.SupabaseUser as { nullable?: boolean }
+    expect(supabaseUser.nullable).toBeUndefined()
+
+    // null許容は認証結果の user 用の別componentへ分離されていること
+    const nullableSupabaseUser = doc.components?.schemas?.NullableSupabaseUser as { nullable?: boolean }
+    expect(nullableSupabaseUser.nullable).toBe(true)
+
+    // 認証結果の user は NullableSupabaseUser を参照すること
+    const authResult = doc.components?.schemas?.SupabaseAuthResult as {
+      properties: { user: { $ref?: string } }
+    }
+    expect(authResult.properties.user.$ref).toBe('#/components/schemas/NullableSupabaseUser')
   })
 })

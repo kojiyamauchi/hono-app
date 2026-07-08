@@ -7,24 +7,33 @@ import { z } from '@hono/zod-openapi'
  * フィールドだけを公開する。optionalの有無は `User` の定義（@supabase/auth-js の型定義）に合わせる。
  * OpenAPI response schemaとして参照するため、`.openapi()` でcomponent名を付与する。
  */
-export const supabaseUserDto = z
-  .object({
-    id: z.string(),
-    aud: z.string(),
-    email: z.string().optional(),
-    phone: z.string().optional(),
-    role: z.string().optional(),
-    app_metadata: z.record(z.string(), z.any()),
-    user_metadata: z.record(z.string(), z.any()),
-    created_at: z.string(),
-    updated_at: z.string().optional(),
-    email_confirmed_at: z.string().optional(),
-    last_sign_in_at: z.string().optional(),
-    is_anonymous: z.boolean().optional(),
-  })
-  .openapi('SupabaseUser')
+const supabaseUserShape = z.object({
+  id: z.string(),
+  aud: z.string(),
+  email: z.string().optional(),
+  phone: z.string().optional(),
+  role: z.string().optional(),
+  app_metadata: z.record(z.string(), z.any()),
+  user_metadata: z.record(z.string(), z.any()),
+  created_at: z.string(),
+  updated_at: z.string().optional(),
+  email_confirmed_at: z.string().optional(),
+  last_sign_in_at: z.string().optional(),
+  is_anonymous: z.boolean().optional(),
+})
+
+export const supabaseUserDto = supabaseUserShape.openapi('SupabaseUser')
 
 export type SupabaseUserDtoType = z.infer<typeof supabaseUserDto>
+
+/**
+ * null許容のSupabase User DTO（サインアップ/ログインの `user` 用）。
+ * `.openapi('SupabaseUser')` 済みのschemaへ直接 `.nullable()` を重ねると、共有される
+ * `SupabaseUser` component自体に `nullable: true` が伝播し、null を返さない `/me` の
+ * 200 responseまで `SupabaseUser | null` として公開されてしまう。これを避けるため、
+ * base shape から nullable を別componentとして分離する。
+ */
+const nullableSupabaseUserDto = supabaseUserShape.nullable().openapi('NullableSupabaseUser')
 
 /**
  * Supabase Auth の認証結果DTO（サインアップ/ログイン共通）。
@@ -34,7 +43,7 @@ export type SupabaseUserDtoType = z.infer<typeof supabaseUserDto>
 export const authResultDto = z
   .object({
     token: z.string().nullable(),
-    user: supabaseUserDto.nullable(),
+    user: nullableSupabaseUserDto,
   })
   .openapi('SupabaseAuthResult')
 
