@@ -2,6 +2,7 @@ import { createRoute, OpenAPIHono } from '@hono/zod-openapi'
 
 import { authMiddleware } from '@/middlewares/auth'
 import { organizationMembershipMiddleware } from '@/middlewares/organizationMembership'
+import { paramValidationMiddleware } from '@/middlewares/paramValidation'
 import { invitationDto } from '@/shared/invitation/dtos'
 import { memberDto } from '@/shared/membership/dtos'
 import { errorResponseDto } from '@/shared/openApi/dtos'
@@ -81,7 +82,7 @@ const getByIdRoute = createRoute({
   path: '/{id}',
   tags: ['Organizations'],
   summary: '指定した組織の情報を取得する',
-  middleware: [authMiddleware, organizationMembershipMiddleware],
+  middleware: [authMiddleware, paramValidationMiddleware(organizationIdParamSchema), organizationMembershipMiddleware],
   security: bearerSecurity,
   request: {
     params: organizationIdParamSchema,
@@ -104,7 +105,7 @@ const updateRoute = createRoute({
   path: '/{id}',
   tags: ['Organizations'],
   summary: '指定した組織を更新する',
-  middleware: [authMiddleware, organizationMembershipMiddleware],
+  middleware: [authMiddleware, paramValidationMiddleware(organizationIdParamSchema), organizationMembershipMiddleware],
   security: bearerSecurity,
   request: {
     params: organizationIdParamSchema,
@@ -134,7 +135,7 @@ const removeRoute = createRoute({
   path: '/{id}',
   tags: ['Organizations'],
   summary: '指定した組織を削除する',
-  middleware: [authMiddleware, organizationMembershipMiddleware],
+  middleware: [authMiddleware, paramValidationMiddleware(organizationIdParamSchema), organizationMembershipMiddleware],
   security: bearerSecurity,
   request: {
     params: organizationIdParamSchema,
@@ -157,7 +158,7 @@ const listMembersRoute = createRoute({
   path: '/{id}/members',
   tags: ['Organization Members'],
   summary: '指定した組織のメンバー一覧を取得する',
-  middleware: [authMiddleware, organizationMembershipMiddleware],
+  middleware: [authMiddleware, paramValidationMiddleware(organizationIdParamSchema), organizationMembershipMiddleware],
   security: bearerSecurity,
   request: {
     params: organizationIdParamSchema,
@@ -180,7 +181,7 @@ const addMemberRoute = createRoute({
   path: '/{id}/members',
   tags: ['Organization Members'],
   summary: '指定した組織へメンバーを追加する',
-  middleware: [authMiddleware, organizationMembershipMiddleware],
+  middleware: [authMiddleware, paramValidationMiddleware(organizationIdParamSchema), organizationMembershipMiddleware],
   security: bearerSecurity,
   request: {
     params: organizationIdParamSchema,
@@ -212,7 +213,7 @@ const updateMemberRoleRoute = createRoute({
   path: '/{id}/members/{membershipId}',
   tags: ['Organization Members'],
   summary: '指定したメンバーのロールを変更する',
-  middleware: [authMiddleware, organizationMembershipMiddleware],
+  middleware: [authMiddleware, paramValidationMiddleware(memberRouteParamSchema), organizationMembershipMiddleware],
   security: bearerSecurity,
   request: {
     params: memberRouteParamSchema,
@@ -244,7 +245,7 @@ const removeMemberRoute = createRoute({
   path: '/{id}/members/{membershipId}',
   tags: ['Organization Members'],
   summary: '指定したメンバーを削除する',
-  middleware: [authMiddleware, organizationMembershipMiddleware],
+  middleware: [authMiddleware, paramValidationMiddleware(memberRouteParamSchema), organizationMembershipMiddleware],
   security: bearerSecurity,
   request: {
     params: memberRouteParamSchema,
@@ -268,7 +269,7 @@ const listInvitationsRoute = createRoute({
   path: '/{id}/invitations',
   tags: ['Organization Invitations'],
   summary: '指定した組織の招待一覧を取得する',
-  middleware: [authMiddleware, organizationMembershipMiddleware],
+  middleware: [authMiddleware, paramValidationMiddleware(organizationIdParamSchema), organizationMembershipMiddleware],
   security: bearerSecurity,
   request: {
     params: organizationIdParamSchema,
@@ -292,7 +293,7 @@ const createInvitationRoute = createRoute({
   path: '/{id}/invitations',
   tags: ['Organization Invitations'],
   summary: '指定した組織への招待を作成する',
-  middleware: [authMiddleware, organizationMembershipMiddleware],
+  middleware: [authMiddleware, paramValidationMiddleware(organizationIdParamSchema), organizationMembershipMiddleware],
   security: bearerSecurity,
   request: {
     params: organizationIdParamSchema,
@@ -324,7 +325,7 @@ const cancelInvitationRoute = createRoute({
   path: '/{id}/invitations/{invitationId}',
   tags: ['Organization Invitations'],
   summary: '指定した招待をキャンセルする',
-  middleware: [authMiddleware, organizationMembershipMiddleware],
+  middleware: [authMiddleware, paramValidationMiddleware(invitationRouteParamSchema), organizationMembershipMiddleware],
   security: bearerSecurity,
   request: {
     params: invitationRouteParamSchema,

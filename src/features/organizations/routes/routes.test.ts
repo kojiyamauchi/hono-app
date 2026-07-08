@@ -280,6 +280,51 @@ describe('organizations routes', () => {
     expect(findByUserAndOrganization).not.toHaveBeenCalled()
   })
 
+  // nested param（membershipId / invitationId）も membership確認より先に検証されること。
+  // 非メンバー状態でも param検証が先に走るため、404ではなく400で止まりDBへ到達しない（挙動退行の回帰テスト）。
+  test('PATCH /organizations/:id/members/:membershipId は不正なmembershipIdなら（非メンバーでも）400を返す', async () => {
+    findByUserAndOrganization.mockResolvedValue(null)
+    const token = await createToken(1)
+
+    const response = await app.request('/organizations/1/members/not-number', {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: 'MEMBER' }),
+    })
+
+    expect(response.status).toBe(400)
+    expect(findByUserAndOrganization).not.toHaveBeenCalled()
+    expect(updateRole).not.toHaveBeenCalled()
+  })
+
+  test('DELETE /organizations/:id/members/:membershipId は不正なmembershipIdなら（非メンバーでも）400を返す', async () => {
+    findByUserAndOrganization.mockResolvedValue(null)
+    const token = await createToken(1)
+
+    const response = await app.request('/organizations/1/members/not-number', {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(response.status).toBe(400)
+    expect(findByUserAndOrganization).not.toHaveBeenCalled()
+    expect(membershipDeleteById).not.toHaveBeenCalled()
+  })
+
+  test('DELETE /organizations/:id/invitations/:invitationId は不正なinvitationIdなら（非メンバーでも）400を返す', async () => {
+    findByUserAndOrganization.mockResolvedValue(null)
+    const token = await createToken(1)
+
+    const response = await app.request('/organizations/1/invitations/not-number', {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(response.status).toBe(400)
+    expect(findByUserAndOrganization).not.toHaveBeenCalled()
+    expect(invitationCancel).not.toHaveBeenCalled()
+  })
+
   // --- メンバー管理ルート ---
 
   test('GET /organizations/:id/members はMEMBERなら200を返す', async () => {
