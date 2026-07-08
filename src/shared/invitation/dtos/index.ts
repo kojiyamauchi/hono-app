@@ -28,18 +28,21 @@ export type InvitationDtoType = z.infer<typeof invitationDto>
 /**
  * 招待詳細取得エンドポイント用の公開レスポンスDTO。
  * トークンは含めず、organization情報（id・name）をネストして含む。
+ * OpenAPI response schemaとして参照するため、`.openapi()` でcomponent名を付与する。
  */
-export const invitationDetailDto = z.object({
-  id: z.number().int(),
-  organization: z.object({
+export const invitationDetailDto = z
+  .object({
     id: z.number().int(),
-    name: z.string(),
-  }),
-  email: z.email(),
-  role: z.enum(roleValues),
-  status: z.enum(invitationStatusValues),
-  expiresAt: z.iso.datetime(),
-  createdAt: z.iso.datetime(),
-})
+    organization: z.object({
+      id: z.number().int(),
+      name: z.string(),
+    }),
+    email: z.email(),
+    role: z.enum(roleValues),
+    status: z.enum(invitationStatusValues),
+    expiresAt: z.iso.datetime(),
+    createdAt: z.iso.datetime(),
+  })
+  .openapi('InvitationDetail')
 
 export type InvitationDetailDtoType = z.infer<typeof invitationDetailDto>
