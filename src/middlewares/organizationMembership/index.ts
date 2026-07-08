@@ -9,6 +9,10 @@ import { AppError } from '@/utils/errors'
  * authMiddlewareの後に使用し、パスパラメータ `id` の組織に対して
  * 認証ユーザーがメンバーかを確認する。メンバーであれば membership をcontextに格納する。
  * 非メンバーには組織の存在を隠すため404を返す。
+ *
+ * OpenAPIHono では route の `middleware` は `request.params` 検証より先に走るため、
+ * このミドルウェアより前に `paramValidationMiddleware(<route param schema>)` を差し込み、
+ * `id` を含む全パスパラメータを検証済みにしておくこと（不正IDが404へ退行するのを防ぐ）。
  */
 export const organizationMembershipMiddleware = createMiddleware<{
   Variables: { userId: number; membership: Membership }
