@@ -1,8 +1,11 @@
-import type { Context } from 'hono'
+import type { Context, TypedResponse } from 'hono'
 
+import type { AuthResultDtoType } from '@/shared/auth/dtos'
 import { clearRefreshTokenCookie, getRefreshTokenCookie, setRefreshTokenCookie } from '@/shared/auth/services'
+import type { UserDtoType } from '@/shared/user/dtos'
 import { AppError } from '@/utils/errors'
 
+import type { SessionListDtoType } from '../dtos'
 import type {
   ChangePasswordSchemaType,
   ConfirmPasswordResetSchemaType,
@@ -37,6 +40,9 @@ const getClientIp = (c: Context): string | undefined => {
  * 認証エンドポイントのコントローラ。
  * バリデーション済みの入力を受け取り、serviceを呼び出してレスポンスを返す。
  * リフレッシュトークンはHttpOnly Cookieとしてセットし、bodyには認証結果DTO（AuthResultDtoType）のみ返す。
+ * JSON応答を返すメソッドは、OpenAPIHono の `openapi()` ハンドラが要求する型付きレスポンス（`TypedResponse`）を返す。
+ * 無内容応答（204/202）を返すメソッドは、`TypedResponse<null, 204, 'body'>` が openapi() の
+ * 要求する型へ代入できないため、素直に `Response` を返す型にする。
  */
 export const authController = {
   /**
@@ -44,7 +50,7 @@ export const authController = {
    * リフレッシュトークンはCookieへセットする。
    * IP単位のレート制限超過時は429を返す。
    */
-  signup: async (c: Context, input: SignupSchemaType): Promise<Response> => {
+  signup: async (c: Context, input: SignupSchemaType): Promise<TypedResponse<AuthResultDtoType, 201, 'json'>> => {
     const result = await authService.signup(input, getClientIp(c))
     setRefreshTokenCookie(c, result.refreshToken)
     return c.json({ token: result.token, user: result.user }, 201)
@@ -55,7 +61,7 @@ export const authController = {
    * リフレッシュトークンはCookieへセットする。
    * IP単位・email単位のレート制限超過時は429を返す。
    */
-  login: async (c: Context, input: LoginSchemaType): Promise<Response> => {
+  login: async (c: Context, input: LoginSchemaType): Promise<TypedResponse<AuthResultDtoType, 200, 'json'>> => {
     const result = await authService.login(input, getClientIp(c))
     setRefreshTokenCookie(c, result.refreshToken)
     return c.json({ token: result.token, user: result.user }, 200)
@@ -65,7 +71,7 @@ export const authController = {
    * Cookieからリフレッシュトークンを取得してローテーションし、200で新しいアクセストークンを返す。
    * Cookieが存在しない場合は401。
    */
-  refresh: async (c: Context): Promise<Response> => {
+  refresh: async (c: Context): Promise<TypedResponse<AuthResultDtoType, 200, 'json'>> => {
     const cookieToken = getRefreshTokenCookie(c)
     if (!cookieToken) {
       throw new AppError(401, 'リフレッシュトークンが見つかりません')
@@ -91,7 +97,7 @@ export const authController = {
   /**
    * 認証済みユーザー自身の情報を返す。
    */
-  me: async (c: Context, userId: number): Promise<Response> => {
+  me: async (c: Context, userId: number): Promise<TypedResponse<UserDtoType, 200, 'json'>> => {
     const user = await authService.getById(userId)
     return c.json(user, 200)
   },
@@ -138,7 +144,7 @@ export const authController = {
   /**
    * 認証済みユーザーのactiveなリフレッシュセッション一覧を返す。
    */
-  listSessions: async (c: Context, userId: number): Promise<Response> => {
+  listSessions: async (c: Context, userId: number): Promise<TypedResponse<SessionListDtoType, 200, 'json'>> => {
     const sessions = await authService.listSessions(userId)
     return c.json({ sessions }, 200)
   },
