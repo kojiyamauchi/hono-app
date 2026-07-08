@@ -4,6 +4,8 @@ import { describe, expect, test } from 'bun:test'
 process.env.JWT_SECRET = 'test-secret'
 process.env.REFRESH_TOKEN_SECRET = 'test-refresh-secret'
 process.env.ALLOWED_ORIGINS = 'http://localhost:3000'
+// 共通ルートのOpenAPI反映を検証するため、app import前にドキュメント公開を有効化する
+process.env.ENABLE_API_DOCS = 'true'
 
 const { app } = await import('./app')
 
@@ -13,6 +15,17 @@ describe('GET /health', () => {
 
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ ok: true })
+  })
+})
+
+describe('共通ルートのOpenAPI定義', () => {
+  test('/ と /health が /open-api/doc の paths へ反映されている', async () => {
+    const response = await app.request('/open-api/doc')
+
+    expect(response.status).toBe(200)
+    const doc = (await response.json()) as { paths?: Record<string, Record<string, unknown>> }
+    expect(doc.paths?.['/']?.get).toBeDefined()
+    expect(doc.paths?.['/health']?.get).toBeDefined()
   })
 })
 
