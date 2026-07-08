@@ -47,6 +47,9 @@ const updateMeRoute = createRoute({
   security: bearerSecurity,
   request: {
     body: {
+      // required: true を付けないと、Content-Typeなし/bodyなしのPATCHが任意bodyとして
+      // 検証スキップされ c.req.valid('json') が {} になり200が返る。既存の必須body検証（400）を維持する。
+      required: true,
       content: { 'application/json': { schema: updateMeSchema } },
     },
   },

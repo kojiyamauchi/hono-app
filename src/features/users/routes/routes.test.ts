@@ -100,6 +100,22 @@ describe('users routes', () => {
     expect(body.error?.message).toBe('ユーザーが見つかりません')
   })
 
+  test('PATCH /users/me はbodyなし（Content-Typeなし）でも入力不正として400を返す', async () => {
+    const token = await createToken(1)
+
+    const response = await app.request('/users/me', {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    // 必須bodyの検証がスキップされず、既存の統一エラー形式で400になること
+    expect(response.status).toBe(400)
+    const body = (await response.json()) as { error?: { message?: string } }
+    expect(body.error?.message).toBeDefined()
+    // 検証で止まるため更新処理は呼ばれない
+    expect(updateById).not.toHaveBeenCalled()
+  })
+
   test('GET /users/:id は指定ユーザーの公開情報だけを返す', async () => {
     findById.mockResolvedValue({ ...user, id: 2, name: 'Public User', email: 'public@example.com' })
     const token = await createToken(1)
