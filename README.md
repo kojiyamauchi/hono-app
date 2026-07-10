@@ -245,6 +245,28 @@ APIは以下で起動します。
 http://localhost:3000
 ```
 
+### 日常の起動・停止
+
+初回セットアップ後は、ローカルSupabaseと開発サーバーをまとめて起動できます。
+
+```bash
+make dev
+```
+
+ホットリロードを使わずにサーバーを起動する場合は、次のコマンドを実行します。
+
+```bash
+make start
+```
+
+`make dev` と `make start` は、`bun run db:start` の正常完了後にそれぞれのサーバーを起動します。Prisma migrationの適用は含まないため、初回セットアップ時やmigration追加後は、事前に `bun run prisma:migrate:dev` を実行してください。
+
+終了時は `Ctrl+C` でサーバーを停止してから、ローカルSupabaseを停止します。
+
+```bash
+make stop
+```
+
 ## API
 
 公開エンドポイント一覧は [docs/endpoints.md](docs/endpoints.md) を参照してください。
@@ -326,6 +348,9 @@ DB spanではSQL本文属性（`db.statement` または `db.query.text`）が送
 ## Scripts
 
 ```bash
+make dev                    # Supabaseとホットリロード付き開発サーバーを順番に起動
+make start                  # Supabaseとサーバーを順番に起動
+make stop                   # ローカルSupabaseを停止
 bun run dev                 # ホットリロード付きで開発サーバーを起動
 bun run start               # サーバーを起動
 bun run build               # TypeScriptの型チェック
