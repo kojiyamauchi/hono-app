@@ -5,6 +5,7 @@ dev:
 	bun run dev
 
 migrate:
+	bun run db:start
 	bun run prisma:migrate:dev
 
 start:
