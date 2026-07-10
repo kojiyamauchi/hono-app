@@ -1,4 +1,8 @@
-.PHONY: start stop
+.PHONY: dev start stop
+
+dev:
+	bun run db:start
+	bun run dev
 
 start:
 	bun run db:start
