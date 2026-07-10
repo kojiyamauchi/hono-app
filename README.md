@@ -261,7 +261,7 @@ make start
 
 `make dev` と `make start` は、`bun run db:start` の正常完了後にそれぞれのサーバーを起動します。Prisma migrationの適用は含まないため、初回セットアップ時やmigration追加後は、事前に `make migrate` を実行してください。
 
-`make migrate` は `bun run prisma:migrate:dev` を実行します。ローカルSupabaseの起動は含まないため、先に `bun run db:start` を実行してください。
+`make migrate` は、`bun run db:start` の正常完了後に `bun run prisma:migrate:dev` を実行します。
 
 終了時は `Ctrl+C` でサーバーを停止してから、ローカルSupabaseを停止します。
 
@@ -351,7 +351,7 @@ DB spanではSQL本文属性（`db.statement` または `db.query.text`）が送
 
 ```bash
 make dev                    # Supabaseとホットリロード付き開発サーバーを順番に起動
-make migrate                # Prisma migrationを作成・適用
+make migrate                # Supabaseの起動後にPrisma migrationを作成・適用
 make start                  # Supabaseとサーバーを順番に起動
 make stop                   # ローカルSupabaseを停止
 bun run dev                 # ホットリロード付きで開発サーバーを起動
