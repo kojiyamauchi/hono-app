@@ -230,7 +230,7 @@ bun run db:start
 Prisma migrationを適用します。
 
 ```bash
-bun run prisma:migrate:dev
+make migrate
 ```
 
 開発サーバーを起動します。
@@ -243,6 +243,30 @@ APIは以下で起動します。
 
 ```txt
 http://localhost:3000
+```
+
+### 日常の起動・停止
+
+初回セットアップ後は、ローカルSupabaseと開発サーバーをまとめて起動できます。
+
+```bash
+make dev
+```
+
+ホットリロードを使わずにサーバーを起動する場合は、次のコマンドを実行します。
+
+```bash
+make start
+```
+
+`make dev` と `make start` は、`bun run db:start` の正常完了後にそれぞれのサーバーを起動します。Prisma migrationの適用は含まないため、初回セットアップ時やmigration追加後は、事前に `make migrate` を実行してください。
+
+`make migrate` は、`bun run db:start` の正常完了後に `bun run prisma:migrate:dev` を実行します。
+
+終了時は `Ctrl+C` でサーバーを停止してから、ローカルSupabaseを停止します。
+
+```bash
+make stop
 ```
 
 ## API
@@ -326,6 +350,10 @@ DB spanではSQL本文属性（`db.statement` または `db.query.text`）が送
 ## Scripts
 
 ```bash
+make dev                    # Supabaseとホットリロード付き開発サーバーを順番に起動
+make migrate                # Supabaseの起動後にPrisma migrationを作成・適用
+make start                  # Supabaseとサーバーを順番に起動
+make stop                   # ローカルSupabaseを停止
 bun run dev                 # ホットリロード付きで開発サーバーを起動
 bun run start               # サーバーを起動
 bun run build               # TypeScriptの型チェック
