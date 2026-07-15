@@ -33,6 +33,13 @@ export const confirmPasswordResetSchema = z.object({
 })
 
 /**
+ * メールアドレス検証確認入力のバリデーションスキーマ。
+ */
+export const confirmEmailVerificationSchema = z.object({
+  token: z.string().min(1, 'トークンは必須です'),
+})
+
+/**
  * パスワード変更入力のバリデーションスキーマ。
  */
 export const changePasswordSchema = z
@@ -57,5 +64,6 @@ export type SignupSchemaType = z.infer<typeof signupSchema>
 export type LoginSchemaType = z.infer<typeof loginSchema>
 export type RequestPasswordResetSchemaType = z.infer<typeof requestPasswordResetSchema>
 export type ConfirmPasswordResetSchemaType = z.infer<typeof confirmPasswordResetSchema>
+export type ConfirmEmailVerificationSchemaType = z.infer<typeof confirmEmailVerificationSchema>
 export type ChangePasswordSchemaType = z.infer<typeof changePasswordSchema>
 export type DeleteSessionParamSchemaType = z.infer<typeof deleteSessionParamSchema>
