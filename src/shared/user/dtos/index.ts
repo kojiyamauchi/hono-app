@@ -11,6 +11,7 @@ export const userDto = z
     id: z.number().int(),
     name: z.string(),
     email: z.email(),
+    emailVerified: z.boolean(),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
   })
