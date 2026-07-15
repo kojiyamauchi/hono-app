@@ -11,6 +11,7 @@ export const toUserResponse = (user: User): UserDtoType => {
     id: user.id,
     name: user.name,
     email: user.email,
+    emailVerified: user.emailVerifiedAt !== null,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
   }
