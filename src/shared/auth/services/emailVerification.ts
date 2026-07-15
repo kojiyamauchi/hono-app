@@ -159,6 +159,7 @@ export const sendEmailVerificationBestEffort = async (userId: number, email: str
   } catch (error) {
     console.error('メールアドレス検証トークンの発行または保存に失敗しました', {
       name: error instanceof Error ? error.name : 'UnknownError',
+      reason: error instanceof Error ? error.message : 'unknown',
     })
     return
   }
@@ -168,6 +169,7 @@ export const sendEmailVerificationBestEffort = async (userId: number, email: str
   } catch (error) {
     console.error('メールアドレス検証メールの配送に失敗しました', {
       name: error instanceof Error ? error.name : 'UnknownError',
+      reason: error instanceof Error ? error.message : 'unknown',
     })
     await emailVerificationTokenRepository.deleteByIdAndTokenHash(savedId, issued.tokenHash).catch(() => {
       // 補償削除に失敗しても、トークンは有効期限で失効するため握りつぶす。

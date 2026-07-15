@@ -140,7 +140,10 @@ describe('sendEmailVerificationBestEffort', () => {
 
     try {
       await expect(sendEmailVerificationBestEffort(1, 'user@example.com')).resolves.toBeUndefined()
-      expect(errorSpy).toHaveBeenCalledWith('メールアドレス検証トークンの発行または保存に失敗しました', { name: 'Error' })
+      expect(errorSpy).toHaveBeenCalledWith('メールアドレス検証トークンの発行または保存に失敗しました', {
+        name: 'Error',
+        reason: 'database unavailable',
+      })
       expect(mockEmailsSend).not.toHaveBeenCalled()
     } finally {
       errorSpy.mockRestore()
@@ -155,7 +158,10 @@ describe('sendEmailVerificationBestEffort', () => {
     try {
       await expect(sendEmailVerificationBestEffort(1, 'user@example.com')).resolves.toBeUndefined()
       expect(deleteByIdAndTokenHash).toHaveBeenCalledWith(30, expect.any(String))
-      expect(errorSpy).toHaveBeenCalledWith('メールアドレス検証メールの配送に失敗しました', { name: 'Error' })
+      expect(errorSpy).toHaveBeenCalledWith('メールアドレス検証メールの配送に失敗しました', {
+        name: 'Error',
+        reason: 'network error',
+      })
     } finally {
       errorSpy.mockRestore()
     }
