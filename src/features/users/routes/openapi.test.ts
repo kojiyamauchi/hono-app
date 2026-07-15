@@ -56,6 +56,13 @@ describe('users routes OpenAPI定義', () => {
     expect(doc.components?.schemas?.User).toBeDefined()
     expect(doc.components?.schemas?.PublicUser).toBeDefined()
     expect(doc.components?.schemas?.UpdateMeRequest).toBeDefined()
+
+    const userSchema = doc.components?.schemas?.User as {
+      properties?: Record<string, { type?: string }>
+      required?: string[]
+    }
+    expect(userSchema.properties?.emailVerified?.type).toBe('boolean')
+    expect(userSchema.required).toContain('emailVerified')
   })
 
   test('/{id} のパスパラメータが定義されている', async () => {

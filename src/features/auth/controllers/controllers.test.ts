@@ -12,13 +12,27 @@ const login = mock()
 const refresh = mock()
 const logout = mock()
 const requestPasswordReset = mock()
+const requestEmailVerification = mock()
+const confirmEmailVerification = mock()
 const changePassword = mock()
 const logoutAll = mock()
 const listSessions = mock()
 const logoutSession = mock()
 
 await mock.module('../services', () => ({
-  authService: { signup, login, refresh, logout, requestPasswordReset, changePassword, logoutAll, listSessions, logoutSession },
+  authService: {
+    signup,
+    login,
+    refresh,
+    logout,
+    requestPasswordReset,
+    requestEmailVerification,
+    confirmEmailVerification,
+    changePassword,
+    logoutAll,
+    listSessions,
+    logoutSession,
+  },
 }))
 
 const { authController } = await import('.')
@@ -40,6 +54,8 @@ const app = new Hono()
     }),
   )
   .post('/password-reset/request', (c) => authController.requestPasswordReset(c, { email: 'taro@example.com' }))
+  .post('/email-verification/request', (c) => authController.requestEmailVerification(c, 1))
+  .post('/email-verification/confirm', (c) => authController.confirmEmailVerification(c, { token: 'verification-token' }))
   .post('/logout-all', (c) => authController.logoutAll(c, 1))
   .get('/sessions', (c) => authController.listSessions(c, 1))
   .delete('/sessions/:id', (c) => authController.logoutSession(c, 1, { id: c.req.param('id') }))
@@ -56,6 +72,8 @@ beforeEach(() => {
   refresh.mockReset()
   logout.mockReset()
   requestPasswordReset.mockReset()
+  requestEmailVerification.mockReset()
+  confirmEmailVerification.mockReset()
   changePassword.mockReset()
   logoutAll.mockReset()
   listSessions.mockReset()
@@ -212,6 +230,26 @@ describe('authController', () => {
 
     expect(response.status).toBe(202)
     expect(requestPasswordReset).toHaveBeenCalledWith('taro@example.com', undefined)
+  })
+
+  test('email-verification/requestは認証ユーザーIDでserviceを呼び出し202を返す', async () => {
+    requestEmailVerification.mockResolvedValue(undefined)
+
+    const response = await app.request('/email-verification/request', { method: 'POST' })
+
+    expect(response.status).toBe(202)
+    expect(await response.text()).toBe('')
+    expect(requestEmailVerification).toHaveBeenCalledWith(1)
+  })
+
+  test('email-verification/confirmはtokenでserviceを呼び出し204を返す', async () => {
+    confirmEmailVerification.mockResolvedValue(undefined)
+
+    const response = await app.request('/email-verification/confirm', { method: 'POST' })
+
+    expect(response.status).toBe(204)
+    expect(await response.text()).toBe('')
+    expect(confirmEmailVerification).toHaveBeenCalledWith('verification-token')
   })
 
   test('logoutAllはserviceを呼び出し、Cookieをクリアして204を返す', async () => {

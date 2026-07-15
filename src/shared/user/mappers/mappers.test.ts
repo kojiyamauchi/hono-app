@@ -10,6 +10,7 @@ const user: User = {
   name: 'Taro',
   email: 'taro@example.com',
   password: 'hashed-password',
+  emailVerifiedAt: null,
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
   updatedAt: new Date('2026-01-02T00:00:00.000Z'),
 }
@@ -22,6 +23,7 @@ describe('toUserResponse', () => {
       id: 1,
       name: 'Taro',
       email: 'taro@example.com',
+      emailVerified: false,
       createdAt: user.createdAt.toISOString(),
       updatedAt: user.updatedAt.toISOString(),
     })
@@ -32,6 +34,12 @@ describe('toUserResponse', () => {
     const result = toUserResponse(user)
 
     expect(userDto.safeParse(result).success).toBe(true)
+  })
+
+  test('emailVerifiedAtが設定済みならemailVerifiedをtrueで返す', () => {
+    const result = toUserResponse({ ...user, emailVerifiedAt: new Date('2026-01-03T00:00:00.000Z') })
+
+    expect(result.emailVerified).toBe(true)
   })
 })
 

@@ -1,6 +1,6 @@
 import type { IssuedAuthTokens } from '@/shared/auth/dtos'
 import { refreshTokenRepository } from '@/shared/auth/repositories'
-import { issueAuthToken, issueRefreshToken } from '@/shared/auth/services'
+import { issueAuthToken, issueRefreshToken, sendEmailVerificationBestEffort } from '@/shared/auth/services'
 import type { InvitationDetailDtoType } from '@/shared/invitation/dtos'
 import type { Invitation } from '@/shared/invitation/entities'
 import { toInvitationDetailResponse } from '@/shared/invitation/mappers'
@@ -156,6 +156,8 @@ export const invitationsService = {
     if (!user) {
       throw new AppError(409, '招待経由の登録に失敗しました')
     }
+
+    await sendEmailVerificationBestEffort(user.id, user.email)
 
     // 5. アクセストークンとリフレッシュトークンを発行して認証レスポンスを返す
     const authToken = await issueAuthToken(user.id)

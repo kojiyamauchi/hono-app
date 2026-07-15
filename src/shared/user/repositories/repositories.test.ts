@@ -24,6 +24,7 @@ const input = {
 const user: User = {
   id: 1,
   ...input,
+  emailVerifiedAt: null,
   createdAt,
   updatedAt: createdAt,
 }

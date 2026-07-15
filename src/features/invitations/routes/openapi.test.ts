@@ -66,6 +66,13 @@ describe('invitations routes OpenAPI定義', () => {
     expect(doc.components?.schemas?.Member).toBeDefined()
     expect(doc.components?.schemas?.AuthResult).toBeDefined()
     expect(doc.components?.schemas?.ErrorResponse).toBeDefined()
+
+    const userSchema = doc.components?.schemas?.User as {
+      properties?: Record<string, { type?: string }>
+      required?: string[]
+    }
+    expect(userSchema.properties?.emailVerified?.type).toBe('boolean')
+    expect(userSchema.required).toContain('emailVerified')
   })
 
   test('accept/decline/signupのrequestBodyが必須になっている', async () => {

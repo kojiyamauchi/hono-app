@@ -293,3 +293,5 @@ export const passwordResetNotifier: PasswordResetNotifier = {
     }
   },
 }
+
+export * from './emailVerification'

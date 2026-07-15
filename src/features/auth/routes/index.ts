@@ -10,7 +10,15 @@ import { openApiDefaultHook } from '@/utils/validation'
 
 import { authController } from '../controllers'
 import { sessionListDto } from '../dtos'
-import { changePasswordSchema, confirmPasswordResetSchema, deleteSessionParamSchema, loginSchema, requestPasswordResetSchema, signupSchema } from '../schemas'
+import {
+  changePasswordSchema,
+  confirmEmailVerificationSchema,
+  confirmPasswordResetSchema,
+  deleteSessionParamSchema,
+  loginSchema,
+  requestPasswordResetSchema,
+  signupSchema,
+} from '../schemas'
 
 /** JSONエラーレスポンス（`{ error: { message } }`）の共通定義を生成する。 */
 const errorResponse = (description: string): { content: { 'application/json': { schema: typeof errorResponseDto } }; description: string } => ({
@@ -211,6 +219,49 @@ const confirmPasswordResetRoute = createRoute({
   },
 })
 
+/** POST /auth/email-verification/request: 認証済みユーザーへメールアドレス検証メールを再送する。 */
+const requestEmailVerificationRoute = createRoute({
+  method: 'post',
+  path: '/email-verification/request',
+  tags: ['Auth'],
+  summary: 'メールアドレス検証メールを再送する',
+  middleware: [originMiddleware, authMiddleware],
+  security: bearerSecurity,
+  responses: {
+    202: {
+      description: '処理を受理',
+    },
+    401: errorResponse('認証が必要、またはトークンが無効'),
+    403: errorResponse('許可されていないOrigin'),
+    404: errorResponse('対象が見つからない'),
+    409: errorResponse('メールアドレスが検証済み'),
+    429: errorResponse('リクエストが多すぎる'),
+    500: errorResponse('サーバーエラー'),
+  },
+})
+
+/** POST /auth/email-verification/confirm: 検証トークンを使いメールアドレスを検証済みにする。 */
+const confirmEmailVerificationRoute = createRoute({
+  method: 'post',
+  path: '/email-verification/confirm',
+  tags: ['Auth'],
+  summary: '検証トークンを使いメールアドレスを検証済みにする',
+  request: {
+    body: {
+      required: true,
+      content: { 'application/json': { schema: confirmEmailVerificationSchema } },
+    },
+  },
+  responses: {
+    204: {
+      description: 'メールアドレスを検証済みに更新',
+    },
+    400: errorResponse('入力値が不正'),
+    401: errorResponse('トークンが無効・期限切れ・使用済み'),
+    500: errorResponse('サーバーエラー'),
+  },
+})
+
 /** POST /auth/logout-all: 認証済みユーザーの全リフレッシュセッションを失効する。 */
 const logoutAllRoute = createRoute({
   method: 'post',
@@ -273,7 +324,8 @@ const logoutSessionRoute = createRoute({
 /**
  * 認証関連のルート（/auth配下）。
  * signup/login/refresh/logoutにはCookieを利用・更新するためOrigin検証を適用する。
- * password-reset/*はCookie/ambient credentialを使用しないためoriginMiddlewareは適用しない。
+ * password-reset/*とemail-verification/confirmはCookie/ambient credentialを使用しないためoriginMiddlewareは適用しない。
+ * email-verification/requestは認証済みの状態変更endpointとしてoriginMiddlewareを適用する。
  * バリデーションエラー時は defaultHook で既存と同じ `{ error: { message } }`（400）を返す。
  * `/sessions` を `/sessions/{id}` より先に登録し、静的パスを優先する。
  */
@@ -286,6 +338,8 @@ export const authRoutes = new OpenAPIHono({ defaultHook: openApiDefaultHook })
   .openapi(changePasswordRoute, (c) => authController.changePassword(c, c.get('userId'), c.req.valid('json')))
   .openapi(requestPasswordResetRoute, (c) => authController.requestPasswordReset(c, c.req.valid('json')))
   .openapi(confirmPasswordResetRoute, (c) => authController.confirmPasswordReset(c, c.req.valid('json')))
+  .openapi(requestEmailVerificationRoute, (c) => authController.requestEmailVerification(c, c.get('userId')))
+  .openapi(confirmEmailVerificationRoute, (c) => authController.confirmEmailVerification(c, c.req.valid('json')))
   .openapi(logoutAllRoute, (c) => authController.logoutAll(c, c.get('userId')))
   .openapi(listSessionsRoute, (c) => authController.listSessions(c, c.get('userId')))
   .openapi(logoutSessionRoute, (c) => authController.logoutSession(c, c.get('userId'), c.req.valid('param')))

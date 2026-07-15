@@ -10,7 +10,15 @@ process.env.REFRESH_TOKEN_SECRET = 'test-refresh-secret'
 const createRefreshToken = mock()
 
 await mock.module('@/shared/auth/repositories', () => ({
+  emailVerificationTokenRepository: { create: mock(), deleteByIdAndTokenHash: mock() },
   refreshTokenRepository: { create: createRefreshToken },
+}))
+
+const sendEmailVerificationBestEffort = mock()
+const authServicesModule = await import('@/shared/auth/services')
+await mock.module('@/shared/auth/services', () => ({
+  ...authServicesModule,
+  sendEmailVerificationBestEffort,
 }))
 
 // repositoryをモックしDB非依存でservice層のロジックを検証する
@@ -71,6 +79,7 @@ const inviteeUser: User = {
   name: 'Invitee',
   email: 'invitee@example.com',
   password: 'hashed',
+  emailVerifiedAt: null,
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
   updatedAt: new Date('2026-01-01T00:00:00.000Z'),
 }
@@ -86,6 +95,7 @@ const createdMembership: Membership = {
 
 beforeEach(() => {
   createRefreshToken.mockReset()
+  sendEmailVerificationBestEffort.mockReset()
 })
 
 describe('invitationsService.accept', () => {
@@ -290,6 +300,7 @@ describe('invitationsService.signup', () => {
         name,
         email,
         password,
+        emailVerifiedAt: null,
         createdAt: new Date('2026-01-01T00:00:00.000Z'),
         updatedAt: new Date('2026-01-01T00:00:00.000Z'),
       }),
@@ -301,7 +312,9 @@ describe('invitationsService.signup', () => {
     expect(typeof result.refreshToken).toBe('string')
     expect(result.user.id).toBe(20)
     expect(result.user.email).toBe('invitee@example.com')
+    expect(result.user.emailVerified).toBe(false)
     expect(result.user).not.toHaveProperty('password')
+    expect(sendEmailVerificationBestEffort).toHaveBeenCalledWith(20, 'invitee@example.com')
 
     const signupArgs = signup.mock.calls[0]
     expect(signupArgs[0]).toBe(1)

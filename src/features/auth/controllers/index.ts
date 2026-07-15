@@ -8,6 +8,7 @@ import { AppError } from '@/utils/errors'
 import type { SessionListDtoType } from '../dtos'
 import type {
   ChangePasswordSchemaType,
+  ConfirmEmailVerificationSchemaType,
   ConfirmPasswordResetSchemaType,
   DeleteSessionParamSchemaType,
   LoginSchemaType,
@@ -128,6 +129,22 @@ export const authController = {
    */
   confirmPasswordReset: async (c: Context, input: ConfirmPasswordResetSchemaType): Promise<Response> => {
     await authService.confirmPasswordReset(input.token, input.password)
+    return c.body(null, 204)
+  },
+
+  /**
+   * 認証済みユーザーへメールアドレス検証メールを再送し、202を返す。
+   */
+  requestEmailVerification: async (c: Context, userId: number): Promise<Response> => {
+    await authService.requestEmailVerification(userId)
+    return c.body(null, 202)
+  },
+
+  /**
+   * メールアドレス検証トークンを確認し、204を返す。
+   */
+  confirmEmailVerification: async (c: Context, input: ConfirmEmailVerificationSchemaType): Promise<Response> => {
+    await authService.confirmEmailVerification(input.token)
     return c.body(null, 204)
   },
 

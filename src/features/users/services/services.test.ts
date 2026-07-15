@@ -16,6 +16,7 @@ const user: User = {
   name: 'Taro',
   email: 'taro@example.com',
   password: 'hashed-password',
+  emailVerifiedAt: null,
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
   updatedAt: new Date('2026-01-02T00:00:00.000Z'),
 }
@@ -35,6 +36,7 @@ describe('usersService.getMe', () => {
       id: 1,
       name: 'Taro',
       email: 'taro@example.com',
+      emailVerified: false,
       createdAt: user.createdAt.toISOString(),
       updatedAt: user.updatedAt.toISOString(),
     })
@@ -64,6 +66,7 @@ describe('usersService.updateMe', () => {
     expect(updateById).toHaveBeenCalledWith(1, { name: 'Updated User' })
     expect(result.name).toBe('Updated User')
     expect(result.email).toBe('taro@example.com')
+    expect(result.emailVerified).toBe(false)
     expect(result).not.toHaveProperty('password')
   })
 

@@ -19,7 +19,7 @@ const fetchOpenApiDoc = async (): Promise<{
 }
 
 describe('auth routes OpenAPI定義', () => {
-  test('/auth配下の11 pathがpathsへ反映されている', async () => {
+  test('/auth配下の13 pathがpathsへ反映されている', async () => {
     const doc = await fetchOpenApiDoc()
 
     expect(doc.paths?.['/auth/signup']?.post).toBeDefined()
@@ -33,6 +33,8 @@ describe('auth routes OpenAPI定義', () => {
     expect(doc.paths?.['/auth/sessions/{id}']?.delete).toBeDefined()
     expect(doc.paths?.['/auth/password-reset/request']?.post).toBeDefined()
     expect(doc.paths?.['/auth/password-reset/confirm']?.post).toBeDefined()
+    expect(doc.paths?.['/auth/email-verification/request']?.post).toBeDefined()
+    expect(doc.paths?.['/auth/email-verification/confirm']?.post).toBeDefined()
   })
 
   test('Bearer securityが必要なendpointに付いている', async () => {
@@ -52,6 +54,9 @@ describe('auth routes OpenAPI定義', () => {
 
     const sessionDelete = doc.paths?.['/auth/sessions/{id}']?.delete as { security?: unknown[] }
     expect(sessionDelete.security).toEqual([{ bearerAuth: [] }])
+
+    const verificationRequestPost = doc.paths?.['/auth/email-verification/request']?.post as { security?: unknown[] }
+    expect(verificationRequestPost.security).toEqual([{ bearerAuth: [] }])
   })
 
   test('Cookie securityがrefresh/logoutに付いている', async () => {
@@ -64,18 +69,20 @@ describe('auth routes OpenAPI定義', () => {
     expect(logoutPost.security).toEqual([{ cookieAuth: [] }])
   })
 
-  test('signup/login/password-reset/*にはsecurityが設定されていない', async () => {
+  test('signup/login/password-reset/*/email-verification/confirmにはsecurityが設定されていない', async () => {
     const doc = await fetchOpenApiDoc()
 
     const signupPost = doc.paths?.['/auth/signup']?.post as { security?: unknown[] }
     const loginPost = doc.paths?.['/auth/login']?.post as { security?: unknown[] }
     const resetRequestPost = doc.paths?.['/auth/password-reset/request']?.post as { security?: unknown[] }
     const resetConfirmPost = doc.paths?.['/auth/password-reset/confirm']?.post as { security?: unknown[] }
+    const verificationConfirmPost = doc.paths?.['/auth/email-verification/confirm']?.post as { security?: unknown[] }
 
     expect(signupPost.security).toBeUndefined()
     expect(loginPost.security).toBeUndefined()
     expect(resetRequestPost.security).toBeUndefined()
     expect(resetConfirmPost.security).toBeUndefined()
+    expect(verificationConfirmPost.security).toBeUndefined()
   })
 
   test('response DTOがschema参照になっている', async () => {
@@ -106,6 +113,10 @@ describe('auth routes OpenAPI定義', () => {
     expect(doc.components?.schemas?.SessionList).toBeDefined()
     expect(doc.components?.schemas?.User).toBeDefined()
     expect(doc.components?.schemas?.ErrorResponse).toBeDefined()
+
+    const userSchema = doc.components?.schemas?.User as { properties?: Record<string, { type?: string }>; required?: string[] }
+    expect(userSchema.properties?.emailVerified?.type).toBe('boolean')
+    expect(userSchema.required).toContain('emailVerified')
   })
 
   test('securitySchemes.cookieAuthが登録されている', async () => {
@@ -118,11 +129,14 @@ describe('auth routes OpenAPI定義', () => {
     })
   })
 
-  test('signupのrequestBodyが必須になっている', async () => {
+  test('signupとemail-verification/confirmのrequestBodyが必須になっている', async () => {
     const doc = await fetchOpenApiDoc()
 
     const signupPost = doc.paths?.['/auth/signup']?.post as { requestBody?: { required?: boolean } }
     expect(signupPost.requestBody?.required).toBe(true)
+
+    const verificationConfirmPost = doc.paths?.['/auth/email-verification/confirm']?.post as { requestBody?: { required?: boolean } }
+    expect(verificationConfirmPost.requestBody?.required).toBe(true)
   })
 
   test('/auth/sessions/{id}のpathパラメータが定義されている', async () => {
@@ -144,6 +158,11 @@ describe('auth routes OpenAPI定義', () => {
     }
     expect(resetRequestPost.responses['202']).toBeDefined()
 
+    const verificationRequestPost = doc.paths?.['/auth/email-verification/request']?.post as {
+      responses: Record<string, unknown>
+    }
+    expect(verificationRequestPost.responses['202']).toBeDefined()
+
     const logoutPost = doc.paths?.['/auth/logout']?.post as { responses: Record<string, unknown> }
     expect(logoutPost.responses['204']).toBeDefined()
 
@@ -151,5 +170,10 @@ describe('auth routes OpenAPI定義', () => {
       responses: Record<string, unknown>
     }
     expect(resetConfirmPost.responses['204']).toBeDefined()
+
+    const verificationConfirmPost = doc.paths?.['/auth/email-verification/confirm']?.post as {
+      responses: Record<string, unknown>
+    }
+    expect(verificationConfirmPost.responses['204']).toBeDefined()
   })
 })

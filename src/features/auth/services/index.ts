@@ -1,13 +1,15 @@
 import type { IssuedAuthTokens, SessionDtoType } from '@/shared/auth/dtos'
 import { toSessionResponse } from '@/shared/auth/mappers'
-import { authCredentialRepository, passwordResetTokenRepository, refreshTokenRepository } from '@/shared/auth/repositories'
+import { authCredentialRepository, emailVerificationTokenRepository, passwordResetTokenRepository, refreshTokenRepository } from '@/shared/auth/repositories'
 import {
+  hashEmailVerificationToken,
   hashPasswordResetToken,
   hashRefreshToken,
   issueAuthToken,
   issuePasswordResetToken,
   issueRefreshToken,
   passwordResetNotifier,
+  sendEmailVerificationBestEffort,
 } from '@/shared/auth/services'
 import type { UserDtoType } from '@/shared/user/dtos'
 import type { User } from '@/shared/user/entities'
@@ -58,6 +60,15 @@ export const PASSWORD_RESET_EMAIL_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000
 
 /** パスワードリセットリクエスト専用のインメモリレートリミッター。 */
 export const passwordResetRequestRateLimiter = createInMemoryRateLimiter()
+
+/** メール検証メール再送のユーザー単位制限回数。 */
+export const EMAIL_VERIFICATION_USER_RATE_LIMIT = 3
+
+/** メール検証メール再送のユーザー単位制限期間（60分）。 */
+export const EMAIL_VERIFICATION_USER_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000
+
+/** メール検証メール再送専用のインメモリレートリミッター。 */
+export const emailVerificationRequestRateLimiter = createInMemoryRateLimiter()
 
 /** ログインのIP単位制限回数。 */
 export const LOGIN_IP_RATE_LIMIT = 5
@@ -124,6 +135,13 @@ const signupIpRateLimitKey = (clientIp: string): string => {
 }
 
 /**
+ * メール検証メール再送のユーザー単位レート制限キーを生成する。
+ */
+const emailVerificationUserRateLimitKey = (userId: number): string => {
+  return `email-verification:user:${userId}`
+}
+
+/**
  * パスワードリセットリクエスト用の最低応答時間＋ジッターを適用する。
  */
 const waitPasswordResetRequestDelay = async (startMs: number): Promise<void> => {
@@ -177,6 +195,8 @@ export const authService = {
       // repositoryでnullへ畳み込まれるため、ここで409へ変換する（最終防衛はDB制約）。
       throw new AppError(409, 'このメールアドレスは既に登録されています')
     }
+
+    await sendEmailVerificationBestEffort(user.id, user.email)
 
     return issueAuthentication(user)
   },
@@ -417,6 +437,51 @@ export const authService = {
     const hashedPassword = await Bun.password.hash(password)
     const success = await passwordResetTokenRepository.confirm(record.id, record.userId, hashedPassword)
 
+    if (!success) {
+      throw new AppError(401, '無効なトークンです')
+    }
+  },
+
+  /**
+   * 認証済みユーザーへメールアドレス検証メールを再送する。
+   */
+  requestEmailVerification: async (userId: number): Promise<void> => {
+    const user = await userRepository.findById(userId)
+    if (!user) {
+      throw new AppError(404, 'ユーザーが見つかりません')
+    }
+    if (user.emailVerifiedAt !== null) {
+      throw new AppError(409, 'メールアドレスは既に検証済みです')
+    }
+
+    const rateLimit = emailVerificationRequestRateLimiter.check({
+      key: emailVerificationUserRateLimitKey(userId),
+      limit: EMAIL_VERIFICATION_USER_RATE_LIMIT,
+      windowMs: EMAIL_VERIFICATION_USER_RATE_LIMIT_WINDOW_MS,
+    })
+    if (!rateLimit.allowed) {
+      console.info('メールアドレス検証メールの再送をユーザー単位で制限しました', {
+        scope: 'user',
+        retryAfterMs: rateLimit.retryAfterMs,
+      })
+      throw new AppError(429, 'リクエストが多すぎます。しばらくしてから再試行してください')
+    }
+
+    await sendEmailVerificationBestEffort(user.id, user.email)
+  },
+
+  /**
+   * メールアドレス検証トークンを検証し、対象ユーザーを検証済みにする。
+   */
+  confirmEmailVerification: async (token: string): Promise<void> => {
+    const tokenHash = hashEmailVerificationToken(token)
+    const record = await emailVerificationTokenRepository.findByTokenHash(tokenHash)
+
+    if (!record || record.expiresAt <= new Date() || record.usedAt !== null) {
+      throw new AppError(401, '無効なトークンです')
+    }
+
+    const success = await emailVerificationTokenRepository.confirm(record.id, record.userId)
     if (!success) {
       throw new AppError(401, '無効なトークンです')
     }

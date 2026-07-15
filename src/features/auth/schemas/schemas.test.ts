@@ -1,6 +1,14 @@
 import { describe, expect, test } from 'bun:test'
 
-import { changePasswordSchema, confirmPasswordResetSchema, deleteSessionParamSchema, loginSchema, requestPasswordResetSchema, signupSchema } from '.'
+import {
+  changePasswordSchema,
+  confirmEmailVerificationSchema,
+  confirmPasswordResetSchema,
+  deleteSessionParamSchema,
+  loginSchema,
+  requestPasswordResetSchema,
+  signupSchema,
+} from '.'
 
 describe('signupSchema', () => {
   test('正しい入力を受け付ける', () => {
@@ -94,6 +102,17 @@ describe('confirmPasswordResetSchema', () => {
   test('passwordが空文字なら拒否する', () => {
     const result = confirmPasswordResetSchema.safeParse({ token: 'valid-token', password: '' })
     expect(result.success).toBe(false)
+  })
+})
+
+describe('confirmEmailVerificationSchema', () => {
+  test('正しいtokenを受け付ける', () => {
+    expect(confirmEmailVerificationSchema.safeParse({ token: 'valid-token' }).success).toBe(true)
+  })
+
+  test('tokenが空文字または欠如なら拒否する', () => {
+    expect(confirmEmailVerificationSchema.safeParse({ token: '' }).success).toBe(false)
+    expect(confirmEmailVerificationSchema.safeParse({}).success).toBe(false)
   })
 })
 

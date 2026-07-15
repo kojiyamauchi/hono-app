@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, mock, spyOn, test } from 'bun:test'
 
-import type { PasswordResetToken, RefreshToken } from '@/shared/auth/entities'
+import type { EmailVerificationToken, PasswordResetToken, RefreshToken } from '@/shared/auth/entities'
 import type { User } from '@/shared/user/entities'
 
 // JWT発行に必要なシークレットをテスト用に設定
 process.env.JWT_SECRET = 'test-secret'
 process.env.REFRESH_TOKEN_SECRET = 'test-refresh-secret'
 process.env.PASSWORD_RESET_TOKEN_SECRET = 'test-password-reset-secret'
+process.env.EMAIL_VERIFICATION_TOKEN_SECRET = 'test-email-verification-secret'
 
 const createRefreshToken = mock()
 const findByTokenHash = mock()
@@ -22,6 +23,8 @@ const prtCreate = mock()
 const prtFindByTokenHash = mock()
 const prtDeleteByIdAndTokenHash = mock()
 const prtConfirm = mock()
+const evtFindByTokenHash = mock()
+const evtConfirm = mock()
 
 await mock.module('@/shared/auth/repositories', () => ({
   authCredentialRepository: {
@@ -43,16 +46,22 @@ await mock.module('@/shared/auth/repositories', () => ({
     deleteByIdAndTokenHash: prtDeleteByIdAndTokenHash,
     confirm: prtConfirm,
   },
+  emailVerificationTokenRepository: {
+    findByTokenHash: evtFindByTokenHash,
+    confirm: evtConfirm,
+  },
 }))
 
 // notifierをモックしてno-op実装を差し替える
 const notifierSend = mock()
+const sendEmailVerificationBestEffort = mock()
 
 // shared/auth/servicesの実装関数はそのまま使い、passwordResetNotifierのみ差し替える
 const authServicesModule = await import('@/shared/auth/services')
 await mock.module('@/shared/auth/services', () => ({
   ...authServicesModule,
   passwordResetNotifier: { send: notifierSend },
+  sendEmailVerificationBestEffort,
 }))
 
 const passwordResetRequestDelayMs = mock(() => 0)
@@ -71,6 +80,7 @@ await mock.module('@/shared/user/repositories', () => ({
 
 const {
   authService,
+  emailVerificationRequestRateLimiter,
   passwordResetRequestRateLimiter,
   loginRateLimiter,
   signupRateLimiter,
@@ -80,6 +90,8 @@ const {
   LOGIN_EMAIL_RATE_LIMIT_WINDOW_MS,
   SIGNUP_IP_RATE_LIMIT,
   SIGNUP_IP_RATE_LIMIT_WINDOW_MS,
+  EMAIL_VERIFICATION_USER_RATE_LIMIT,
+  EMAIL_VERIFICATION_USER_RATE_LIMIT_WINDOW_MS,
 } = await import('.')
 
 const user: User = {
@@ -87,6 +99,7 @@ const user: User = {
   name: 'Taro',
   email: 'taro@example.com',
   password: 'hashed',
+  emailVerifiedAt: null,
   createdAt: new Date('2026-06-18T00:00:00.000Z'),
   updatedAt: new Date('2026-06-18T00:00:00.000Z'),
 }
@@ -110,6 +123,15 @@ const savedPasswordResetToken: PasswordResetToken = {
   createdAt: new Date('2026-06-18T00:00:00.000Z'),
 }
 
+const savedEmailVerificationToken: EmailVerificationToken = {
+  id: 30,
+  userId: 1,
+  tokenHash: 'hashed-email-verification-token',
+  expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+  usedAt: null,
+  createdAt: new Date('2026-06-18T00:00:00.000Z'),
+}
+
 beforeEach(() => {
   createRefreshToken.mockReset()
   findByTokenHash.mockReset()
@@ -125,10 +147,14 @@ beforeEach(() => {
   prtFindByTokenHash.mockReset()
   prtDeleteByIdAndTokenHash.mockReset()
   prtConfirm.mockReset()
+  evtFindByTokenHash.mockReset()
+  evtConfirm.mockReset()
   notifierSend.mockReset()
+  sendEmailVerificationBestEffort.mockReset()
   passwordResetRequestDelayMs.mockReset()
   passwordResetRequestDelayMs.mockImplementation(() => 0)
   passwordResetRequestRateLimiter.reset()
+  emailVerificationRequestRateLimiter.reset()
   loginRateLimiter.reset()
   signupRateLimiter.reset()
 })
@@ -146,6 +172,7 @@ describe('authService.signup', () => {
       name: input.name,
       email: input.email,
       password: input.password,
+      emailVerifiedAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     }))
@@ -159,8 +186,10 @@ describe('authService.signup', () => {
     expect(typeof result.token).toBe('string')
     expect(typeof result.refreshToken).toBe('string')
     expect(result.user.email).toBe('taro@example.com')
+    expect(result.user.emailVerified).toBe(false)
     expect(result.user).not.toHaveProperty('password')
     expect(createRefreshToken).toHaveBeenCalledTimes(1)
+    expect(sendEmailVerificationBestEffort).toHaveBeenCalledWith(1, 'taro@example.com')
 
     // パスワードはハッシュ化されて保存される（平文のままでない）
     const createdInput = create.mock.calls[0][0] as { password: string }
@@ -173,6 +202,7 @@ describe('authService.signup', () => {
       name: 'Existing',
       email: 'taro@example.com',
       password: 'hashed',
+      emailVerifiedAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     })
@@ -199,6 +229,7 @@ describe('authService.signup', () => {
       name: input.name,
       email: input.email,
       password: input.password,
+      emailVerifiedAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     }))
@@ -224,6 +255,7 @@ describe('authService.signup', () => {
       name: input.name,
       email: input.email,
       password: input.password,
+      emailVerifiedAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     }))
@@ -246,6 +278,7 @@ describe('authService.login', () => {
       name: 'Taro',
       email: 'taro@example.com',
       password: hashed,
+      emailVerifiedAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     })
@@ -265,6 +298,7 @@ describe('authService.login', () => {
       name: 'Taro',
       email: 'taro@example.com',
       password: hashed,
+      emailVerifiedAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     })
@@ -823,5 +857,94 @@ describe('authService.confirmPasswordReset', () => {
 
     // confirm が success の場合、repository.confirm 内で全refresh失効が実行される
     expect(prtConfirm).toHaveBeenCalledWith(savedPasswordResetToken.id, savedPasswordResetToken.userId, expect.any(String))
+  })
+})
+
+describe('authService.requestEmailVerification', () => {
+  test('未検証ユーザーへ検証メールを送信する', async () => {
+    findById.mockResolvedValue(user)
+
+    await expect(authService.requestEmailVerification(1)).resolves.toBeUndefined()
+
+    expect(sendEmailVerificationBestEffort).toHaveBeenCalledWith(1, 'taro@example.com')
+  })
+
+  test('検証済みユーザーは409エラーを投げる', async () => {
+    findById.mockResolvedValue({ ...user, emailVerifiedAt: new Date() })
+
+    await expect(authService.requestEmailVerification(1)).rejects.toMatchObject({ statusCode: 409 })
+    expect(sendEmailVerificationBestEffort).not.toHaveBeenCalled()
+  })
+
+  test('ユーザーが存在しない場合は404エラーを投げる', async () => {
+    findById.mockResolvedValue(null)
+
+    await expect(authService.requestEmailVerification(1)).rejects.toMatchObject({ statusCode: 404 })
+    expect(sendEmailVerificationBestEffort).not.toHaveBeenCalled()
+  })
+
+  test('同一ユーザーで3回送信後の次の試行は429エラーを投げる', async () => {
+    findById.mockResolvedValue(user)
+    const infoSpy = spyOn(console, 'info').mockImplementation(() => {})
+
+    try {
+      for (let i = 0; i < EMAIL_VERIFICATION_USER_RATE_LIMIT; i++) {
+        await expect(authService.requestEmailVerification(1)).resolves.toBeUndefined()
+      }
+      sendEmailVerificationBestEffort.mockClear()
+
+      await expect(authService.requestEmailVerification(1)).rejects.toMatchObject({ statusCode: 429 })
+      expect(sendEmailVerificationBestEffort).not.toHaveBeenCalled()
+      expect(infoSpy).toHaveBeenCalledWith('メールアドレス検証メールの再送をユーザー単位で制限しました', expect.objectContaining({ scope: 'user' }))
+    } finally {
+      infoSpy.mockRestore()
+    }
+  })
+
+  test('rate limitは3回・60分である', () => {
+    expect(EMAIL_VERIFICATION_USER_RATE_LIMIT).toBe(3)
+    expect(EMAIL_VERIFICATION_USER_RATE_LIMIT_WINDOW_MS).toBe(3_600_000)
+  })
+})
+
+describe('authService.confirmEmailVerification', () => {
+  test('有効なトークンをhash化して検証済みにする', async () => {
+    evtFindByTokenHash.mockResolvedValue(savedEmailVerificationToken)
+    evtConfirm.mockResolvedValue(true)
+
+    await expect(authService.confirmEmailVerification('plain-verification-token')).resolves.toBeUndefined()
+
+    const tokenHash = evtFindByTokenHash.mock.calls[0][0] as string
+    expect(tokenHash).not.toBe('plain-verification-token')
+    expect(tokenHash).toHaveLength(64)
+    expect(evtConfirm).toHaveBeenCalledWith(savedEmailVerificationToken.id, savedEmailVerificationToken.userId)
+  })
+
+  test('存在しないトークンは401エラーを投げる', async () => {
+    evtFindByTokenHash.mockResolvedValue(null)
+
+    await expect(authService.confirmEmailVerification('unknown-token')).rejects.toMatchObject({ statusCode: 401 })
+    expect(evtConfirm).not.toHaveBeenCalled()
+  })
+
+  test('期限切れトークンは401エラーを投げる', async () => {
+    evtFindByTokenHash.mockResolvedValue({ ...savedEmailVerificationToken, expiresAt: new Date(Date.now() - 1) })
+
+    await expect(authService.confirmEmailVerification('expired-token')).rejects.toMatchObject({ statusCode: 401 })
+    expect(evtConfirm).not.toHaveBeenCalled()
+  })
+
+  test('使用済みトークンは401エラーを投げる', async () => {
+    evtFindByTokenHash.mockResolvedValue({ ...savedEmailVerificationToken, usedAt: new Date() })
+
+    await expect(authService.confirmEmailVerification('used-token')).rejects.toMatchObject({ statusCode: 401 })
+    expect(evtConfirm).not.toHaveBeenCalled()
+  })
+
+  test('並行競合でconfirmがfalseなら401エラーを投げる', async () => {
+    evtFindByTokenHash.mockResolvedValue(savedEmailVerificationToken)
+    evtConfirm.mockResolvedValue(false)
+
+    await expect(authService.confirmEmailVerification('concurrent-token')).rejects.toMatchObject({ statusCode: 401 })
   })
 })

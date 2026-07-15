@@ -15,6 +15,7 @@ await mock.module('@/shared/auth/repositories', () => ({
   authCredentialRepository: {},
   refreshTokenRepository: { create: createRefreshToken },
   passwordResetTokenRepository: {},
+  emailVerificationTokenRepository: { create: mock(), deleteByIdAndTokenHash: mock() },
 }))
 
 // repositoryをモックしDB非依存でroute統合を検証する
@@ -75,6 +76,7 @@ const inviteeUser: User = {
   name: 'Invitee',
   email: 'invitee@example.com',
   password: 'hashed',
+  emailVerifiedAt: null,
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
   updatedAt: new Date('2026-01-01T00:00:00.000Z'),
 }
@@ -352,6 +354,7 @@ describe('invitations routes', () => {
         name,
         email,
         password,
+        emailVerifiedAt: null,
         createdAt: new Date('2026-01-01T00:00:00.000Z'),
         updatedAt: new Date('2026-01-01T00:00:00.000Z'),
       }),
@@ -367,13 +370,14 @@ describe('invitations routes', () => {
     const body = (await response.json()) as {
       token?: string
       refreshToken?: string
-      user?: { id?: number; email?: string; password?: string }
+      user?: { id?: number; email?: string; emailVerified?: boolean; password?: string }
     }
     expect(typeof body.token).toBe('string')
     // bodyにrefreshTokenが含まれないことを確認する
     expect(body.refreshToken).toBeUndefined()
     expect(body.user?.id).toBe(20)
     expect(body.user?.email).toBe('invitee@example.com')
+    expect(body.user?.emailVerified).toBe(false)
     expect(body.user).not.toHaveProperty('password')
 
     // リフレッシュトークンはCookieとして設定されることを確認する
@@ -392,6 +396,7 @@ describe('invitations routes', () => {
       name: 'New Invitee',
       email: 'invitee@example.com',
       password: 'hashed',
+      emailVerifiedAt: null,
       createdAt: new Date('2026-01-01T00:00:00.000Z'),
       updatedAt: new Date('2026-01-01T00:00:00.000Z'),
     })

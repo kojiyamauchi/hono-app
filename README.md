@@ -386,6 +386,7 @@ ENABLE_API_DOCS=false
 JWT_SECRET="your-jwt-secret"
 REFRESH_TOKEN_SECRET="your-refresh-token-secret"
 PASSWORD_RESET_TOKEN_SECRET="your-password-reset-token-secret"
+EMAIL_VERIFICATION_TOKEN_SECRET="your-email-verification-token-secret"
 SUPABASE_URL="http://127.0.0.1:54321"
 SUPABASE_ANON_KEY="your-supabase-anon-key"
 ALLOWED_ORIGINS="http://localhost:3000"
@@ -395,7 +396,7 @@ ALLOWED_ORIGINS="http://localhost:3000"
 
 staging / production では環境ごとに別のSupabase projectを作成し、`DATABASE_URL` や各secretをdeployment platformまたはCI secretsで管理してください。
 
-Cookie、パスワードリセット、OpenTelemetry / New Relic送信に関する環境変数も `.env.example` に定義しています。OpenTelemetryの詳細は [docs/observability.md](docs/observability.md) を参照してください。
+Cookie、パスワードリセット、メールアドレス検証、OpenTelemetry / New Relic送信に関する環境変数も `.env.example` に定義しています。OpenTelemetryの詳細は [docs/observability.md](docs/observability.md) を参照してください。
 
 ### パスワードリセット（本番利用に必要な設定）
 
@@ -418,6 +419,28 @@ PASSWORD_RESET_URL_BASE="https://your-frontend.com/reset-password"
 - `PASSWORD_RESET_TOKEN_SECRET` が未設定の場合、パスワードリセットトークンを発行できないため500を返します。
 - `RESEND_API_KEY` / `PASSWORD_RESET_FROM_EMAIL` / `PASSWORD_RESET_URL_BASE` のいずれかが未設定の場合、メール送信は失敗し、発行済みのリセットトークンは補償削除されます。ただし**アカウント列挙を防ぐため、外部レスポンスは登録有無・配送成否によらず常に `202 Accepted`** を返します（配送失敗は機密を含めない形でサーバーログに記録されます）。
 - CI では Resend SDK をモックするため、実際のAPIキーは不要です。
+- Resend 受理後の非同期バウンス・迷惑メール判定・実配達失敗は補償対象外です（Resend の管理画面で確認してください）。
+
+### メールアドレス検証（本番利用に必要な設定）
+
+メールアドレス検証機能を本番利用する場合、共通の `RESEND_API_KEY` に加えて以下の環境変数を設定してください。
+
+| 環境変数                          | 説明                                                                                |
+| --------------------------------- | ----------------------------------------------------------------------------------- |
+| `EMAIL_VERIFICATION_TOKEN_SECRET` | 検証トークンのHMAC-SHA256署名鍵。パスワードリセット用とは異なる値を設定する。       |
+| `EMAIL_VERIFICATION_FROM_EMAIL`   | 検証メールの送信元アドレス。Resend で検証済みのドメインを使用する。                 |
+| `EMAIL_VERIFICATION_URL_BASE`     | フロントエンドの検証ページURL。`?token=...` が付与されてメール本文の検証URLになる。 |
+
+```txt
+EMAIL_VERIFICATION_TOKEN_SECRET="your-email-verification-token-secret"
+RESEND_API_KEY="re_your_resend_api_key"
+EMAIL_VERIFICATION_FROM_EMAIL="noreply@your-domain.com"
+EMAIL_VERIFICATION_URL_BASE="https://your-frontend.com/verify-email"
+```
+
+- 検証トークンの有効期限は24時間で、再発行時に同じユーザーの未使用トークンを置き換えます。
+- `/auth/signup` と `/invitations/signup` は登録成功後に検証メールを送信します。トークン保存またはメール送信に失敗しても登録結果は維持し、配送失敗時は発行済みトークンを補償削除します。
+- `POST /auth/email-verification/request` はユーザー単位で1時間に3回まで再送できます。
 - Resend 受理後の非同期バウンス・迷惑メール判定・実配達失敗は補償対象外です（Resend の管理画面で確認してください）。
 
 ### パスワードリセットリクエストのレート制限
