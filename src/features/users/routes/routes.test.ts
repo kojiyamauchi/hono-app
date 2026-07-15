@@ -21,6 +21,7 @@ const user: User = {
   name: 'Taro',
   email: 'taro@example.com',
   password: 'hashed-password',
+  emailVerifiedAt: null,
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
   updatedAt: new Date('2026-01-02T00:00:00.000Z'),
 }
@@ -56,6 +57,7 @@ describe('users routes', () => {
     expect(body.id).toBe(1)
     expect(body.name).toBe('Taro')
     expect(body.email).toBe('taro@example.com')
+    expect(body.emailVerified).toBe(false)
     expect(body).not.toHaveProperty('password')
   })
 
@@ -78,6 +80,7 @@ describe('users routes', () => {
     expect(updateById).toHaveBeenCalledWith(1, { name: 'Updated User' })
     expect(body.name).toBe('Updated User')
     expect(body.email).toBe('taro@example.com')
+    expect(body.emailVerified).toBe(false)
     expect(body).not.toHaveProperty('password')
   })
 
