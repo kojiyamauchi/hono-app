@@ -24,6 +24,18 @@ export type PasswordResetToken = {
 }
 
 /**
+ * メールアドレス検証トークンの永続化表現。
+ */
+export type EmailVerificationToken = {
+  id: number
+  userId: number
+  tokenHash: string
+  expiresAt: Date
+  usedAt: Date | null
+  createdAt: Date
+}
+
+/**
  * リフレッシュセッション（familyId単位のログインセッション）の集約表現。
  * tokenHash等の内部値は含めず、レスポンス組み立てに必要な値のみ持つ。
  */
