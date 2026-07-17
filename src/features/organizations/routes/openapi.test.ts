@@ -16,7 +16,7 @@ const fetchOpenApiDoc = async (): Promise<{
 }
 
 describe('organizations routes OpenAPI定義', () => {
-  test('13 path × method が paths へ反映されている', async () => {
+  test('14 path × method が paths へ反映されている', async () => {
     const doc = await fetchOpenApiDoc()
 
     expect(doc.paths?.['/organizations']?.get).toBeDefined()
@@ -27,6 +27,7 @@ describe('organizations routes OpenAPI定義', () => {
     expect(doc.paths?.['/organizations/{id}/transfer-ownership']?.post).toBeDefined()
     expect(doc.paths?.['/organizations/{id}/members']?.get).toBeDefined()
     expect(doc.paths?.['/organizations/{id}/members']?.post).toBeDefined()
+    expect(doc.paths?.['/organizations/{id}/members/me']?.delete).toBeDefined()
     expect(doc.paths?.['/organizations/{id}/members/{membershipId}']?.patch).toBeDefined()
     expect(doc.paths?.['/organizations/{id}/members/{membershipId}']?.delete).toBeDefined()
     expect(doc.paths?.['/organizations/{id}/invitations']?.get).toBeDefined()
@@ -106,6 +107,27 @@ describe('organizations routes OpenAPI定義', () => {
     expect(idParam?.required).toBe(true)
     expect(membershipIdParam?.in).toBe('path')
     expect(membershipIdParam?.required).toBe(true)
+  })
+
+  test('組織脱退endpointの認証、パスパラメータ、responseが定義されている', async () => {
+    const doc = await fetchOpenApiDoc()
+
+    const leaveOrganizationDelete = doc.paths?.['/organizations/{id}/members/me']?.delete as {
+      security?: unknown[]
+      parameters?: { name: string; in: string; required?: boolean }[]
+      responses: Record<string, { content?: Record<string, { schema?: { $ref?: string } }> }>
+    }
+    expect(leaveOrganizationDelete.security).toEqual([{ bearerAuth: [] }])
+
+    const idParam = leaveOrganizationDelete.parameters?.find((parameter) => parameter.name === 'id')
+    expect(idParam?.in).toBe('path')
+    expect(idParam?.required).toBe(true)
+    expect(leaveOrganizationDelete.parameters?.some((parameter) => parameter.name === 'membershipId')).toBe(false)
+
+    expect(leaveOrganizationDelete.responses['204']).toBeDefined()
+    expect(leaveOrganizationDelete.responses['401'].content?.['application/json'].schema?.$ref).toBe('#/components/schemas/ErrorResponse')
+    expect(leaveOrganizationDelete.responses['404'].content?.['application/json'].schema?.$ref).toBe('#/components/schemas/ErrorResponse')
+    expect(leaveOrganizationDelete.responses['409'].content?.['application/json'].schema?.$ref).toBe('#/components/schemas/ErrorResponse')
   })
 
   test('/organizations/{id}/invitations/{invitationId} のパスパラメータがidとinvitationIdの両方定義されている', async () => {
