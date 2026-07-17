@@ -288,7 +288,8 @@ export const authService = {
       expiresAt: next.expiresAt,
     })
 
-    if (rotated.status === 'REUSED') {
+    // ローテーション成立（ROTATED）だけを成功として通し、未知の結果値はエラー側へ倒す（fail-closed）
+    if (rotated.status !== 'ROTATED') {
       throw invalidRefreshTokenError()
     }
 

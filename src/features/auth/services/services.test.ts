@@ -477,6 +477,12 @@ describe('authService.refresh', () => {
     await expect(authService.refresh('reused-token')).rejects.toThrow('リフレッシュトークンが無効です')
   })
 
+  test('未知の結果値はエラー側へ倒れる（fail-closed）', async () => {
+    rotate.mockResolvedValue({ status: 'UNKNOWN' })
+
+    await expect(authService.refresh('unknown-status-token')).rejects.toThrow('リフレッシュトークンが無効です')
+  })
+
   test('アクセストークンを発行できない場合はローテーションしない', async () => {
     const jwtSecret = process.env.JWT_SECRET
     delete process.env.JWT_SECRET

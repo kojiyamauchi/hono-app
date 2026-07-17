@@ -45,15 +45,17 @@ export const usersService = {
   deleteMe: async (userId: number, currentPassword: string): Promise<void> => {
     const result = await accountDeletionRepository.deleteAccount(userId, (passwordHash) => Bun.password.verify(currentPassword, passwordHash))
 
+    // 成功（DELETED）だけを先頭で通し、未知の結果値はエラー側へ倒す（fail-closed）
+    if (result === accountDeletionResults.deleted) {
+      return
+    }
     if (result === accountDeletionResults.notFound) {
       throw new AppError(404, 'ユーザーが見つかりません')
     }
     if (result === accountDeletionResults.invalidPassword) {
       throw new AppError(401, '現在のパスワードが正しくありません')
     }
-    if (result === accountDeletionResults.soleOwner) {
-      throw new AppError(409, '唯一のOWNERである組織が存在するためアカウントを削除できません')
-    }
+    throw new AppError(409, '唯一のOWNERである組織が存在するためアカウントを削除できません')
   },
 
   /**

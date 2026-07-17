@@ -169,6 +169,13 @@ describe('invitationsService.accept', () => {
     expect(findById).not.toHaveBeenCalled()
   })
 
+  test('未知の結果値はエラー側へ倒れる（fail-closed）', async () => {
+    findByToken.mockResolvedValue({ ...pendingInvitation, status: 'UNKNOWN' })
+
+    await expect(invitationsService.accept(5, TOKEN)).rejects.toThrow('この招待は利用できません')
+    expect(findById).not.toHaveBeenCalled()
+  })
+
   test('認証ユーザーのメールと招待のメールが不一致の場合は403エラーを投げる', async () => {
     const otherUser: User = { ...inviteeUser, email: 'other@example.com' }
     findByToken.mockResolvedValue(pendingInvitation)
@@ -267,6 +274,13 @@ describe('invitationsService.decline', () => {
 
     await expect(invitationsService.decline(TOKEN)).rejects.toThrow('招待の有効期限が切れています')
     expect(markExpired).toHaveBeenCalledWith(1)
+    expect(decline).not.toHaveBeenCalled()
+  })
+
+  test('未知の結果値はエラー側へ倒れる（fail-closed）', async () => {
+    findByToken.mockResolvedValue({ ...pendingInvitation, status: 'UNKNOWN' })
+
+    await expect(invitationsService.decline(TOKEN)).rejects.toThrow('この招待は利用できません')
     expect(decline).not.toHaveBeenCalled()
   })
 
@@ -373,6 +387,13 @@ describe('invitationsService.signup', () => {
 
     await expect(invitationsService.signup(TOKEN, 'New Invitee', 'password123')).rejects.toThrow('招待の有効期限が切れています')
     expect(markExpired).toHaveBeenCalledWith(1)
+    expect(findByEmail).not.toHaveBeenCalled()
+  })
+
+  test('未知の結果値はエラー側へ倒れる（fail-closed）', async () => {
+    findByToken.mockResolvedValue({ ...pendingInvitation, status: 'UNKNOWN' })
+
+    await expect(invitationsService.signup(TOKEN, 'New Invitee', 'password123')).rejects.toThrow('この招待は利用できません')
     expect(findByEmail).not.toHaveBeenCalled()
   })
 

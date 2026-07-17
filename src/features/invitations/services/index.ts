@@ -40,6 +40,11 @@ const findPendingValidInvitation = async (token: string): Promise<Invitation> =>
     throw new AppError(409, '既に辞退済みの招待です')
   }
 
+  // 未知ステータスをfail-closedで止める（成功パスへの入口はPENDINGの肯定判定だけにする）
+  if (invitation.status !== 'PENDING') {
+    throw new AppError(409, 'この招待は利用できません')
+  }
+
   // PENDINGでも有効期限切れの場合は遅延失効してから409
   if (invitation.expiresAt < new Date()) {
     await invitationRepository.markExpired(invitation.id)
