@@ -155,4 +155,10 @@ describe('usersService.deleteMe', () => {
 
     await expect(usersService.deleteMe(1, 'current-password-123')).rejects.toMatchObject({ statusCode: 409 })
   })
+
+  test('未知の結果値はエラー側へ倒れる（fail-closed）', async () => {
+    deleteAccount.mockResolvedValue('UNKNOWN')
+
+    await expect(usersService.deleteMe(1, 'current-password-123')).rejects.toMatchObject({ statusCode: 409 })
+  })
 })
