@@ -62,12 +62,13 @@ APIの追加・変更・削除を行う場合は、実装と同じPRでこのド
 
 ## Organization Members
 
-| Method | Path                                       | 認証 | 概要                                         |
-| ------ | ------------------------------------------ | ---- | -------------------------------------------- |
-| GET    | `/organizations/:id/members`               | 必要 | 所属している組織のメンバー一覧を取得する     |
-| POST   | `/organizations/:id/members`               | 必要 | OWNERまたはADMINがメンバーを追加する         |
-| PATCH  | `/organizations/:id/members/:membershipId` | 必要 | OWNERまたはADMINがメンバーのロールを更新する |
-| DELETE | `/organizations/:id/members/:membershipId` | 必要 | OWNERまたはADMINがメンバーを削除する         |
+| Method | Path                                       | 認証 | 概要                                            |
+| ------ | ------------------------------------------ | ---- | ----------------------------------------------- |
+| GET    | `/organizations/:id/members`               | 必要 | 所属している組織のメンバー一覧を取得する        |
+| POST   | `/organizations/:id/members`               | 必要 | OWNERまたはADMINがメンバーを追加する            |
+| DELETE | `/organizations/:id/members/me`            | 必要 | ADMINまたはMEMBERが自分自身を組織から脱退させる |
+| PATCH  | `/organizations/:id/members/:membershipId` | 必要 | OWNERまたはADMINがメンバーのロールを更新する    |
+| DELETE | `/organizations/:id/members/:membershipId` | 必要 | OWNERまたはADMINがメンバーを削除する            |
 
 ## Organization Invitations
 
