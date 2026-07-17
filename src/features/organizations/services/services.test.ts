@@ -25,9 +25,17 @@ const invitationFindById = mock()
 const invitationCancel = mock()
 
 const transferOwnership = mock()
+const leaveOrganization = mock()
 
 await mock.module('@/features/organizations/repositories', () => ({
+  organizationMembershipRepository: { leave: leaveOrganization },
   organizationOwnershipRepository: { transferOwnership },
+  leaveOrganizationResults: {
+    left: 'LEFT',
+    owner: 'OWNER',
+    notMember: 'NOT_MEMBER',
+    conflict: 'CONFLICT',
+  },
   ownershipTransferResults: {
     transferred: 'TRANSFERRED',
     targetNotFound: 'TARGET_NOT_FOUND',
@@ -211,6 +219,41 @@ describe('organizationsService.transferOwnership', () => {
     transferOwnership.mockResolvedValue('CONFLICT')
 
     await expect(organizationsService.transferOwnership(1, 1, 'OWNER', 2)).rejects.toMatchObject({ statusCode: 409 })
+  })
+})
+
+describe('organizationsService.leave', () => {
+  beforeEach(() => {
+    leaveOrganization.mockReset()
+  })
+
+  test('repositoryがLEFTを返した場合は脱退を完了する', async () => {
+    leaveOrganization.mockResolvedValue('LEFT')
+
+    await organizationsService.leave(1, 2)
+
+    expect(leaveOrganization).toHaveBeenCalledWith(1, 2)
+  })
+
+  test('最新状態がOWNERなら所有権移譲を求める409エラーになる', async () => {
+    leaveOrganization.mockResolvedValue('OWNER')
+
+    await expect(organizationsService.leave(1, 2)).rejects.toMatchObject({
+      statusCode: 409,
+      message: 'OWNERは組織から脱退できません。先に所有権を移譲してください',
+    })
+  })
+
+  test('最新状態で未所属なら404エラーになる', async () => {
+    leaveOrganization.mockResolvedValue('NOT_MEMBER')
+
+    await expect(organizationsService.leave(1, 2)).rejects.toMatchObject({ statusCode: 404 })
+  })
+
+  test('再試行後も競合した場合は409エラーになる', async () => {
+    leaveOrganization.mockResolvedValue('CONFLICT')
+
+    await expect(organizationsService.leave(1, 2)).rejects.toMatchObject({ statusCode: 409 })
   })
 })
 
