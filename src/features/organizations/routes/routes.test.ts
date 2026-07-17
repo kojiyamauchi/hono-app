@@ -22,6 +22,7 @@ const updateRole = mock()
 const membershipDeleteById = mock()
 
 const findByEmail = mock()
+const existsById = mock()
 
 const invitationFindPendingByOrgAndEmail = mock()
 const invitationCreate = mock()
@@ -63,7 +64,7 @@ await mock.module('@/shared/membership/repositories', () => ({
   },
 }))
 await mock.module('@/shared/user/repositories', () => ({
-  userRepository: { findByEmail },
+  userRepository: { findByEmail, existsById },
 }))
 await mock.module('@/shared/invitation/repositories', () => ({
   invitationRepository: {
@@ -116,6 +117,8 @@ const createToken = async (userId: number): Promise<string> => {
 
 describe('organizations routes', () => {
   beforeEach(() => {
+    existsById.mockReset()
+    existsById.mockResolvedValue(true)
     createWithOwner.mockReset()
     findByUserId.mockReset()
     findById.mockReset()

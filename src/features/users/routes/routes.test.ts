@@ -10,9 +10,10 @@ const updateById = mock()
 const findByEmail = mock()
 const create = mock()
 const deleteAccount = mock()
+const existsById = mock()
 
 await mock.module('@/shared/user/repositories', () => ({
-  userRepository: { findById, updateById, findByEmail, create },
+  userRepository: { findById, updateById, findByEmail, create, existsById },
 }))
 
 await mock.module('@/features/users/repositories', () => ({
@@ -54,6 +55,8 @@ describe('users routes', () => {
     findByEmail.mockReset()
     create.mockReset()
     deleteAccount.mockReset()
+    existsById.mockReset()
+    existsById.mockResolvedValue(true)
   })
 
   test('GET /users/me は認証済みユーザー自身の詳細情報を返す', async () => {
