@@ -237,6 +237,29 @@ const addMemberRoute = createRoute({
   },
 })
 
+/** DELETE /organizations/{id}/members/me: 認証ユーザー自身を組織から脱退させる。 */
+const leaveOrganizationRoute = createRoute({
+  method: 'delete',
+  path: '/{id}/members/me',
+  tags: ['Organization Members'],
+  summary: '認証ユーザー自身を指定した組織から脱退させる',
+  middleware: [authMiddleware, paramValidationMiddleware(organizationIdParamSchema), organizationMembershipMiddleware],
+  security: bearerSecurity,
+  request: {
+    params: organizationIdParamSchema,
+  },
+  responses: {
+    204: {
+      description: '組織からの脱退に成功',
+    },
+    400: errorResponse('組織IDが不正'),
+    401: errorResponse('認証が必要、またはトークンが無効'),
+    404: errorResponse('組織が見つからない'),
+    409: errorResponse('OWNERのため脱退できない、または競合により脱退できない'),
+    500: errorResponse('サーバーエラー'),
+  },
+})
+
 /** PATCH /organizations/{id}/members/{membershipId}: メンバーのロールを変更する。 */
 const updateMemberRoleRoute = createRoute({
   method: 'patch',
@@ -390,6 +413,7 @@ export const organizationsRoutes = new OpenAPIHono({ defaultHook: openApiDefault
   )
   .openapi(listMembersRoute, (c) => organizationsMembersController.listMembers(c, c.req.valid('param').id))
   .openapi(addMemberRoute, (c) => organizationsMembersController.addMember(c, c.req.valid('param').id, c.get('membership').role, c.req.valid('json')))
+  .openapi(leaveOrganizationRoute, (c) => organizationsMembersController.leave(c, c.req.valid('param').id, c.get('userId')))
   .openapi(updateMemberRoleRoute, (c) =>
     organizationsMembersController.updateMemberRole(
       c,
