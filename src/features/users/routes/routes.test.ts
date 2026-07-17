@@ -150,6 +150,7 @@ describe('users routes', () => {
     expect(response.status).toBe(204)
     expect(deleteAccount).toHaveBeenCalledTimes(1)
     expect(response.headers.get('set-cookie')).toContain('refreshToken=')
+    expect(response.headers.get('set-cookie')).toContain('Max-Age=0')
   })
 
   test('DELETE /users/me は現在のパスワードが不一致なら401を返す', async () => {
