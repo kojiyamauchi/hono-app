@@ -16,7 +16,7 @@ const fetchOpenApiDoc = async (): Promise<{
 }
 
 describe('organizations routes OpenAPI定義', () => {
-  test('12 path × method が paths へ反映されている', async () => {
+  test('13 path × method が paths へ反映されている', async () => {
     const doc = await fetchOpenApiDoc()
 
     expect(doc.paths?.['/organizations']?.get).toBeDefined()
@@ -24,6 +24,7 @@ describe('organizations routes OpenAPI定義', () => {
     expect(doc.paths?.['/organizations/{id}']?.get).toBeDefined()
     expect(doc.paths?.['/organizations/{id}']?.patch).toBeDefined()
     expect(doc.paths?.['/organizations/{id}']?.delete).toBeDefined()
+    expect(doc.paths?.['/organizations/{id}/transfer-ownership']?.post).toBeDefined()
     expect(doc.paths?.['/organizations/{id}/members']?.get).toBeDefined()
     expect(doc.paths?.['/organizations/{id}/members']?.post).toBeDefined()
     expect(doc.paths?.['/organizations/{id}/members/{membershipId}']?.patch).toBeDefined()
@@ -72,7 +73,25 @@ describe('organizations routes OpenAPI定義', () => {
     expect(doc.components?.schemas?.UpdateOrganizationRequest).toBeDefined()
     expect(doc.components?.schemas?.AddMemberRequest).toBeDefined()
     expect(doc.components?.schemas?.UpdateMemberRoleRequest).toBeDefined()
+    expect(doc.components?.schemas?.TransferOrganizationOwnershipRequest).toBeDefined()
     expect(doc.components?.schemas?.CreateInvitationRequest).toBeDefined()
+  })
+
+  test('所有権移譲endpointのrequest bodyとresponseが定義されている', async () => {
+    const doc = await fetchOpenApiDoc()
+
+    const transferOwnershipPost = doc.paths?.['/organizations/{id}/transfer-ownership']?.post as {
+      security?: unknown[]
+      requestBody: { content: Record<string, { schema?: { $ref?: string } }> }
+      responses: Record<string, { content?: Record<string, { schema?: { $ref?: string } }> }>
+    }
+    expect(transferOwnershipPost.security).toEqual([{ bearerAuth: [] }])
+    expect(transferOwnershipPost.requestBody.content['application/json'].schema?.$ref).toBe('#/components/schemas/TransferOrganizationOwnershipRequest')
+    expect(transferOwnershipPost.responses['204']).toBeDefined()
+    expect(transferOwnershipPost.responses['403'].content?.['application/json'].schema?.$ref).toBe('#/components/schemas/ErrorResponse')
+    expect(transferOwnershipPost.responses['404'].content?.['application/json'].schema?.$ref).toBe('#/components/schemas/ErrorResponse')
+    expect(transferOwnershipPost.responses['409'].content?.['application/json'].schema?.$ref).toBe('#/components/schemas/ErrorResponse')
+    expect(transferOwnershipPost.responses['422'].content?.['application/json'].schema?.$ref).toBe('#/components/schemas/ErrorResponse')
   })
 
   test('/organizations/{id}/members/{membershipId} のパスパラメータがidとmembershipIdの両方定義されている', async () => {
