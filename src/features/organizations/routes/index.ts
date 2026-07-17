@@ -18,6 +18,7 @@ import {
   invitationRouteParamSchema,
   memberRouteParamSchema,
   organizationIdParamSchema,
+  transferOwnershipBodySchema,
   updateMemberRoleBodySchema,
   updateOrganizationSchema,
 } from '../schemas'
@@ -148,6 +149,35 @@ const removeRoute = createRoute({
     401: errorResponse('認証が必要、またはトークンが無効'),
     403: errorResponse('権限が不足'),
     404: errorResponse('組織が見つからない'),
+    500: errorResponse('サーバーエラー'),
+  },
+})
+
+/** POST /organizations/{id}/transfer-ownership: 組織の所有権を既存メンバーへ移譲する。 */
+const transferOwnershipRoute = createRoute({
+  method: 'post',
+  path: '/{id}/transfer-ownership',
+  tags: ['Organizations'],
+  summary: '組織の所有権を既存メンバーへ移譲する',
+  middleware: [authMiddleware, paramValidationMiddleware(organizationIdParamSchema), organizationMembershipMiddleware],
+  security: bearerSecurity,
+  request: {
+    params: organizationIdParamSchema,
+    body: {
+      required: true,
+      content: { 'application/json': { schema: transferOwnershipBodySchema } },
+    },
+  },
+  responses: {
+    204: {
+      description: '所有権の移譲に成功',
+    },
+    400: errorResponse('入力値が不正'),
+    401: errorResponse('認証が必要、またはトークンが無効'),
+    403: errorResponse('OWNER権限が必要'),
+    404: errorResponse('組織または移譲先メンバーが見つからない'),
+    409: errorResponse('競合により移譲できない'),
+    422: errorResponse('自分自身への移譲など意味的に不正な入力'),
     500: errorResponse('サーバーエラー'),
   },
 })
@@ -355,6 +385,9 @@ export const organizationsRoutes = new OpenAPIHono({ defaultHook: openApiDefault
   .openapi(getByIdRoute, (c) => organizationsController.getById(c, c.req.valid('param').id))
   .openapi(updateRoute, (c) => organizationsController.update(c, c.req.valid('param').id, c.req.valid('json'), c.get('membership').role))
   .openapi(removeRoute, (c) => organizationsController.remove(c, c.req.valid('param').id, c.get('membership').role))
+  .openapi(transferOwnershipRoute, (c) =>
+    organizationsController.transferOwnership(c, c.req.valid('param').id, c.get('userId'), c.get('membership').role, c.req.valid('json')),
+  )
   .openapi(listMembersRoute, (c) => organizationsMembersController.listMembers(c, c.req.valid('param').id))
   .openapi(addMemberRoute, (c) => organizationsMembersController.addMember(c, c.req.valid('param').id, c.get('membership').role, c.req.valid('json')))
   .openapi(updateMemberRoleRoute, (c) =>
