@@ -5,12 +5,14 @@ import type { Role } from '@/shared/membership/entities'
 const queryRaw = mock()
 const updateMany = mock()
 const transaction = mock()
+const deleteMany = mock()
+const findUnique = mock()
 
 await mock.module('@/libs/prisma', () => ({
-  prisma: { $transaction: transaction },
+  prisma: { $transaction: transaction, membership: { deleteMany, findUnique } },
 }))
 
-const { organizationOwnershipRepository, ownershipTransferResults } = await import('.')
+const { leaveOrganizationResults, organizationMembershipRepository, organizationOwnershipRepository, ownershipTransferResults } = await import('.')
 
 type MembershipRow = {
   id: number
@@ -156,5 +158,75 @@ describe('organizationOwnershipRepository.transferOwnership', () => {
     queryRaw.mockRejectedValueOnce(error)
 
     await expect(organizationOwnershipRepository.transferOwnership(1, 1, 2)).rejects.toThrow('接続エラー')
+  })
+})
+
+describe('organizationMembershipRepository.leave', () => {
+  beforeEach(() => {
+    deleteMany.mockReset()
+    findUnique.mockReset()
+  })
+
+  test('認証ユーザー自身のOWNER以外のmembershipを条件付きで削除する', async () => {
+    deleteMany.mockResolvedValue({ count: 1 })
+
+    const result = await organizationMembershipRepository.leave(1, 2)
+
+    expect(result).toBe(leaveOrganizationResults.left)
+    expect(deleteMany).toHaveBeenCalledWith({
+      where: { organizationId: 1, userId: 2, role: { not: 'OWNER' } },
+    })
+    expect(findUnique).not.toHaveBeenCalled()
+  })
+
+  test('条件付き削除が0件で最新ロールがOWNERならOWNERを返す', async () => {
+    deleteMany.mockResolvedValue({ count: 0 })
+    findUnique.mockResolvedValue({ role: 'OWNER' })
+
+    const result = await organizationMembershipRepository.leave(1, 2)
+
+    expect(result).toBe(leaveOrganizationResults.owner)
+    expect(deleteMany).toHaveBeenCalledTimes(1)
+  })
+
+  test('条件付き削除が0件でmembershipがなければNOT_MEMBERを返す', async () => {
+    deleteMany.mockResolvedValue({ count: 0 })
+    findUnique.mockResolvedValue(null)
+
+    const result = await organizationMembershipRepository.leave(1, 2)
+
+    expect(result).toBe(leaveOrganizationResults.notMember)
+    expect(findUnique).toHaveBeenCalledWith({
+      where: { userId_organizationId: { userId: 2, organizationId: 1 } },
+      select: { role: true },
+    })
+  })
+
+  test('競合後の最新ロールがADMINまたはMEMBERなら条件付き削除を再試行する', async () => {
+    deleteMany.mockResolvedValueOnce({ count: 0 }).mockResolvedValueOnce({ count: 1 })
+    findUnique.mockResolvedValue({ role: 'ADMIN' })
+
+    const result = await organizationMembershipRepository.leave(1, 2)
+
+    expect(result).toBe(leaveOrganizationResults.left)
+    expect(deleteMany).toHaveBeenCalledTimes(2)
+    expect(findUnique).toHaveBeenCalledTimes(1)
+  })
+
+  test('再試行後も削除できず最新ロールがOWNER以外ならCONFLICTを返す', async () => {
+    deleteMany.mockResolvedValue({ count: 0 })
+    findUnique.mockResolvedValue({ role: 'MEMBER' })
+
+    const result = await organizationMembershipRepository.leave(1, 2)
+
+    expect(result).toBe(leaveOrganizationResults.conflict)
+    expect(deleteMany).toHaveBeenCalledTimes(2)
+    expect(findUnique).toHaveBeenCalledTimes(2)
+  })
+
+  test('予期しないDBエラーはそのままthrowする', async () => {
+    deleteMany.mockRejectedValue(new Error('接続エラー'))
+
+    await expect(organizationMembershipRepository.leave(1, 2)).rejects.toThrow('接続エラー')
   })
 })
