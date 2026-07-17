@@ -58,6 +58,16 @@ export const updateMemberRoleBodySchema = z
   .openapi('UpdateMemberRoleRequest')
 
 /**
+ * 所有権移譲ボディのバリデーションスキーマ。
+ * OpenAPI request bodyとして参照するため、`.openapi()` でcomponent名を付与する。
+ */
+export const transferOwnershipBodySchema = z
+  .object({
+    membershipId: z.number().int('メンバーシップIDは整数で指定してください').positive('メンバーシップIDは1以上で指定してください'),
+  })
+  .openapi('TransferOrganizationOwnershipRequest')
+
+/**
  * 組織IDとメンバーシップIDを含むパスパラメータのバリデーションスキーマ。
  * OpenAPI上でpath parameterとして表示するため、`.openapi()` でparamメタデータを付与する。
  */
@@ -108,6 +118,7 @@ export type UpdateOrganizationSchemaType = z.infer<typeof updateOrganizationSche
 export type OrganizationIdParamSchemaType = z.infer<typeof organizationIdParamSchema>
 export type AddMemberBodySchemaType = z.infer<typeof addMemberBodySchema>
 export type UpdateMemberRoleBodySchemaType = z.infer<typeof updateMemberRoleBodySchema>
+export type TransferOwnershipBodySchemaType = z.infer<typeof transferOwnershipBodySchema>
 export type MemberRouteParamSchemaType = z.infer<typeof memberRouteParamSchema>
 export type CreateInvitationBodySchemaType = z.infer<typeof createInvitationBodySchema>
 export type InvitationRouteParamSchemaType = z.infer<typeof invitationRouteParamSchema>

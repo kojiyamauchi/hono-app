@@ -11,6 +11,7 @@ import { organizationRepository } from '@/shared/organization/repositories'
 import { userRepository } from '@/shared/user/repositories'
 import { AppError } from '@/utils/errors'
 
+import { organizationOwnershipRepository, ownershipTransferResults } from '../repositories'
 import type {
   AddMemberBodySchemaType,
   CreateInvitationBodySchemaType,
@@ -76,6 +77,27 @@ export const organizationsService = {
     if (!deleted) {
       throw new AppError(404, '組織が見つかりません')
     }
+  },
+
+  /**
+   * 現在のOWNERから同じ組織のADMINまたはMEMBERへ所有権を移譲する。
+   */
+  transferOwnership: async (organizationId: number, currentOwnerUserId: number, operatorRole: Role, targetMembershipId: number): Promise<void> => {
+    if (operatorRole !== 'OWNER') {
+      throw new AppError(403, 'この操作にはオーナー権限が必要です')
+    }
+
+    const result = await organizationOwnershipRepository.transferOwnership(organizationId, currentOwnerUserId, targetMembershipId)
+    if (result === ownershipTransferResults.transferred) {
+      return
+    }
+    if (result === ownershipTransferResults.targetNotFound) {
+      throw new AppError(404, 'メンバーが見つかりません')
+    }
+    if (result === ownershipTransferResults.selfTransfer) {
+      throw new AppError(422, '自分自身へ所有権を移譲することはできません')
+    }
+    throw new AppError(409, '競合により所有権を移譲できませんでした')
   },
 
   /**
