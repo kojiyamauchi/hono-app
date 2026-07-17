@@ -7,6 +7,7 @@ import {
   invitationRouteParamSchema,
   memberRouteParamSchema,
   organizationIdParamSchema,
+  transferOwnershipBodySchema,
   updateMemberRoleBodySchema,
   updateOrganizationSchema,
 } from '.'
@@ -91,6 +92,24 @@ describe('updateMemberRoleBodySchema', () => {
 
   test('roleがなければ拒否する', () => {
     expect(updateMemberRoleBodySchema.safeParse({}).success).toBe(false)
+  })
+})
+
+describe('transferOwnershipBodySchema', () => {
+  test('正の整数のmembershipIdを受け付ける', () => {
+    expect(transferOwnershipBodySchema.safeParse({ membershipId: 2 }).success).toBe(true)
+  })
+
+  test('membershipIdがなければ拒否する', () => {
+    expect(transferOwnershipBodySchema.safeParse({}).success).toBe(false)
+  })
+
+  test('整数ではないmembershipIdを拒否する', () => {
+    expect(transferOwnershipBodySchema.safeParse({ membershipId: 1.5 }).success).toBe(false)
+  })
+
+  test('1未満のmembershipIdを拒否する', () => {
+    expect(transferOwnershipBodySchema.safeParse({ membershipId: 0 }).success).toBe(false)
   })
 })
 
