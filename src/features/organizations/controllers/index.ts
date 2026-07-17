@@ -9,6 +9,7 @@ import type {
   AddMemberBodySchemaType,
   CreateInvitationBodySchemaType,
   CreateOrganizationSchemaType,
+  TransferOwnershipBodySchemaType,
   UpdateMemberRoleBodySchemaType,
   UpdateOrganizationSchemaType,
 } from '../schemas'
@@ -63,6 +64,20 @@ export const organizationsController = {
    */
   remove: async (c: Context, organizationId: number, role: Role): Promise<Response> => {
     await organizationsService.remove(organizationId, role)
+    return c.body(null, 204)
+  },
+
+  /**
+   * 組織の所有権を既存メンバーへ移譲する。204を返す。
+   */
+  transferOwnership: async (
+    c: Context,
+    organizationId: number,
+    currentOwnerUserId: number,
+    operatorRole: Role,
+    input: TransferOwnershipBodySchemaType,
+  ): Promise<Response> => {
+    await organizationsService.transferOwnership(organizationId, currentOwnerUserId, operatorRole, input.membershipId)
     return c.body(null, 204)
   },
 }
