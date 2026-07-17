@@ -11,6 +11,18 @@ export const ownershipTransferResults = {
 
 export type OwnershipTransferResult = (typeof ownershipTransferResults)[keyof typeof ownershipTransferResults]
 
+/** 組織脱退repositoryの処理結果。 */
+export const leaveOrganizationResults = {
+  left: 'LEFT',
+  owner: 'OWNER',
+  notMember: 'NOT_MEMBER',
+  conflict: 'CONFLICT',
+} as const
+
+export type LeaveOrganizationResult = (typeof leaveOrganizationResults)[keyof typeof leaveOrganizationResults]
+
+const LEAVE_MAX_ATTEMPTS = 2
+
 type LockedIdRow = {
   id: number
 }
@@ -109,5 +121,38 @@ export const organizationOwnershipRepository = {
       }
       throw error
     }
+  },
+}
+
+/**
+ * organizations feature固有のメンバーシップデータアクセスを提供するリポジトリ。
+ */
+export const organizationMembershipRepository = {
+  /**
+   * 認証ユーザー自身のOWNER以外のメンバーシップを条件付きで削除する。
+   * 削除直前のロール変更で0件になった場合は最新状態を確認し、脱退可能なら再試行する。
+   */
+  leave: async (organizationId: number, userId: number): Promise<LeaveOrganizationResult> => {
+    for (let attempt = 0; attempt < LEAVE_MAX_ATTEMPTS; attempt += 1) {
+      const deleted = await prisma.membership.deleteMany({
+        where: { organizationId, userId, role: { not: 'OWNER' } },
+      })
+      if (deleted.count === 1) {
+        return leaveOrganizationResults.left
+      }
+
+      const latestMembership = await prisma.membership.findUnique({
+        where: { userId_organizationId: { userId, organizationId } },
+        select: { role: true },
+      })
+      if (!latestMembership) {
+        return leaveOrganizationResults.notMember
+      }
+      if (latestMembership.role === 'OWNER') {
+        return leaveOrganizationResults.owner
+      }
+    }
+
+    return leaveOrganizationResults.conflict
   },
 }

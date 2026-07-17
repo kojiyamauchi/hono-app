@@ -11,7 +11,7 @@ import { organizationRepository } from '@/shared/organization/repositories'
 import { userRepository } from '@/shared/user/repositories'
 import { AppError } from '@/utils/errors'
 
-import { organizationOwnershipRepository, ownershipTransferResults } from '../repositories'
+import { leaveOrganizationResults, organizationMembershipRepository, organizationOwnershipRepository, ownershipTransferResults } from '../repositories'
 import type {
   AddMemberBodySchemaType,
   CreateInvitationBodySchemaType,
@@ -98,6 +98,23 @@ export const organizationsService = {
       throw new AppError(422, '自分自身へ所有権を移譲することはできません')
     }
     throw new AppError(409, '競合により所有権を移譲できませんでした')
+  },
+
+  /**
+   * 認証ユーザー自身を組織から脱退させる。OWNERは先に所有権を移譲する必要がある。
+   */
+  leave: async (organizationId: number, userId: number): Promise<void> => {
+    const result = await organizationMembershipRepository.leave(organizationId, userId)
+    if (result === leaveOrganizationResults.left) {
+      return
+    }
+    if (result === leaveOrganizationResults.notMember) {
+      throw new AppError(404, '組織が見つかりません')
+    }
+    if (result === leaveOrganizationResults.owner) {
+      throw new AppError(409, 'OWNERは組織から脱退できません。先に所有権を移譲してください')
+    }
+    throw new AppError(409, '競合により組織から脱退できませんでした')
   },
 
   /**
