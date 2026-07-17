@@ -4,9 +4,20 @@ import type { User } from '@/shared/user/entities'
 
 const findById = mock()
 const updateById = mock()
+const deleteAccount = mock()
 
 await mock.module('@/shared/user/repositories', () => ({
   userRepository: { findById, updateById },
+}))
+
+await mock.module('../repositories', () => ({
+  accountDeletionRepository: { deleteAccount },
+  accountDeletionResults: {
+    deleted: 'DELETED',
+    notFound: 'NOT_FOUND',
+    invalidPassword: 'INVALID_PASSWORD',
+    soleOwner: 'SOLE_OWNER',
+  },
 }))
 
 const { usersService } = await import('.')
@@ -108,5 +119,40 @@ describe('usersService.getById', () => {
     findById.mockResolvedValue(null)
 
     await expect(usersService.getById(999)).rejects.toThrow('ユーザーが見つかりません')
+  })
+})
+
+describe('usersService.deleteMe', () => {
+  beforeEach(() => {
+    deleteAccount.mockReset()
+  })
+
+  test('現在のパスワードが一致すればアカウントを削除する', async () => {
+    const hashed = await Bun.password.hash('current-password-123')
+    deleteAccount.mockImplementation(async (_userId: number, verifyPassword: (passwordHash: string) => Promise<boolean>) => {
+      expect(await verifyPassword(hashed)).toBe(true)
+      return 'DELETED'
+    })
+
+    await expect(usersService.deleteMe(1, 'current-password-123')).resolves.toBeUndefined()
+    expect(deleteAccount).toHaveBeenCalledTimes(1)
+  })
+
+  test('ユーザーが存在しない場合は404エラーを投げる', async () => {
+    deleteAccount.mockResolvedValue('NOT_FOUND')
+
+    await expect(usersService.deleteMe(999, 'current-password-123')).rejects.toMatchObject({ statusCode: 404 })
+  })
+
+  test('現在のパスワードが不一致の場合は401エラーを投げる', async () => {
+    deleteAccount.mockResolvedValue('INVALID_PASSWORD')
+
+    await expect(usersService.deleteMe(1, 'wrong-password')).rejects.toMatchObject({ statusCode: 401 })
+  })
+
+  test('唯一のOWNERである組織が存在する場合は409エラーを投げる', async () => {
+    deleteAccount.mockResolvedValue('SOLE_OWNER')
+
+    await expect(usersService.deleteMe(1, 'current-password-123')).rejects.toMatchObject({ statusCode: 409 })
   })
 })
