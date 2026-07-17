@@ -7,7 +7,7 @@ import { publicUserDto, userDto } from '@/shared/user/dtos'
 import { openApiDefaultHook } from '@/utils/validation'
 
 import { usersController } from '../controllers'
-import { updateMeSchema, userIdParamSchema } from '../schemas'
+import { deleteMeSchema, updateMeSchema, userIdParamSchema } from '../schemas'
 
 /** JSONエラーレスポンス（`{ error: { message } }`）の共通定義を生成する。 */
 const errorResponse = (description: string): { content: { 'application/json': { schema: typeof errorResponseDto } }; description: string } => ({
@@ -65,6 +65,32 @@ const updateMeRoute = createRoute({
   },
 })
 
+/** DELETE /users/me: 現在のパスワードで本人確認し、認証済みユーザー自身のアカウントを削除する。 */
+const deleteMeRoute = createRoute({
+  method: 'delete',
+  path: '/me',
+  tags: ['Users'],
+  summary: '認証済みユーザー自身のアカウントを削除する',
+  middleware: [authMiddleware],
+  security: bearerSecurity,
+  request: {
+    body: {
+      required: true,
+      content: { 'application/json': { schema: deleteMeSchema } },
+    },
+  },
+  responses: {
+    204: {
+      description: 'アカウントを削除',
+    },
+    400: errorResponse('入力値が不正'),
+    401: errorResponse('認証が必要、またはトークンが無効、または現在のパスワードが正しくない'),
+    404: errorResponse('ユーザーが見つからない'),
+    409: errorResponse('唯一のOWNERである組織が存在するため削除できない'),
+    500: errorResponse('サーバーエラー'),
+  },
+})
+
 /** GET /users/:id: 指定したユーザーの公開情報を取得する。 */
 const getByIdRoute = createRoute({
   method: 'get',
@@ -96,4 +122,5 @@ const getByIdRoute = createRoute({
 export const usersRoutes = new OpenAPIHono({ defaultHook: openApiDefaultHook })
   .openapi(meRoute, (c) => usersController.me(c, c.get('userId')))
   .openapi(updateMeRoute, (c) => usersController.updateMe(c, c.get('userId'), c.req.valid('json')))
+  .openapi(deleteMeRoute, (c) => usersController.deleteMe(c, c.get('userId'), c.req.valid('json')))
   .openapi(getByIdRoute, (c) => usersController.getById(c, c.req.valid('param').id))

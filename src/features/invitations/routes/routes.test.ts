@@ -30,6 +30,7 @@ const findByUserAndOrganization = mock()
 
 const findById = mock()
 const findByEmail = mock()
+const existsById = mock()
 
 await mock.module('@/shared/invitation/repositories', () => ({
   invitationRepository: { findByToken, findByTokenWithOrganization, markExpired, accept, decline, signup },
@@ -38,7 +39,7 @@ await mock.module('@/shared/membership/repositories', () => ({
   membershipRepository: { findByUserAndOrganization },
 }))
 await mock.module('@/shared/user/repositories', () => ({
-  userRepository: { findById, findByEmail },
+  userRepository: { findById, findByEmail, existsById },
 }))
 
 const { app } = await import('@/app')
@@ -99,6 +100,8 @@ const createToken = async (userId: number): Promise<string> => {
 
 describe('invitations routes', () => {
   beforeEach(() => {
+    existsById.mockReset()
+    existsById.mockResolvedValue(true)
     findByToken.mockReset()
     findByTokenWithOrganization.mockReset()
     markExpired.mockReset()

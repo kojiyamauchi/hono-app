@@ -3,6 +3,7 @@ import { toPublicUserResponse, toUserResponse } from '@/shared/user/mappers'
 import { userRepository } from '@/shared/user/repositories'
 import { AppError } from '@/utils/errors'
 
+import { accountDeletionRepository, accountDeletionResults } from '../repositories'
 import type { UpdateMeSchemaType } from '../schemas'
 
 /**
@@ -36,6 +37,23 @@ export const usersService = {
     }
 
     return toUserResponse(updatedUser)
+  },
+
+  /**
+   * 現在のパスワードで本人確認し、認証済みユーザー自身のアカウントを削除する。
+   */
+  deleteMe: async (userId: number, currentPassword: string): Promise<void> => {
+    const result = await accountDeletionRepository.deleteAccount(userId, (passwordHash) => Bun.password.verify(currentPassword, passwordHash))
+
+    if (result === accountDeletionResults.notFound) {
+      throw new AppError(404, 'ユーザーが見つかりません')
+    }
+    if (result === accountDeletionResults.invalidPassword) {
+      throw new AppError(401, '現在のパスワードが正しくありません')
+    }
+    if (result === accountDeletionResults.soleOwner) {
+      throw new AppError(409, '唯一のOWNERである組織が存在するためアカウントを削除できません')
+    }
   },
 
   /**

@@ -9,9 +9,21 @@ const findById = mock()
 const updateById = mock()
 const findByEmail = mock()
 const create = mock()
+const deleteAccount = mock()
+const existsById = mock()
 
 await mock.module('@/shared/user/repositories', () => ({
-  userRepository: { findById, updateById, findByEmail, create },
+  userRepository: { findById, updateById, findByEmail, create, existsById },
+}))
+
+await mock.module('@/features/users/repositories', () => ({
+  accountDeletionRepository: { deleteAccount },
+  accountDeletionResults: {
+    deleted: 'DELETED',
+    notFound: 'NOT_FOUND',
+    invalidPassword: 'INVALID_PASSWORD',
+    soleOwner: 'SOLE_OWNER',
+  },
 }))
 
 const { app } = await import('@/app')
@@ -42,6 +54,9 @@ describe('users routes', () => {
     updateById.mockReset()
     findByEmail.mockReset()
     create.mockReset()
+    deleteAccount.mockReset()
+    existsById.mockReset()
+    existsById.mockResolvedValue(true)
   })
 
   test('GET /users/me は認証済みユーザー自身の詳細情報を返す', async () => {
@@ -117,6 +132,86 @@ describe('users routes', () => {
     expect(body.error?.message).toBeDefined()
     // 検証で止まるため更新処理は呼ばれない
     expect(updateById).not.toHaveBeenCalled()
+  })
+
+  test('DELETE /users/me は本人確認後にアカウントを削除しCookieをクリアする', async () => {
+    deleteAccount.mockResolvedValue('DELETED')
+    const token = await createToken(1)
+
+    const response = await app.request('/users/me', {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ currentPassword: 'current-password-123' }),
+    })
+
+    expect(response.status).toBe(204)
+    expect(deleteAccount).toHaveBeenCalledTimes(1)
+    expect(response.headers.get('set-cookie')).toContain('refreshToken=')
+    expect(response.headers.get('set-cookie')).toContain('Max-Age=0')
+  })
+
+  test('DELETE /users/me は現在のパスワードが不一致なら401を返す', async () => {
+    deleteAccount.mockResolvedValue('INVALID_PASSWORD')
+    const token = await createToken(1)
+
+    const response = await app.request('/users/me', {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ currentPassword: 'wrong-password' }),
+    })
+
+    expect(response.status).toBe(401)
+    expect(response.headers.get('set-cookie')).toBeNull()
+  })
+
+  test('DELETE /users/me は唯一のOWNERである組織が存在する場合に409を返す', async () => {
+    deleteAccount.mockResolvedValue('SOLE_OWNER')
+    const token = await createToken(1)
+
+    const response = await app.request('/users/me', {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ currentPassword: 'current-password-123' }),
+    })
+
+    expect(response.status).toBe(409)
+  })
+
+  test('DELETE /users/me は処理中にユーザーが存在しなくなったら404を返す', async () => {
+    deleteAccount.mockResolvedValue('NOT_FOUND')
+    const token = await createToken(1)
+
+    const response = await app.request('/users/me', {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ currentPassword: 'current-password-123' }),
+    })
+
+    expect(response.status).toBe(404)
+  })
+
+  test('DELETE /users/me はbodyなしなら400を返す', async () => {
+    const token = await createToken(1)
+
+    const response = await app.request('/users/me', {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(response.status).toBe(400)
+    expect(deleteAccount).not.toHaveBeenCalled()
   })
 
   test('GET /users/:id は指定ユーザーの公開情報だけを返す', async () => {

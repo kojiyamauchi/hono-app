@@ -11,6 +11,15 @@ export const updateMeSchema = z
   .openapi('UpdateMeRequest')
 
 /**
+ * アカウント削除時の本人確認入力スキーマ。
+ */
+export const deleteMeSchema = z
+  .object({
+    currentPassword: z.string().min(1, '現在のパスワードは必須です'),
+  })
+  .openapi('DeleteMeRequest')
+
+/**
  * ユーザーIDパスパラメータのバリデーションスキーマ。
  * OpenAPI上でpath parameterとして表示するため、`.openapi()` でparamメタデータを付与する。
  */
@@ -23,4 +32,5 @@ export const userIdParamSchema = z.object({
 })
 
 export type UpdateMeSchemaType = z.infer<typeof updateMeSchema>
+export type DeleteMeSchemaType = z.infer<typeof deleteMeSchema>
 export type UserIdParamSchemaType = z.infer<typeof userIdParamSchema>

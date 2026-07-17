@@ -1,9 +1,15 @@
-import { beforeEach, describe, expect, test } from 'bun:test'
+import { beforeEach, describe, expect, mock, test } from 'bun:test'
 import { Hono } from 'hono'
 import { sign } from 'hono/jwt'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
 
 import { AppError } from '@/utils/errors'
+
+const existsById = mock()
+
+await mock.module('@/shared/user/repositories', () => ({
+  userRepository: { existsById },
+}))
 
 const { authMiddleware } = await import('.')
 
@@ -36,6 +42,8 @@ const requestWithPayload = async (payload: Record<string, unknown>): Promise<Res
 describe('authMiddleware', () => {
   beforeEach(() => {
     process.env.JWT_SECRET = JWT_SECRET
+    existsById.mockReset()
+    existsById.mockResolvedValue(true)
   })
 
   test('subが正の整数のトークンは通し、userIdをcontextに格納する', async () => {
@@ -43,6 +51,7 @@ describe('authMiddleware', () => {
 
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ userId: 1 })
+    expect(existsById).toHaveBeenCalledWith(1)
   })
 
   test('subが正の整数の文字列でも通す', async () => {
@@ -54,6 +63,14 @@ describe('authMiddleware', () => {
 
   test('Authorizationヘッダーなしのリクエストは401を返す', async () => {
     const response = await app.request('/test')
+
+    expect(response.status).toBe(401)
+  })
+
+  test('署名済みトークンでも対象ユーザーが削除済みなら401を返す', async () => {
+    existsById.mockResolvedValue(false)
+
+    const response = await requestWithPayload({ sub: 1 })
 
     expect(response.status).toBe(401)
   })

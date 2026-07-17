@@ -38,6 +38,14 @@ export const userRepository = {
   },
 
   /**
+   * IDに対応するユーザーが存在するかを返す。
+   */
+  existsById: async (id: number): Promise<boolean> => {
+    const user = await prisma.user.findUnique({ where: { id }, select: { id: true } })
+    return user !== null
+  },
+
+  /**
    * ユーザーを新規作成する。メールの一意制約違反（同時signupの競合）の場合はnullを返す。
    * 事前のfindByEmailチェックをすり抜けた競合の最終防衛をDB制約に委ねるため、
    * P2002をnullへ畳み込みinvitation/membershipリポジトリの流儀に揃える。

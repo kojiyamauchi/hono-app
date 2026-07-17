@@ -2,6 +2,7 @@ import { createMiddleware } from 'hono/factory'
 import { verify } from 'hono/jwt'
 
 import { authSubjectSchema } from '@/shared/auth/schemas'
+import { userRepository } from '@/shared/user/repositories'
 import { AppError } from '@/utils/errors'
 
 /**
@@ -35,6 +36,11 @@ export const authMiddleware = createMiddleware<{
   // （`NaN`や想定外の値が後続のPrismaクエリへ渡り500になるのを防ぐ）。
   const parsedSubject = authSubjectSchema.safeParse(payload.sub)
   if (!parsedSubject.success) {
+    throw new AppError(401, '認証トークンが無効です')
+  }
+
+  // User削除後は署名・有効期限が正しい既発行トークンも即時に無効として扱う。
+  if (!(await userRepository.existsById(parsedSubject.data))) {
     throw new AppError(401, '認証トークンが無効です')
   }
   c.set('userId', parsedSubject.data)

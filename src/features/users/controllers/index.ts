@@ -1,8 +1,9 @@
 import type { Context, TypedResponse } from 'hono'
 
+import { clearRefreshTokenCookie } from '@/shared/auth/services'
 import type { PublicUserDtoType, UserDtoType } from '@/shared/user/dtos'
 
-import type { UpdateMeSchemaType } from '../schemas'
+import type { DeleteMeSchemaType, UpdateMeSchemaType } from '../schemas'
 import { usersService } from '../services'
 
 /**
@@ -25,6 +26,15 @@ export const usersController = {
   updateMe: async (c: Context, userId: number, input: UpdateMeSchemaType): Promise<TypedResponse<UserDtoType, 200, 'json'>> => {
     const user = await usersService.updateMe(userId, input)
     return c.json(user, 200)
+  },
+
+  /**
+   * 認証済みユーザー自身のアカウントを削除し、リフレッシュトークンCookieをクリアする。
+   */
+  deleteMe: async (c: Context, userId: number, input: DeleteMeSchemaType): Promise<Response> => {
+    await usersService.deleteMe(userId, input.currentPassword)
+    clearRefreshTokenCookie(c)
+    return c.body(null, 204)
   },
 
   /**

@@ -29,6 +29,7 @@ const evtConfirm = mock()
 
 const findByEmail = mock()
 const findById = mock()
+const existsById = mock()
 const createUser = mock()
 
 await mock.module('@/shared/auth/repositories', () => ({
@@ -55,7 +56,7 @@ await mock.module('@/shared/auth/repositories', () => ({
   },
 }))
 await mock.module('@/shared/user/repositories', () => ({
-  userRepository: { findByEmail, findById, create: createUser },
+  userRepository: { findByEmail, findById, existsById, create: createUser },
 }))
 
 // notifierをモックしてno-op実装を差し替える
@@ -115,6 +116,8 @@ const emailVerificationToken: EmailVerificationToken = {
 }
 
 beforeEach(() => {
+  existsById.mockReset()
+  existsById.mockResolvedValue(true)
   create.mockReset()
   findByTokenHash.mockReset()
   revokeById.mockReset()
