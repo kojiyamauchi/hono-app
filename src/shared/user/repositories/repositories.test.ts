@@ -65,3 +65,22 @@ describe('userRepository.create', () => {
     await expect(userRepository.create(input)).rejects.toThrow('接続エラー')
   })
 })
+
+describe('userRepository.existsById', () => {
+  beforeEach(() => {
+    findUnique.mockReset()
+  })
+
+  test('ユーザーが存在する場合はtrueを返す', async () => {
+    findUnique.mockResolvedValue({ id: 1 })
+
+    await expect(userRepository.existsById(1)).resolves.toBe(true)
+    expect(findUnique).toHaveBeenCalledWith({ where: { id: 1 }, select: { id: true } })
+  })
+
+  test('ユーザーが存在しない場合はfalseを返す', async () => {
+    findUnique.mockResolvedValue(null)
+
+    await expect(userRepository.existsById(999)).resolves.toBe(false)
+  })
+})
