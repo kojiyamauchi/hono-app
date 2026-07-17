@@ -30,9 +30,17 @@ const invitationFindById = mock()
 const invitationCancel = mock()
 
 const transferOwnership = mock()
+const leaveOrganization = mock()
 
 await mock.module('@/features/organizations/repositories', () => ({
+  organizationMembershipRepository: { leave: leaveOrganization },
   organizationOwnershipRepository: { transferOwnership },
+  leaveOrganizationResults: {
+    left: 'LEFT',
+    owner: 'OWNER',
+    notMember: 'NOT_MEMBER',
+    conflict: 'CONFLICT',
+  },
   ownershipTransferResults: {
     transferred: 'TRANSFERRED',
     targetNotFound: 'TARGET_NOT_FOUND',
@@ -126,6 +134,7 @@ describe('organizations routes', () => {
     invitationFindById.mockReset()
     invitationCancel.mockReset()
     transferOwnership.mockReset()
+    leaveOrganization.mockReset()
   })
 
   test('POST /organizations は組織を作成する', async () => {
@@ -582,6 +591,78 @@ describe('organizations routes', () => {
 
     expect(response.status).toBe(403)
     expect(membershipDeleteById).not.toHaveBeenCalled()
+  })
+
+  test('DELETE /organizations/:id/members/me はMEMBERなら204を返す', async () => {
+    findByUserAndOrganization.mockResolvedValue(membershipWithRole('MEMBER'))
+    leaveOrganization.mockResolvedValue('LEFT')
+    const token = await createToken(1)
+
+    const response = await app.request('/organizations/1/members/me', {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(response.status).toBe(204)
+    expect(leaveOrganization).toHaveBeenCalledWith(1, 1)
+    expect(membershipFindById).not.toHaveBeenCalled()
+  })
+
+  test('DELETE /organizations/:id/members/me はADMINなら204を返す', async () => {
+    findByUserAndOrganization.mockResolvedValue(membershipWithRole('ADMIN'))
+    leaveOrganization.mockResolvedValue('LEFT')
+    const token = await createToken(1)
+
+    const response = await app.request('/organizations/1/members/me', {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(response.status).toBe(204)
+  })
+
+  test('DELETE /organizations/:id/members/me はOWNERなら409を返す', async () => {
+    findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))
+    leaveOrganization.mockResolvedValue('OWNER')
+    const token = await createToken(1)
+
+    const response = await app.request('/organizations/1/members/me', {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(response.status).toBe(409)
+    expect(leaveOrganization).toHaveBeenCalledWith(1, 1)
+  })
+
+  test('DELETE /organizations/:id/members/me は未所属なら404を返す', async () => {
+    findByUserAndOrganization.mockResolvedValue(null)
+    const token = await createToken(1)
+
+    const response = await app.request('/organizations/1/members/me', {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(response.status).toBe(404)
+    expect(leaveOrganization).not.toHaveBeenCalled()
+  })
+
+  test('脱退後は同じ組織のメンバー向けAPIへアクセスできない', async () => {
+    findByUserAndOrganization.mockResolvedValueOnce(membershipWithRole('MEMBER')).mockResolvedValueOnce(null)
+    leaveOrganization.mockResolvedValue('LEFT')
+    const token = await createToken(1)
+
+    const leaveResponse = await app.request('/organizations/1/members/me', {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const accessResponse = await app.request('/organizations/1/members', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(leaveResponse.status).toBe(204)
+    expect(accessResponse.status).toBe(404)
   })
 
   // --- 招待管理ルート ---
