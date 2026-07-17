@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { updateMeSchema, userIdParamSchema } from '.'
+import { deleteMeSchema, updateMeSchema, userIdParamSchema } from '.'
 
 describe('updateMeSchema', () => {
   test('正しい入力を受け付ける', () => {
@@ -13,6 +13,20 @@ describe('updateMeSchema', () => {
     const result = updateMeSchema.safeParse({ name: '' })
 
     expect(result.success).toBe(false)
+  })
+})
+
+describe('deleteMeSchema', () => {
+  test('現在のパスワードがあれば受け付ける', () => {
+    expect(deleteMeSchema.safeParse({ currentPassword: 'password123' }).success).toBe(true)
+  })
+
+  test('現在のパスワードが空文字なら拒否する', () => {
+    expect(deleteMeSchema.safeParse({ currentPassword: '' }).success).toBe(false)
+  })
+
+  test('bodyが空なら拒否する', () => {
+    expect(deleteMeSchema.safeParse({}).success).toBe(false)
   })
 })
 
