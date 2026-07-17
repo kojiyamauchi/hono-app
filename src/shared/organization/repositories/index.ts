@@ -19,6 +19,16 @@ export const organizationRepository = {
    */
   createWithOwner: async (name: string, ownerUserId: number): Promise<Organization> => {
     return prisma.$transaction(async (tx) => {
+      const lockedOwners = await tx.$queryRaw<{ id: number }[]>`
+        SELECT id
+        FROM "User"
+        WHERE id = ${ownerUserId}
+        FOR UPDATE
+      `
+      if (lockedOwners.length === 0) {
+        throw new Error('組織の作成者が見つかりません')
+      }
+
       const organization = await tx.organization.create({ data: { name } })
       await tx.membership.create({
         data: { userId: ownerUserId, organizationId: organization.id, role: 'OWNER' },
