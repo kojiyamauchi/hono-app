@@ -92,6 +92,16 @@ describe('organizationOwnershipRepository.transferOwnership', () => {
     expect(updateMany).not.toHaveBeenCalled()
   })
 
+  test('組織が存在しない場合はCONFLICTを返す', async () => {
+    queryRaw.mockResolvedValueOnce([{ id: target.userId }]).mockResolvedValueOnce([])
+
+    const result = await organizationOwnershipRepository.transferOwnership(1, 1, 2)
+
+    expect(result).toBe(ownershipTransferResults.conflict)
+    expect(queryRaw).toHaveBeenCalledTimes(2)
+    expect(updateMany).not.toHaveBeenCalled()
+  })
+
   test('移譲先が別組織のメンバーならTARGET_NOT_FOUNDを返す', async () => {
     prepareLocks([owner, { ...target, organizationId: 2 }])
 
