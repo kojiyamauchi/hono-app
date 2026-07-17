@@ -21,6 +21,7 @@ describe('users routes OpenAPI定義', () => {
 
     expect(doc.paths?.['/users/me']?.get).toBeDefined()
     expect(doc.paths?.['/users/me']?.patch).toBeDefined()
+    expect(doc.paths?.['/users/me']?.delete).toBeDefined()
     expect(doc.paths?.['/users/{id}']?.get).toBeDefined()
   })
 
@@ -46,6 +47,17 @@ describe('users routes OpenAPI定義', () => {
     }
     expect(patchMe.requestBody.content['application/json'].schema?.$ref).toBe('#/components/schemas/UpdateMeRequest')
 
+    const deleteMe = doc.paths?.['/users/me']?.delete as {
+      requestBody: { content: Record<string, { schema?: { $ref?: string } }> }
+      responses: Record<string, { content?: Record<string, { schema?: { $ref?: string } }> }>
+      security?: unknown[]
+    }
+    expect(deleteMe.requestBody.content['application/json'].schema?.$ref).toBe('#/components/schemas/DeleteMeRequest')
+    expect(deleteMe.security).toEqual([{ bearerAuth: [] }])
+    for (const status of ['400', '401', '404', '409']) {
+      expect(deleteMe.responses[status]?.content?.['application/json'].schema?.$ref).toBe('#/components/schemas/ErrorResponse')
+    }
+
     // 公開情報取得は PublicUser DTO を参照する
     const getById = doc.paths?.['/users/{id}']?.get as {
       responses: Record<string, { content?: Record<string, { schema?: { $ref?: string } }> }>
@@ -56,6 +68,7 @@ describe('users routes OpenAPI定義', () => {
     expect(doc.components?.schemas?.User).toBeDefined()
     expect(doc.components?.schemas?.PublicUser).toBeDefined()
     expect(doc.components?.schemas?.UpdateMeRequest).toBeDefined()
+    expect(doc.components?.schemas?.DeleteMeRequest).toBeDefined()
 
     const userSchema = doc.components?.schemas?.User as {
       properties?: Record<string, { type?: string }>
