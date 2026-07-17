@@ -87,6 +87,14 @@ export const organizationsController = {
  */
 export const organizationsMembersController = {
   /**
+   * 認証ユーザー自身を組織から脱退させる。204を返す。
+   */
+  leave: async (c: Context, organizationId: number, userId: number): Promise<Response> => {
+    await organizationsService.leave(organizationId, userId)
+    return c.body(null, 204)
+  },
+
+  /**
    * 組織のメンバー一覧を返す。
    */
   listMembers: async (c: Context, organizationId: number): Promise<TypedResponse<MemberDtoType[], 200, 'json'>> => {
