@@ -271,7 +271,7 @@ types                          （型宣言のみ・最下層）
 - `types/`: アプリ全体で使う型宣言専用（Honoの型拡張、環境変数の型など）です。ランタイムコードは置きません。
 - `utils/`: 特定サービスのクライアント実体に依存しない汎用ユーティリティ（errors / rateLimit / timing / validation / prisma判定ヘルパーなど）です。外部パッケージや生成物の型（例: `@/generated/prisma/client` の `Prisma` 型）の利用は可ですが、`libs` のクライアント実体へのimportは禁止です。
 - `libs/`: 外部サービス・インフラのクライアント（prisma / supabase / telemetry）です。`utils` のimportは許可します。
-- `shared/`: 複数featureで使う共有ドメイン（前述の定義どおり）です。`middlewares`・`features` へのimportは禁止です（HTTP層の関心事をsharedへ持ち込まず、ミドルウェアが設定した値はcontroller/feature側で取り出して引数として渡します）。
+- `shared/`: 複数featureで使う共有ドメイン（前述の定義どおり）です。`middlewares`・`features` へのimportは禁止です（HTTP層の関心事をsharedへ持ち込まず、ミドルウェアが設定した値はcontroller/feature側で取り出して引数として渡します）。ただし、`src/shared/auth/services/` のcookieヘルパーはCookie入出力に責務を限定し、Controllerから受け取った `Context` を操作する例外とします。
 - `middlewares/`: Hono横断ミドルウェアです。`shared` のrepositoryの利用は許可します。`features` へのimportは禁止です。
 - `features/`: `shared` 以下の層に加え `middlewares` もimport可（feature内routesでのミドルウェア適用）です。feature間の相互importは前述のとおり禁止です。
 - `routes/` / `app.ts` / `server.ts`: 配線層です。全層をimport可（例: `app.ts` でのグローバルミドルウェア適用・CORS設定・telemetry初期化）です。
