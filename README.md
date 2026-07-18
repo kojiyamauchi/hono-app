@@ -58,6 +58,7 @@ flowchart TD
     Repositories --> Prisma[Prisma Client]
 
     Shared --> Libs[External Service Clients]
+    Services --> Libs
     Shared --> Resend[Resend]
     Prisma --> PostgreSQL[(PostgreSQL)]
 
