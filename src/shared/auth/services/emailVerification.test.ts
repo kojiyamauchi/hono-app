@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from 'bun:
 
 process.env.EMAIL_VERIFICATION_TOKEN_SECRET = 'test-email-verification-secret'
 process.env.PASSWORD_RESET_TOKEN_SECRET = 'test-password-reset-secret'
-process.env.RESEND_API_KEY = 'test-resend-api-key'
 process.env.EMAIL_VERIFICATION_FROM_EMAIL = 'verify@example.com'
 process.env.EMAIL_VERIFICATION_URL_BASE = 'https://example.com/verify-email'
 
@@ -16,15 +15,10 @@ await mock.module('@/shared/auth/repositories', () => ({
   },
 }))
 
-const mockEmailsSend = mock()
+const sendResendEmail = mock()
 
-await mock.module('resend', () => ({
-  Resend: class {
-    // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
-    get emails() {
-      return { send: mockEmailsSend }
-    }
-  },
+await mock.module('@/libs/resend', () => ({
+  sendResendEmail,
 }))
 
 const {
@@ -68,21 +62,20 @@ describe('メールアドレス検証トークン', () => {
 
 describe('emailVerificationNotifier.send', () => {
   beforeEach(() => {
-    mockEmailsSend.mockReset()
+    sendResendEmail.mockReset()
   })
 
   afterEach(() => {
-    process.env.RESEND_API_KEY = 'test-resend-api-key'
     process.env.EMAIL_VERIFICATION_FROM_EMAIL = 'verify@example.com'
     process.env.EMAIL_VERIFICATION_URL_BASE = 'https://example.com/verify-email'
   })
 
   test('送信元・宛先・検証URL・24時間の案内を含むメールを送信する', async () => {
-    mockEmailsSend.mockResolvedValue({ data: { id: 'email-id' }, error: null })
+    sendResendEmail.mockResolvedValue({ data: { id: 'email-id' }, error: null })
 
     await emailVerificationNotifier.send({ email: 'user@example.com', token: 'plain-token' })
 
-    const callArg = mockEmailsSend.mock.calls[0][0] as { from: string; to: string; text: string; html: string }
+    const callArg = sendResendEmail.mock.calls[0][0] as { from: string; to: string; text: string; html: string }
     expect(callArg.from).toBe('verify@example.com')
     expect(callArg.to).toBe('user@example.com')
     expect(callArg.text).toContain('https://example.com/verify-email?token=plain-token')
@@ -91,7 +84,7 @@ describe('emailVerificationNotifier.send', () => {
   })
 
   test('Resendがエラーを返した場合はthrowする', async () => {
-    mockEmailsSend.mockResolvedValue({ data: null, error: { name: 'validation_error', message: 'Invalid email' } })
+    sendResendEmail.mockResolvedValue({ data: null, error: { name: 'validation_error', message: 'Invalid email' } })
 
     await expect(emailVerificationNotifier.send({ email: 'user@example.com', token: 'plain-token' })).rejects.toThrow('メール送信に失敗しました')
   })
@@ -114,7 +107,7 @@ describe('sendEmailVerificationBestEffort', () => {
   beforeEach(() => {
     create.mockReset()
     deleteByIdAndTokenHash.mockReset()
-    mockEmailsSend.mockReset()
+    sendResendEmail.mockReset()
     create.mockImplementation(async (userId: number, tokenHash: string, expiresAt: Date) => ({
       id: 30,
       userId,
@@ -123,14 +116,14 @@ describe('sendEmailVerificationBestEffort', () => {
       usedAt: null,
       createdAt: new Date(),
     }))
-    mockEmailsSend.mockResolvedValue({ data: { id: 'email-id' }, error: null })
+    sendResendEmail.mockResolvedValue({ data: { id: 'email-id' }, error: null })
   })
 
   test('トークンを保存して通知する', async () => {
     await expect(sendEmailVerificationBestEffort(1, 'user@example.com')).resolves.toBeUndefined()
 
     expect(create).toHaveBeenCalledWith(1, expect.any(String), expect.any(Date))
-    expect(mockEmailsSend).toHaveBeenCalledTimes(1)
+    expect(sendResendEmail).toHaveBeenCalledTimes(1)
     expect(deleteByIdAndTokenHash).not.toHaveBeenCalled()
   })
 
@@ -144,14 +137,14 @@ describe('sendEmailVerificationBestEffort', () => {
         name: 'Error',
         reason: 'database unavailable',
       })
-      expect(mockEmailsSend).not.toHaveBeenCalled()
+      expect(sendResendEmail).not.toHaveBeenCalled()
     } finally {
       errorSpy.mockRestore()
     }
   })
 
   test('通知失敗時は保存したトークンを条件付き削除して正常終了する', async () => {
-    mockEmailsSend.mockRejectedValue(new Error('network error'))
+    sendResendEmail.mockRejectedValue(new Error('network error'))
     deleteByIdAndTokenHash.mockResolvedValue(1)
     const errorSpy = spyOn(console, 'error').mockImplementation(() => {})
 
@@ -168,7 +161,7 @@ describe('sendEmailVerificationBestEffort', () => {
   })
 
   test('通知失敗後の補償削除にも失敗しても正常終了する', async () => {
-    mockEmailsSend.mockRejectedValue(new Error('network error'))
+    sendResendEmail.mockRejectedValue(new Error('network error'))
     deleteByIdAndTokenHash.mockRejectedValue(new Error('database unavailable'))
     const errorSpy = spyOn(console, 'error').mockImplementation(() => {})
 
