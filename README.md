@@ -59,9 +59,9 @@ flowchart TD
 
     Shared --> Libs[External Service Clients]
     Services --> Libs
-    Shared --> Resend[Resend]
     Prisma --> PostgreSQL[(PostgreSQL)]
 
+    Libs --> Resend[Resend]
     Libs --> Supabase[Supabase Auth]
     Libs --> Telemetry[OpenTelemetry / New Relic]
 ```
@@ -91,7 +91,7 @@ sequenceDiagram
     Controller-->>Client: HTTP Response
 ```
 
-ControllerはHTTPリクエストとレスポンスの変換、Serviceはユースケースと業務ルール、Repositoryはデータ取得・更新とtransaction境界を担当します。複数featureで共有するドメイン処理は `src/shared/`、Prisma・Supabase・Telemetryのクライアントは `src/libs/` に配置します。Resendによる通知処理は `src/shared/auth/services/` に実装しています。
+ControllerはHTTPリクエストとレスポンスの変換、Serviceはユースケースと業務ルール、Repositoryはデータ取得・更新とtransaction境界を担当します。複数featureで共有するドメイン処理は `src/shared/`、Prisma・Resend・Supabase・Telemetryのクライアントは `src/libs/` に配置します。Resendを使う認証通知のメール内容・URL生成・通知タイミング・補償処理は `src/shared/auth/services/` に実装しています。
 
 ### 認証構成
 
@@ -153,6 +153,7 @@ flowchart LR
 |   |   `-- index.ts                 # トップレベルroute登録
 |   |-- libs/
 |   |   |-- prisma/                  # Prisma Client設定
+|   |   |-- resend/                  # Resendクライアント設定とメール送信
 |   |   |-- supabase/                # Supabase client設定
 |   |   `-- telemetry/               # OpenTelemetry初期化とspan計測
 |   |-- features/
@@ -270,7 +271,7 @@ types                          （型宣言のみ・最下層）
 
 - `types/`: アプリ全体で使う型宣言専用（Honoの型拡張、環境変数の型など）です。ランタイムコードは置きません。
 - `utils/`: 特定サービスのクライアント実体に依存しない汎用ユーティリティ（errors / rateLimit / timing / validation / prisma判定ヘルパーなど）です。外部パッケージや生成物の型（例: `@/generated/prisma/client` の `Prisma` 型）の利用は可ですが、`libs` のクライアント実体へのimportは禁止です。
-- `libs/`: 外部サービス・インフラのクライアント（prisma / supabase / telemetry）です。`utils` のimportは許可します。
+- `libs/`: 外部サービス・インフラのクライアント（prisma / resend / supabase / telemetry）です。`utils` のimportは許可します。
 - `shared/`: 複数featureで使う共有ドメイン（前述の定義どおり）です。`middlewares`・`features` へのimportは禁止です（HTTP層の関心事をsharedへ持ち込まず、ミドルウェアが設定した値はcontroller/feature側で取り出して引数として渡します）。ただし、`src/shared/auth/services/` のcookieヘルパーはCookie入出力に責務を限定し、Controllerから受け取った `Context` を操作する例外とします。
 - `middlewares/`: Hono横断ミドルウェアです。`shared` のrepositoryの利用は許可します。`features` へのimportは禁止です。
 - `features/`: `shared` 以下の層に加え `middlewares` もimport可（feature内routesでのミドルウェア適用）です。feature間の相互importは前述のとおり禁止です。
