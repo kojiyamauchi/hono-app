@@ -1,7 +1,6 @@
 import { createHmac, randomBytes } from 'node:crypto'
 
-import { Resend } from 'resend'
-
+import { sendResendEmail } from '@/libs/resend'
 import { resolveExternalApiErrorType, resolveExternalApiStatusCode, traceExternalApiCall } from '@/libs/telemetry/external'
 import { emailVerificationTokenRepository } from '@/shared/auth/repositories'
 import { AppError } from '@/utils/errors'
@@ -58,17 +57,6 @@ export type EmailVerificationNotifier = {
 }
 
 /**
- * 環境変数からResend APIキーを取得する。
- */
-const getResendApiKey = (): string => {
-  const key = process.env.RESEND_API_KEY
-  if (!key) {
-    throw new AppError(500, 'RESEND_API_KEYが設定されていません')
-  }
-  return key
-}
-
-/**
  * 環境変数からメールアドレス検証メールの送信元を取得する。
  */
 const getEmailVerificationFromEmail = (): string => {
@@ -95,7 +83,6 @@ const getEmailVerificationUrlBase = (): string => {
  */
 export const emailVerificationNotifier: EmailVerificationNotifier = {
   send: async (params: EmailVerificationNotifierParams): Promise<void> => {
-    const resend = new Resend(getResendApiKey())
     const from = getEmailVerificationFromEmail()
     const verificationUrl = `${getEmailVerificationUrlBase()}?token=${params.token}`
     const ttlHours = EMAIL_VERIFICATION_TOKEN_TTL_MS / (60 * 60 * 1000)
@@ -105,7 +92,7 @@ export const emailVerificationNotifier: EmailVerificationNotifier = {
         host: 'api.resend.com',
         method: 'POST',
         operation: 'emails.send',
-        resolveResult: (result: Awaited<ReturnType<typeof resend.emails.send>>) => ({
+        resolveResult: (result: Awaited<ReturnType<typeof sendResendEmail>>) => ({
           errorType: resolveExternalApiErrorType(result.error),
           statusCode: resolveExternalApiStatusCode(result.error),
           success: !result.error,
@@ -113,7 +100,7 @@ export const emailVerificationNotifier: EmailVerificationNotifier = {
         system: 'resend',
       },
       () =>
-        resend.emails.send({
+        sendResendEmail({
           from,
           to: params.email,
           subject: 'メールアドレス確認のご案内',

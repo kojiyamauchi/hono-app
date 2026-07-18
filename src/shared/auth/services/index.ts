@@ -3,8 +3,8 @@ import { createHmac, randomBytes, randomUUID } from 'node:crypto'
 import type { Context } from 'hono'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import { sign } from 'hono/jwt'
-import { Resend } from 'resend'
 
+import { sendResendEmail } from '@/libs/resend'
 import { resolveExternalApiErrorType, resolveExternalApiStatusCode, traceExternalApiCall } from '@/libs/telemetry/external'
 import { AppError } from '@/utils/errors'
 
@@ -201,17 +201,6 @@ export type PasswordResetNotifier = {
 }
 
 /**
- * 環境変数から Resend API キーを取得する。未設定なら500エラー。
- */
-const getResendApiKey = (): string => {
-  const key = process.env.RESEND_API_KEY
-  if (!key) {
-    throw new AppError(500, 'RESEND_API_KEYが設定されていません')
-  }
-  return key
-}
-
-/**
  * 環境変数からパスワードリセットメールの送信元アドレスを取得する。未設定なら500エラー。
  */
 const getPasswordResetFromEmail = (): string => {
@@ -241,7 +230,6 @@ const getPasswordResetUrlBase = (): string => {
  */
 export const passwordResetNotifier: PasswordResetNotifier = {
   send: async (params: PasswordResetNotifierParams): Promise<void> => {
-    const resend = new Resend(getResendApiKey())
     const from = getPasswordResetFromEmail()
     const urlBase = getPasswordResetUrlBase()
     const resetUrl = `${urlBase}?token=${params.token}`
@@ -252,7 +240,7 @@ export const passwordResetNotifier: PasswordResetNotifier = {
         host: 'api.resend.com',
         method: 'POST',
         operation: 'emails.send',
-        resolveResult: (result: Awaited<ReturnType<typeof resend.emails.send>>) => ({
+        resolveResult: (result: Awaited<ReturnType<typeof sendResendEmail>>) => ({
           errorType: resolveExternalApiErrorType(result.error),
           statusCode: resolveExternalApiStatusCode(result.error),
           success: !result.error,
@@ -260,7 +248,7 @@ export const passwordResetNotifier: PasswordResetNotifier = {
         system: 'resend',
       },
       () =>
-        resend.emails.send({
+        sendResendEmail({
           from,
           to: params.email,
           subject: 'パスワード再設定のご案内',
