@@ -191,6 +191,12 @@ bun run lint-staged  # ステージングされたファイルのチェックを
 
 ### テスト
 
+詳細なテスト方針、各テスト層の責務、重複テストを避ける基準、実DB検証が必要な変更は [docs/testing.md](docs/testing.md) を参照すること。
+
+- 変更した責務とリスクに対応するテストを追加すること
+- 同じ条件を全レイヤーで過剰に重複検証しないこと
+- Repositoryのresult unionやenumは成功値を明示的に判定し、未知の値を暗黙の成功として扱わないこと
+- migration、DB制約、transaction、raw SQL、行ロック、同時実行はmockテストだけで完了とせず、実DBで確認すること
 - Bunに組み込まれた`bun test --isolate`を使用
 - テストファイル: `**/*.test.ts`または`**/*.test.js`
 - テストがない場合は失敗するため、最低限の動作確認テストを維持

@@ -427,6 +427,8 @@ Prisma Studioを開きます。
 bun run prisma:studio
 ```
 
+テスト種別ごとの責務、変更内容に応じたテスト選択、重複テストを避ける方針は [docs/testing.md](docs/testing.md) を参照してください。
+
 テストと CI は意図的に DB 非依存（`mock.module` で repository をモック）です。そのため migration の適用や実 DB での挙動（transaction・一意制約・外部キーなど）は CI で検証されません。migration を含む変更は、ローカルで実 DB へ適用し必要に応じて smoke 確認してください。共通原則は CLAUDE.md / AGENTS.md「migrationを含む変更の実DB検証」、詳細手順は migration検証Skill（[.claude/skills/migration-verification/SKILL.md](.claude/skills/migration-verification/SKILL.md)）を参照してください。
 
 ## OpenTelemetry
