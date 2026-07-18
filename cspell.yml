@@ -25,6 +25,7 @@ flagWords:
   - null
 ignorePaths:
   - ./**/node_modules/**
+  - .claude/settings.local.json
   - .git/**
   - .husky/**
   - .history/**
