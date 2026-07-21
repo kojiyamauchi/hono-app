@@ -46,6 +46,8 @@ model Membership {
   organization   Organization @relation(fields: [organizationId], references: [id])
 
   @@unique([userId, organizationId])
+  // 組織単位のメンバー一覧取得（参加日時順）と、組織削除時の一括削除を支援する
+  @@index([organizationId, createdAt])
 }
 
 enum InvitationStatus {
