@@ -154,6 +154,10 @@ flowchart LR
 |-- docs/
 |   |-- endpoints.md                 # 公開API一覧
 |   `-- observability.md             # OpenTelemetry / New Relic運用手順
+|-- infra/
+|   |-- .terraform.lock.hcl          # Terraform provider依存ロック
+|   |-- .tflint.hcl                  # TFLint設定
+|   `-- main.tf                      # AWS providerとTerraform基本設定
 |-- prisma/
 |   |-- schema.prisma                # Prismaスキーマ
 |   `-- migrations/                  # Prisma migration
@@ -442,6 +446,17 @@ bun run prisma:studio
 
 テストと CI は意図的に DB 非依存（`mock.module` で repository をモック）です。そのため migration の適用や実 DB での挙動（transaction・一意制約・外部キーなど）は CI で検証されません。migration を含む変更は、ローカルで実 DB へ適用し必要に応じて smoke 確認してください。共通原則は CLAUDE.md / AGENTS.md「migrationを含む変更の実DB検証」、詳細手順は migration検証Skill（[.claude/skills/migration-verification/SKILL.md](.claude/skills/migration-verification/SKILL.md)）を参照してください。
 
+## Terraform
+
+Terraform CLIとTFLintをインストールしたうえで、clone後の初回セットアップとしてproviderとTFLint pluginを初期化します。
+
+```bash
+bun run tf:init
+bun run tf:lint:init
+```
+
+現在はbackend未設定のため、Terraform stateはローカルへ保存されます。state・plan・crash logはGit管理対象外です。実リソースで`tf:plan` / `tf:apply`を運用する前に、対象AWSアカウントとremote backendの方針を決定してください。
+
 ## OpenTelemetry
 
 `OTEL_TRACES_ENABLED=true` の場合、OpenTelemetryでHTTP request spanとPostgreSQLのDB spanを作成し、OTLP/HTTP protobuf exporterでNew Relicへ送信します。New Relic Node.js AgentはBun + Hono構成では使わず、OpenTelemetry経由のtrace送信を採用します。
@@ -482,6 +497,13 @@ bun run prisma:migrate:dev  # Prisma migrationを作成・適用
 bun run prisma:validate     # Prisma schemaを検証
 bun run prisma:format       # Prisma schemaをフォーマット
 bun run prisma:studio       # Prisma Studioを起動
+bun run tf:init             # Terraform providerを初期化
+bun run tf:plan             # Terraformの変更計画を確認
+bun run tf:apply            # Terraformの変更を適用
+bun run tf:fmt              # Terraform構成をフォーマット
+bun run tf:lint:init        # TFLint pluginを初期化
+bun run tf:lint             # Terraform構成をTFLintで検査
+bun run tf:validate         # Terraform構成を検証
 ```
 
 ## Environment
