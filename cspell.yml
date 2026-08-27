@@ -24,6 +24,7 @@ words:
   - Supabase
   - tflint
   - tfstate
+  - tfvars
 flagWords:
   - null
 ignorePaths:
