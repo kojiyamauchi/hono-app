@@ -29,6 +29,7 @@
     "tf:plan": "terraform -chdir=infra plan",
     "tf:apply": "terraform -chdir=infra apply",
     "tf:fmt": "terraform -chdir=infra fmt",
+    "tf:lint:init": "tflint --chdir=infra --init",
     "tf:lint": "tflint --chdir=infra",
     "tf:validate": "terraform -chdir=infra validate"
   },

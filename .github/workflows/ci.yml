@@ -85,7 +85,7 @@ jobs:
         run: bun run tf:init
 
       - name: Initialize TFLint
-        run: tflint --chdir=infra --init
+        run: bun run tf:lint:init
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
