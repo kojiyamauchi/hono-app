@@ -6,4 +6,9 @@ dist/
 src/generated/
 
 # Terraformのローカル生成物
-**/.terraform/*
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
