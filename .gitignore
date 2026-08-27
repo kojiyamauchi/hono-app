@@ -4,3 +4,11 @@ dist/
 .env
 .history/
 src/generated/
+
+# Terraformのローカル生成物
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log

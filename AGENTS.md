@@ -164,6 +164,22 @@ bun run prisma:format        # スキーマファイルのフォーマット
 bun run prisma:studio        # Prisma Studioを開く
 ```
 
+### Terraform操作
+
+clone後の初回セットアップでは、Terraform providerとTFLint pluginを初期化すること。
+
+```bash
+bun run tf:init       # Terraform providerを初期化
+bun run tf:lint:init  # TFLint pluginを初期化
+bun run tf:plan       # Terraformの変更計画を確認
+bun run tf:apply      # Terraformの変更を適用
+bun run tf:fmt        # Terraform構成をフォーマット
+bun run tf:lint       # Terraform構成をTFLintで検査
+bun run tf:validate   # Terraform構成を検証
+```
+
+現時点ではbackend未設定のため、実リソースで`tf:plan` / `tf:apply`を運用する前に、対象AWSアカウントとremote backendの方針を確認すること。
+
 ### プレコミットフック
 
 Husky + lint-stagedがコミット時に実行されるよう設定されています:

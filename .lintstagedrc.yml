@@ -1,8 +1,0 @@
-./**/*.{ts,mjs}:
-  - bunx prettier --write
-  - bunx eslint --fix --no-warn-ignored --max-warnings 0
-./**/*.js: bunx prettier --write
-./prisma/schema.prisma:
-  - bun run prisma:validate
-  - bun run prisma:format
-./**/*: bunx cspell --dot --no-must-find-files

@@ -2,28 +2,33 @@ version: 0.2
 language: en
 words:
   - autoincrement
+  - bun
+  - Bun
+  - bunx
+  - chdir
   - datasource
   - dotenv
   - dtos
   - extname
-  - bun
-  - Bun
-  - bunx
   - HMAC
   - hono
   - Hono
   - kojiyamauchi
   - mappers
-  - oneline
   - octocat
+  - oneline
   - postgresql
   - Prisma
   - Refreshable
-  - Supabase
   - supabase
+  - Supabase
+  - tflint
+  - tfstate
+  - tfvars
 flagWords:
   - null
 ignorePaths:
+  - ./**/.terraform/**
   - ./**/node_modules/**
   - .claude/settings.local.json
   - .git/**

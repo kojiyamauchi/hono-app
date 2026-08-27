@@ -1,6 +1,10 @@
 node_modules
 dist
 src/generated
+infra/.terraform
+infra/**/*.tf
+infra/**/*.tfvars
+infra/**/*.hcl
 .husky
 .history
 .DS_Store
