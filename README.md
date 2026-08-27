@@ -196,7 +196,7 @@ flowchart LR
 |   `-- snippets/
 |-- .env.example                     # 環境変数の例
 |-- .dockerignore                    # Docker build contextの除外設定
-|-- .lintstagedrc.yml                # lint-staged設定
+|-- .lintstagedrc.mjs                # lint-staged設定
 |-- .prettierignore                  # Prettier対象外設定
 |-- .prettierrc.yml                  # Prettier設定
 |-- AGENTS.md                        # Codex向け運用ルール
