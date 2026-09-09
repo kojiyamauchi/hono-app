@@ -82,7 +82,7 @@ jobs:
           cache: true
 
       - name: Initialize Terraform Without Backend
-        run: terraform -chdir=infra init -backend=false
+        run: bun run tf:init:no-backend
 
       - name: Initialize TFLint
         run: bun run tf:lint:init

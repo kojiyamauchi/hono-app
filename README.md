@@ -448,14 +448,14 @@ bun run prisma:studio
 
 ## Terraform
 
-Terraform CLIとTFLintをインストールしたうえで、clone後の初回セットアップとしてproviderとTFLint pluginを初期化します。
+Terraform CLIとTFLintをインストールしたうえで、clone後の初回セットアップとしてproviderとTFLint pluginを初期化します。AWS認証情報を持たない環境では、remote backendへ接続しない初期化コマンドを使用します。
 
 ```bash
-bun run tf:init
+bun run tf:init:no-backend
 bun run tf:lint:init
 ```
 
-Terraform stateは、`ap-northeast-1`のS3バケット`terraform-state-hono-app`へ`hono-app/terraform.tfstate`として保存します。S3 lockfileによるstate lockingを有効にしています。ローカルではAWS CLIのprofileで対象アカウントを確認してから`tf:init` / `tf:plan` / `tf:apply`を実行してください。CIの静的検証ではremote backendへ接続しません。
+Terraform stateは、`ap-northeast-1`のS3バケット`terraform-state-hono-app`へ`hono-app/terraform.tfstate`として保存します。S3 lockfileによるstate lockingを有効にしています。ローカルではAWS CLIのprofileで対象アカウントを確認してから`tf:init` / `tf:plan` / `tf:apply`を実行してください。`bun run tf:init`はS3 backendへ接続するため、AWS認証情報が未設定の状態では失敗します。CIの静的検証では`bun run tf:init:no-backend`を使用し、remote backendへ接続しません。
 
 ## OpenTelemetry
 
@@ -498,6 +498,7 @@ bun run prisma:validate     # Prisma schemaを検証
 bun run prisma:format       # Prisma schemaをフォーマット
 bun run prisma:studio       # Prisma Studioを起動
 bun run tf:init             # Terraform providerを初期化
+bun run tf:init:no-backend  # remote backendへ接続せずTerraform providerを初期化
 bun run tf:plan             # Terraformの変更計画を確認
 bun run tf:apply            # Terraformの変更を適用
 bun run tf:fmt              # Terraform構成をフォーマット
