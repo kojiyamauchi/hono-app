@@ -81,8 +81,8 @@ jobs:
           tflint_version: ${{ env.TFLINT_VERSION }}
           cache: true
 
-      - name: Initialize Terraform
-        run: bun run tf:init
+      - name: Initialize Terraform Without Backend
+        run: terraform -chdir=infra init -backend=false
 
       - name: Initialize TFLint
         run: bun run tf:lint:init
