@@ -457,6 +457,14 @@ bun run tf:lint:init
 
 Terraform stateは、`ap-northeast-1`のS3バケット`terraform-state-hono-app`へ`hono-app/terraform.tfstate`として保存します。S3 lockfileによるstate lockingを有効にしています。ローカルではAWS CLIのprofileで対象アカウントを確認してから`tf:init` / `tf:plan` / `tf:apply`を実行してください。`bun run tf:init`はS3 backendへ接続するため、AWS認証情報が未設定の状態では失敗します。CIの静的検証では`bun run tf:init:no-backend`を使用し、remote backendへ接続しません。
 
+remote backendのS3バケットは、このTerraform構成の管理対象外です。backendの初期化より前に、AWS CLIまたはAWS Management Consoleで次の設定を満たすバケットを用意してください。
+
+- バケット名: `terraform-state-hono-app`
+- リージョン: `ap-northeast-1`
+- バージョニング: 有効
+- デフォルト暗号化: 有効
+- S3 Block Public Access: すべて有効
+
 ## OpenTelemetry
 
 `OTEL_TRACES_ENABLED=true` の場合、OpenTelemetryでHTTP request spanとPostgreSQLのDB spanを作成し、OTLP/HTTP protobuf exporterでNew Relicへ送信します。New Relic Node.js AgentはBun + Hono構成では使わず、OpenTelemetry経由のtrace送信を採用します。

@@ -179,7 +179,7 @@ bun run tf:lint       # Terraform構成をTFLintで検査
 bun run tf:validate   # Terraform構成を検証
 ```
 
-remote backendには、`ap-northeast-1`のS3バケット`terraform-state-hono-app`とS3 lockfileを使用する。実リソースで`tf:init` / `tf:plan` / `tf:apply`を実行する前に、AWS CLIのprofileが対象AWSアカウントを指していることを確認すること。AWS認証情報を持たない環境とCIの静的検証では`tf:init:no-backend`を使用し、remote backendへ接続しないこと。
+remote backendには、`ap-northeast-1`のS3バケット`terraform-state-hono-app`とS3 lockfileを使用する。このバケットはTerraform管理外の前提リソースとし、バージョニング、デフォルト暗号化、S3 Block Public Accessを有効にして事前作成すること。実リソースで`tf:init` / `tf:plan` / `tf:apply`を実行する前に、AWS CLIのprofileが対象AWSアカウントを指していることを確認すること。AWS認証情報を持たない環境とCIの静的検証では`tf:init:no-backend`を使用し、remote backendへ接続しないこと。
 
 ### プレコミットフック
 
