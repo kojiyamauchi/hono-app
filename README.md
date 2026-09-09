@@ -455,7 +455,7 @@ bun run tf:init
 bun run tf:lint:init
 ```
 
-現在はbackend未設定のため、Terraform stateはローカルへ保存されます。state・plan・crash logはGit管理対象外です。実リソースで`tf:plan` / `tf:apply`を運用する前に、対象AWSアカウントとremote backendの方針を決定してください。
+Terraform stateは、`ap-northeast-1`のS3バケット`terraform-state-hono-app`へ`hono-app/terraform.tfstate`として保存します。S3 lockfileによるstate lockingを有効にしています。ローカルではAWS CLIのprofileで対象アカウントを確認してから`tf:init` / `tf:plan` / `tf:apply`を実行してください。CIの静的検証ではremote backendへ接続しません。
 
 ## OpenTelemetry
 

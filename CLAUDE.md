@@ -178,7 +178,7 @@ bun run tf:lint       # Terraform構成をTFLintで検査
 bun run tf:validate   # Terraform構成を検証
 ```
 
-現時点ではbackend未設定のため、実リソースで`tf:plan` / `tf:apply`を運用する前に、対象AWSアカウントとremote backendの方針を確認すること。
+remote backendには、`ap-northeast-1`のS3バケット`terraform-state-hono-app`とS3 lockfileを使用する。実リソースで`tf:init` / `tf:plan` / `tf:apply`を実行する前に、AWS CLIのprofileが対象AWSアカウントを指していることを確認すること。CIの静的検証ではremote backendへ接続しないこと。
 
 ### プレコミットフック
 
