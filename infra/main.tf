@@ -7,6 +7,14 @@ terraform {
       version = "~> 6.0"
     }
   }
+
+  backend "s3" {
+    bucket       = "terraform-state-hono-app"
+    encrypt      = true
+    key          = "hono-app/terraform.tfstate"
+    region       = "ap-northeast-1"
+    use_lockfile = true
+  }
 }
 
 provider "aws" {
