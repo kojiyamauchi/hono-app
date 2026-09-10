@@ -28,6 +28,6 @@ module "vpc" {
   env            = terraform.workspace
   vpc_cidr_block = "10.0.0.0/16"
   vpc_additional_tags = {
-    Usage = "hono app vpc explanation"
+    Usage = "hono web server"
   }
 }
