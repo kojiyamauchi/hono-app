@@ -4,8 +4,12 @@ variable "vpc_cidr_block" {
   description = "VPCに割り当てるCIDRブロック"
 
   validation {
-    condition     = can(cidrnetmask(var.vpc_cidr_block))
-    error_message = "VPCのCIDRブロックはIPv4 CIDR形式で指定してください。"
+    condition = (
+      can(cidrnetmask(var.vpc_cidr_block)) &&
+      can(regex("/(1[6-9]|2[0-8])$", var.vpc_cidr_block)) &&
+      try(cidrsubnet(var.vpc_cidr_block, 0, 0) == var.vpc_cidr_block, false)
+    )
+    error_message = "VPCのCIDRブロックは/16〜/28のネットワークアドレスをIPv4 CIDR形式で指定してください。"
   }
 }
 
