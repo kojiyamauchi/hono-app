@@ -27,6 +27,7 @@
     "prisma:studio": "bunx prisma studio",
     "tf:init": "terraform -chdir=infra init",
     "tf:init:no-backend": "terraform -chdir=infra init -backend=false",
+    "tf:workspace:dev": "terraform -chdir=infra workspace select -or-create dev",
     "tf:plan": "terraform -chdir=infra plan",
     "tf:apply": "terraform -chdir=infra apply",
     "tf:fmt": "terraform -chdir=infra fmt -recursive",

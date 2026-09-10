@@ -172,16 +172,16 @@ clone後の初回セットアップでは、Terraform providerとTFLint plugin�
 bun run tf:init       # Terraform providerを初期化
 bun run tf:init:no-backend # remote backendへ接続せずTerraform providerを初期化
 bun run tf:lint:init  # TFLint pluginを初期化
-terraform -chdir=infra workspace select -or-create dev # dev workspaceを作成または選択
-bun run tf:plan       # dev環境のTerraform変更計画を確認
-bun run tf:apply      # dev環境へTerraform変更を適用
+bun run tf:workspace:dev # dev workspaceを作成または選択
+bun run tf:plan       # 選択中のworkspaceのTerraform変更計画を確認
+bun run tf:apply      # 選択中のworkspaceへTerraform変更を適用
 bun run tf:fmt        # Terraform構成を再帰的にフォーマット
 bun run tf:fmt:check  # Terraform構成のフォーマットを検証
 bun run tf:lint       # Terraform構成をTFLintで検査
 bun run tf:validate   # Terraform構成を検証
 ```
 
-remote backendには、`ap-northeast-1`のS3バケット`terraform-state-hono-app`とS3 lockfileを使用する。このバケットはTerraform管理外の前提リソースとし、バージョニング、デフォルト暗号化、S3 Block Public Accessを有効にして事前作成すること。環境ごとのstateはTerraform workspaceで分離し、現時点では`dev` workspaceを使用する。`tf:plan` / `tf:apply`は選択中のworkspaceを対象とし、特定のtfvarsファイルを自動では読み込まない。実行前に`terraform -chdir=infra workspace show`で対象workspaceを確認すること。stg / prod環境を追加する場合は、対応するworkspaceを作成してstateを分離すること。実リソースで`tf:init` / `tf:plan` / `tf:apply`を実行する前に、AWS CLIのprofileが対象AWSアカウントを指していることを確認すること。AWS認証情報を持たない環境とCIの静的検証では`TF_WORKSPACE=dev`と`tf:init:no-backend`を使用し、remote backendへ接続しないこと。
+remote backendには、`ap-northeast-1`のS3バケット`terraform-state-hono-app`とS3 lockfileを使用する。このバケットはTerraform管理外の前提リソースとし、バージョニング、デフォルト暗号化、S3 Block Public Accessを有効にして事前作成すること。環境ごとのstateはTerraform workspaceで分離し、現時点では`dev` workspaceを使用する。`tf:plan` / `tf:apply`は選択中のworkspaceを対象とし、特定のtfvarsファイルを自動では読み込まない。`infra/env/*.tfvars`は将来の環境別入力値の仮置きであり、利用する場合は`-var-file=env/<workspace>.tfvars`を明示的に指定すること。実行前に`terraform -chdir=infra workspace show`で対象workspaceを確認すること。stg / prod環境を追加する場合は、対応するworkspaceを作成してstateを分離すること。実リソースで`tf:init` / `tf:plan` / `tf:apply`を実行する前に、AWS CLIのprofileが対象AWSアカウントを指していることを確認すること。AWS認証情報を持たない環境とCIの静的検証では`TF_WORKSPACE=dev`と`tf:init:no-backend`を使用し、remote backendへ接続しないこと。
 
 ### プレコミットフック
 
