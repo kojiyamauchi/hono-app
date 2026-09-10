@@ -15,13 +15,11 @@ variable "vpc_cidr_block" {
 
 variable "service_name" {
   type        = string
-  default     = "hono-app"
   description = "VPCを利用するサービス名を指定"
 }
 
 variable "env" {
   type        = string
-  default     = "dev"
   description = "環境識別子 (dev, stg, prod)"
 
   validation {
