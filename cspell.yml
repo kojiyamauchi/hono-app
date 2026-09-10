@@ -9,6 +9,7 @@ words:
   - datasource
   - dotenv
   - dtos
+  - esbenp
   - extname
   - HMAC
   - hono
