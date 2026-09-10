@@ -21,11 +21,6 @@ provider "aws" {
   region = "ap-northeast-1"
 }
 
-moved {
-  from = aws_vpc.vpc
-  to   = module.vpc.aws_vpc.vpc
-}
-
 module "vpc" {
   source = "./modules/vpc"
 
