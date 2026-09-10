@@ -89,6 +89,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
+      - name: Check Terraform Formatting
+        run: bun run tf:fmt:check
+
       - name: Run TFLint
         run: bun run tf:lint
 

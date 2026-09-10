@@ -172,14 +172,15 @@ clone後の初回セットアップでは、Terraform providerとTFLint plugin�
 bun run tf:init       # Terraform providerを初期化
 bun run tf:init:no-backend # remote backendへ接続せずTerraform providerを初期化
 bun run tf:lint:init  # TFLint pluginを初期化
-bun run tf:plan       # Terraformの変更計画を確認
-bun run tf:apply      # Terraformの変更を適用
-bun run tf:fmt        # Terraform構成をフォーマット
+bun run tf:plan       # dev環境のTerraform変更計画を確認
+bun run tf:apply      # dev環境へTerraform変更を適用
+bun run tf:fmt        # Terraform構成を再帰的にフォーマット
+bun run tf:fmt:check  # Terraform構成のフォーマットを検証
 bun run tf:lint       # Terraform構成をTFLintで検査
 bun run tf:validate   # Terraform構成を検証
 ```
 
-remote backendには、`ap-northeast-1`のS3バケット`terraform-state-hono-app`とS3 lockfileを使用する。このバケットはTerraform管理外の前提リソースとし、バージョニング、デフォルト暗号化、S3 Block Public Accessを有効にして事前作成すること。実リソースで`tf:init` / `tf:plan` / `tf:apply`を実行する前に、AWS CLIのprofileが対象AWSアカウントを指していることを確認すること。AWS認証情報を持たない環境とCIの静的検証では`tf:init:no-backend`を使用し、remote backendへ接続しないこと。
+remote backendには、`ap-northeast-1`のS3バケット`terraform-state-hono-app`とS3 lockfileを使用する。このバケットはTerraform管理外の前提リソースとし、バージョニング、デフォルト暗号化、S3 Block Public Accessを有効にして事前作成すること。現時点の管理対象はdev環境のみで、`tf:plan` / `tf:apply`は`infra/env/dev.tfvars`を読み込む。stg / prod環境を追加する場合は、適用前にbackend key、ディレクトリ、またはTerraform workspaceで環境ごとのstateを分離すること。実リソースで`tf:init` / `tf:plan` / `tf:apply`を実行する前に、AWS CLIのprofileが対象AWSアカウントを指していることを確認すること。AWS認証情報を持たない環境とCIの静的検証では`tf:init:no-backend`を使用し、remote backendへ接続しないこと。
 
 ### プレコミットフック
 
