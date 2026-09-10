@@ -157,10 +157,12 @@ flowchart LR
 |-- infra/
 |   |-- .terraform.lock.hcl          # Terraform provider依存ロック
 |   |-- .tflint.hcl                  # TFLint設定
-|   |-- env/
-|   |   `-- dev.tfvars               # dev環境のTerraform変数値
-|   |-- main.tf                      # AWS providerとTerraform基本設定
-|   `-- variables.tf                 # Terraform入力変数
+|   |-- env/                         # 将来の環境別Terraform変数値
+|   |-- modules/
+|   |   `-- vpc/                     # VPC module
+|   |-- main.tf                      # AWS providerとmodule設定
+|   |-- outputs.tf                   # root moduleの出力値
+|   `-- variables.tf                 # root moduleの入力変数
 |-- prisma/
 |   |-- schema.prisma                # Prismaスキーマ
 |   `-- migrations/                  # Prisma migration
@@ -458,9 +460,9 @@ bun run tf:init:no-backend
 bun run tf:lint:init
 ```
 
-Terraform stateは、`ap-northeast-1`のS3バケット`terraform-state-hono-app`へ`hono-app/terraform.tfstate`として保存します。S3 lockfileによるstate lockingを有効にしています。現時点の管理対象はdev環境のみで、`tf:plan` / `tf:apply`は`infra/env/dev.tfvars`を自動的に読み込みます。stg / prod環境を追加する場合は、適用前に環境ごとのbackend key、ディレクトリ分割、またはTerraform workspaceのいずれかでstateを分離してください。
+Terraform stateは、`ap-northeast-1`のS3バケット`terraform-state-hono-app`へ保存し、S3 lockfileによるstate lockingを有効にしています。環境ごとのstateはTerraform workspaceで分離し、現時点では`dev` workspaceを使用します。`tf:plan` / `tf:apply`は選択中のworkspaceを対象とし、特定のtfvarsファイルを自動では読み込みません。
 
-ローカルではAWS CLIのprofileで対象アカウントを確認してから`tf:init` / `tf:plan` / `tf:apply`を実行してください。`bun run tf:init`はS3 backendへ接続するため、AWS認証情報が未設定の状態では失敗します。CIの静的検証では`bun run tf:init:no-backend`を使用し、remote backendへ接続しません。
+ローカルではAWS CLIのprofileで対象AWSアカウントを確認してから`tf:init`を実行し、`terraform -chdir=infra workspace select -or-create dev`で`dev` workspaceを選択してから`tf:plan` / `tf:apply`を実行してください。`bun run tf:init`はS3 backendへ接続するため、AWS認証情報が未設定の状態では失敗します。CIの静的検証では`TF_WORKSPACE=dev`と`bun run tf:init:no-backend`を使用し、remote backendへ接続しません。stg / prod環境を追加する場合は、対応するworkspaceを作成してstateを分離してください。
 
 remote backendのS3バケットは、このTerraform構成の管理対象外です。backendの初期化より前に、AWS CLIまたはAWS Management Consoleで次の設定を満たすバケットを用意してください。
 
@@ -512,6 +514,7 @@ bun run prisma:format       # Prisma schemaをフォーマット
 bun run prisma:studio       # Prisma Studioを起動
 bun run tf:init             # Terraform providerを初期化
 bun run tf:init:no-backend  # remote backendへ接続せずTerraform providerを初期化
+terraform -chdir=infra workspace select -or-create dev # dev workspaceを作成または選択
 bun run tf:plan             # dev環境のTerraform変更計画を確認
 bun run tf:apply            # dev環境へTerraform変更を適用
 bun run tf:fmt              # Terraform構成を再帰的にフォーマット
