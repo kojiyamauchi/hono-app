@@ -27,9 +27,10 @@
     "prisma:studio": "bunx prisma studio",
     "tf:init": "terraform -chdir=infra init",
     "tf:init:no-backend": "terraform -chdir=infra init -backend=false",
-    "tf:plan": "terraform -chdir=infra plan",
-    "tf:apply": "terraform -chdir=infra apply",
-    "tf:fmt": "terraform -chdir=infra fmt",
+    "tf:plan": "terraform -chdir=infra plan -var-file=env/dev.tfvars",
+    "tf:apply": "terraform -chdir=infra apply -var-file=env/dev.tfvars",
+    "tf:fmt": "terraform -chdir=infra fmt -recursive",
+    "tf:fmt:check": "terraform -chdir=infra fmt -recursive -check -diff",
     "tf:lint:init": "tflint --chdir=infra --init",
     "tf:lint": "tflint --chdir=infra",
     "tf:validate": "terraform -chdir=infra validate"

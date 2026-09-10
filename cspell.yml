@@ -9,10 +9,12 @@ words:
   - datasource
   - dotenv
   - dtos
+  - esbenp
   - extname
   - HMAC
   - hono
   - Hono
+  - hostnames
   - kojiyamauchi
   - mappers
   - octocat
