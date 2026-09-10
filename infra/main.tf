@@ -21,16 +21,18 @@ provider "aws" {
   region = "ap-northeast-1"
 }
 
-resource "aws_vpc" "vpc" {
-  cidr_block           = var.vpc_cidr_block
-  enable_dns_support   = true
-  enable_dns_hostnames = true
+moved {
+  from = aws_vpc.vpc
+  to   = module.vpc.aws_vpc.vpc
+}
 
-  tags = merge(
-    var.vpc_additional_tags,
-    {
-      Name = "${var.service_name}-${var.env}-vpc"
-      Env  = var.env
-    }
-  )
+module "vpc" {
+  source = "./modules/vpc"
+
+  service_name   = "hono-app"
+  env            = terraform.workspace
+  vpc_cidr_block = "10.0.0.0/16"
+  vpc_additional_tags = {
+    Usage = "hono app vpc explanation"
+  }
 }
