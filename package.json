@@ -34,7 +34,9 @@
     "tf:fmt:check": "terraform -chdir=infra fmt -recursive -check -diff",
     "tf:lint:init": "tflint --chdir=infra --init",
     "tf:lint": "tflint --chdir=infra",
-    "tf:validate": "terraform -chdir=infra validate"
+    "tf:validate": "terraform -chdir=infra validate",
+    "tf:test:init": "terraform -chdir=infra/modules/vpc init -backend=false -plugin-dir=../../.terraform/providers",
+    "tf:test": "terraform -chdir=infra/modules/vpc test"
   },
   "dependencies": {
     "@hono/otel": "1.1.2",
