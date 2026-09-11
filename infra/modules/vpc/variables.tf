@@ -130,3 +130,17 @@ variable "subnets" {
     error_message = "配置先AZは、対象リージョンで利用可能かつ除外対象ではないAZを指定してください。"
   }
 }
+
+variable "subnet_additional_tags" {
+  type        = map(string)
+  default     = {}
+  description = "サブネットに付与したい追加タグ (Name, Env, AvailabilityZone, Scopeは除く)"
+
+  validation {
+    condition = length(setintersection(
+      keys(var.subnet_additional_tags),
+      ["Name", "Env", "AvailabilityZone", "Scope"]
+    )) == 0
+    error_message = "キーのName、Env、AvailabilityZone、Scopeは予約済みのため指定できません。"
+  }
+}
