@@ -462,6 +462,25 @@ bun run tf:lint:init
 
 Terraform stateは、`ap-northeast-1`のS3バケット`terraform-state-hono-app`へ保存し、S3 lockfileによるstate lockingを有効にしています。環境ごとのstateはTerraform workspaceで分離し、現時点では`dev` workspaceを使用します。`tf:plan` / `tf:apply`は選択中のworkspaceを対象とし、特定のtfvarsファイルを自動では読み込みません。`infra/env/*.tfvars`は将来の環境別入力値の仮置きであり、利用する場合は`-var-file=env/<workspace>.tfvars`を明示的に指定してください。
 
+サブネットは必須変数 `subnets` でCIDRと配置先AZを明示します。以下はtfvarsファイルの入力例です。AZは対象アカウントで利用可能な名前に合わせてください。public/privateはそれぞれ2個以上かつ同数とし、各種別を2つ以上のAZに分散します。
+
+```hcl
+subnets = {
+  public = [
+    { cidr_block = "10.0.0.0/24", availability_zone = "ap-northeast-1a" },
+    { cidr_block = "10.0.1.0/24", availability_zone = "ap-northeast-1c" },
+  ]
+  private = [
+    { cidr_block = "10.0.2.0/24", availability_zone = "ap-northeast-1a" },
+    { cidr_block = "10.0.3.0/24", availability_zone = "ap-northeast-1c" },
+  ]
+}
+```
+
+既存サブネットがある場合は現在のCIDRとAZの組み合わせを引き継いでください。リソースのキーはCIDRのまま維持するため、リストの並べ替えや利用可能なAZの追加で配置先は変わりません。指定したAZが利用できない場合や、除外対象の `ap-northeast-1b` を除いた利用可能AZが2つ未満の場合は処理を停止します。CIDRや指定AZを変更するとサブネットの再作成が発生します。
+
+現時点ではサブネットの作成とタグ付けまでを定義しています。public側をインターネットへ接続するには、Internet Gatewayとルートテーブルの設定を追加してください。
+
 ローカルではAWS CLIのprofileで対象AWSアカウントを確認してから`tf:init`を実行し、`bun run tf:workspace:dev`で`dev` workspaceを選択してから`tf:plan` / `tf:apply`を実行してください。`bun run tf:init`はS3 backendへ接続するため、AWS認証情報が未設定の状態では失敗します。CIの静的検証では`TF_WORKSPACE=dev`と`bun run tf:init:no-backend`を使用し、remote backendへ接続しません。stg / prod環境を追加する場合は、対応するworkspaceを作成してstateを分離してください。
 
 remote backendのS3バケットは、このTerraform構成の管理対象外です。backendの初期化より前に、AWS CLIまたはAWS Management Consoleで次の設定を満たすバケットを用意してください。
