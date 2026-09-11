@@ -41,10 +41,10 @@ run "valid_two_each" {
 
   assert {
     condition = (
-      aws_subnet.public_subnets["10.0.1.0/24"].tags["Name"] == "subnet-validation-test-dev-ap-northeast-1c-public-subnet" &&
+      aws_subnet.public_subnets["10.0.1.0/24"].tags["Name"] == "subnet-validation-test-dev-ap-northeast-1c-10.0.1.0-24-public-subnet" &&
       aws_subnet.public_subnets["10.0.1.0/24"].tags["AvailabilityZone"] == "ap-northeast-1c" &&
       aws_subnet.public_subnets["10.0.1.0/24"].tags["Scope"] == "public" &&
-      aws_subnet.private_subnets["10.0.3.0/24"].tags["Name"] == "subnet-validation-test-dev-ap-northeast-1c-private-subnet" &&
+      aws_subnet.private_subnets["10.0.3.0/24"].tags["Name"] == "subnet-validation-test-dev-ap-northeast-1c-10.0.3.0-24-private-subnet" &&
       aws_subnet.private_subnets["10.0.3.0/24"].tags["AvailabilityZone"] == "ap-northeast-1c" &&
       aws_subnet.private_subnets["10.0.3.0/24"].tags["Scope"] == "private"
     )
@@ -68,6 +68,14 @@ run "valid_three_each" {
         { cidr_block = "10.0.5.0/24", availability_zone = "ap-northeast-1a" },
       ]
     }
+  }
+
+  assert {
+    condition = (
+      length(distinct([for subnet in aws_subnet.public_subnets : subnet.tags["Name"]])) == length(aws_subnet.public_subnets) &&
+      length(distinct([for subnet in aws_subnet.private_subnets : subnet.tags["Name"]])) == length(aws_subnet.private_subnets)
+    )
+    error_message = "同一scope・同一AZに複数のサブネットを配置してもNameタグは一意である必要があります。"
   }
 }
 
