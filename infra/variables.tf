@@ -15,7 +15,7 @@ variable "subnets" {
 
 variable "excluded_availability_zones" {
   type        = list(string)
-  default     = ["ap-northeast-1b"]
+  default     = []
   nullable    = false
   description = "サブネットの配置先から除外するAZ名"
 }
