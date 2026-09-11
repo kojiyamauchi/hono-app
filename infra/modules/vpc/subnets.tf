@@ -8,7 +8,7 @@ resource "aws_subnet" "public_subnets" {
 
   tags = merge(var.subnet_additional_tags,
     {
-      Name             = "${var.service_name}-${var.env}-${each.value.availability_zone}-public-subnet"
+      Name             = "${var.service_name}-${var.env}-${each.value.availability_zone}-${replace(each.key, "/", "-")}-public-subnet"
       Env              = var.env
       Scope            = "public"
       AvailabilityZone = each.value.availability_zone
@@ -24,7 +24,7 @@ resource "aws_subnet" "private_subnets" {
 
   tags = merge(var.subnet_additional_tags,
     {
-      Name             = "${var.service_name}-${var.env}-${each.value.availability_zone}-private-subnet"
+      Name             = "${var.service_name}-${var.env}-${each.value.availability_zone}-${replace(each.key, "/", "-")}-private-subnet"
       Env              = var.env
       Scope            = "private"
       AvailabilityZone = each.value.availability_zone
