@@ -7,6 +7,7 @@ src/generated/
 
 # Terraformのローカル生成物
 **/.terraform/
+infra/modules/**/.terraform.lock.hcl
 *.tfstate
 *.tfstate.*
 *.tfplan

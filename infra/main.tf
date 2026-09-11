@@ -24,9 +24,11 @@ provider "aws" {
 module "vpc" {
   source = "./modules/vpc"
 
-  service_name   = "hono-app"
-  env            = terraform.workspace
-  vpc_cidr_block = "10.0.0.0/16"
+  service_name                = "hono-app"
+  env                         = terraform.workspace
+  vpc_cidr_block              = "10.0.0.0/16"
+  subnets                     = var.subnets
+  excluded_availability_zones = var.excluded_availability_zones
   vpc_additional_tags = {
     Usage = "hono web server"
   }
