@@ -29,6 +29,27 @@ run "valid_two_each" {
     }
   }
 
+  assert {
+    condition = (
+      aws_subnet.public_subnets["10.0.0.0/24"].availability_zone == "ap-northeast-1a" &&
+      aws_subnet.public_subnets["10.0.1.0/24"].availability_zone == "ap-northeast-1c" &&
+      aws_subnet.private_subnets["10.0.2.0/24"].availability_zone == "ap-northeast-1a" &&
+      aws_subnet.private_subnets["10.0.3.0/24"].availability_zone == "ap-northeast-1c"
+    )
+    error_message = "public/privateサブネットはそれぞれ2つのAZに配置される必要があります。"
+  }
+
+  assert {
+    condition = (
+      aws_subnet.public_subnets["10.0.1.0/24"].tags["Name"] == "subnet-validation-test-dev-ap-northeast-1c-public-subnet" &&
+      aws_subnet.public_subnets["10.0.1.0/24"].tags["AvailabilityZone"] == "ap-northeast-1c" &&
+      aws_subnet.public_subnets["10.0.1.0/24"].tags["Scope"] == "public" &&
+      aws_subnet.private_subnets["10.0.3.0/24"].tags["Name"] == "subnet-validation-test-dev-ap-northeast-1c-private-subnet" &&
+      aws_subnet.private_subnets["10.0.3.0/24"].tags["AvailabilityZone"] == "ap-northeast-1c" &&
+      aws_subnet.private_subnets["10.0.3.0/24"].tags["Scope"] == "private"
+    )
+    error_message = "サブネットのタグは配置先AZとpublic/privateの種別に一致する必要があります。"
+  }
 }
 
 run "valid_three_each" {
