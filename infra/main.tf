@@ -27,6 +27,7 @@ module "vpc" {
   service_name   = "hono-app"
   env            = terraform.workspace
   vpc_cidr_block = "10.0.0.0/16"
+  subnets        = var.subnets
   vpc_additional_tags = {
     Usage = "hono web server"
   }
