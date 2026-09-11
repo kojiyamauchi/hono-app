@@ -1,7 +1,7 @@
 data "aws_availability_zones" "availability_zone" {
   state = "available"
 
-  exclude_names = ["ap-northeast-1b"]
+  exclude_names = var.excluded_availability_zones
 
   lifecycle {
     postcondition {

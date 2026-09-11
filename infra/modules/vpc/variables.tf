@@ -44,6 +44,21 @@ variable "vpc_additional_tags" {
   }
 }
 
+variable "excluded_availability_zones" {
+  type        = list(string)
+  default     = []
+  nullable    = false
+  description = "サブネットの配置先から除外するAZ名"
+
+  validation {
+    condition = try(alltrue([
+      for availability_zone in var.excluded_availability_zones :
+      length(trimspace(availability_zone)) > 0 && availability_zone == trimspace(availability_zone)
+    ]), false)
+    error_message = "除外するAZは空文字・null・前後の空白を含まない名前で指定してください。"
+  }
+}
+
 variable "subnets" {
   description = "public/privateサブネットのCIDRと配置先AZ。それぞれ2個以上かつ同数で指定し、各種別を2つ以上のAZへ分散する"
   nullable    = false
