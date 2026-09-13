@@ -40,6 +40,7 @@ run "one_nat_gateway_per_az" {
     condition = (
       aws_eip.eips["ap-northeast-1a"].domain == "vpc" &&
       aws_eip.eips["ap-northeast-1a"].tags["Name"] == "nat-gateway-test-dev-ap-northeast-1a-eip" &&
+      aws_eip.eips["ap-northeast-1a"].tags["Env"] == "dev" &&
       aws_eip.eips["ap-northeast-1a"].tags["AvailabilityZone"] == "ap-northeast-1a" &&
       aws_eip.eips["ap-northeast-1a"].tags["Usage"] == "NAT"
     )
@@ -49,6 +50,7 @@ run "one_nat_gateway_per_az" {
   assert {
     condition = (
       aws_nat_gateway.nat_gateways["ap-northeast-1d"].tags["Name"] == "nat-gateway-test-dev-ap-northeast-1d-nat-gateway" &&
+      aws_nat_gateway.nat_gateways["ap-northeast-1d"].tags["Env"] == "dev" &&
       aws_nat_gateway.nat_gateways["ap-northeast-1d"].tags["AvailabilityZone"] == "ap-northeast-1d"
     )
     error_message = "NAT Gatewayは配置先AZに対応するタグを持つ必要があります。"
