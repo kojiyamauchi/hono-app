@@ -60,7 +60,7 @@ variable "excluded_availability_zones" {
 }
 
 variable "subnets" {
-  description = "public/privateサブネットのCIDRと配置先AZ。それぞれ2個以上かつ同数で指定し、各種別を2つ以上のAZへ分散する"
+  description = "public/privateサブネットのCIDRと配置先AZ。それぞれ2個以上かつ同数で指定し、同じ2つ以上のAZへ分散する"
   nullable    = false
   type = object({
     public = list(object({
@@ -138,6 +138,15 @@ variable "subnets" {
   }
 
   validation {
+    condition = try(
+      toset([for subnet in var.subnets.public : subnet.availability_zone]) ==
+      toset([for subnet in var.subnets.private : subnet.availability_zone]),
+      false
+    )
+    error_message = "public/privateサブネットは同じAZの組み合わせへ配置してください。"
+  }
+
+  validation {
     condition = try(alltrue([
       for subnet in concat(var.subnets.public, var.subnets.private) :
       contains(data.aws_availability_zones.availability_zone.names, subnet.availability_zone)
@@ -157,5 +166,16 @@ variable "subnet_additional_tags" {
       ["Name", "Env", "AvailabilityZone", "Scope"]
     )) == 0
     error_message = "キーのName、Env、AvailabilityZone、Scopeは予約済みのため指定できません。"
+  }
+}
+
+variable "igw_additional_tags" {
+  type        = map(string)
+  default     = {}
+  description = "インターネットゲートウェイに付与したい追加タグ (Name, Env, VpcIdは除く)"
+
+  validation {
+    condition     = length(setintersection(keys(var.igw_additional_tags), ["Name", "Env", "VpcId"])) == 0
+    error_message = "キーのName、Env、VpcIdは予約済みのため指定できません。"
   }
 }

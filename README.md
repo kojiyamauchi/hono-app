@@ -462,7 +462,7 @@ bun run tf:lint:init
 
 Terraform stateは、`ap-northeast-1`のS3バケット`terraform-state-hono-app`へ保存し、S3 lockfileによるstate lockingを有効にしています。環境ごとのstateはTerraform workspaceで分離し、現時点では`dev` workspaceを使用します。`tf:plan` / `tf:apply`は選択中のworkspaceを対象とし、特定のtfvarsファイルを自動では読み込みません。`infra/env/*.tfvars`は将来の環境別入力値の仮置きであり、利用する場合は`-var-file=env/<workspace>.tfvars`を明示的に指定してください。
 
-サブネットは必須変数 `subnets` でCIDRと配置先AZを明示します。以下はtfvarsファイルの入力例です。AZは対象アカウントで利用可能な名前に合わせてください。public/privateはそれぞれ2個以上かつ同数とし、各種別を2つ以上のAZに分散します。
+サブネットは必須変数 `subnets` でCIDRと配置先AZを明示します。以下は最小構成となる2AZのtfvarsファイル入力例です。AZは対象アカウントで利用可能な名前に合わせてください。public/privateはそれぞれ2個以上かつ同数とし、同じ2つ以上のAZの組み合わせへ分散します。
 
 ```hcl
 subnets = {
@@ -485,7 +485,7 @@ dev環境のplanでは、必須のサブネット入力を含むtfvarsファイ�
 terraform -chdir=infra plan -var-file=env/dev.tfvars
 ```
 
-現時点ではサブネットの作成とタグ付けまでを定義しています。public側をインターネットへ接続するには、Internet Gatewayとルートテーブルの設定を追加してください。
+現時点ではサブネット、Internet Gateway、AZごとのNAT GatewayとEIPまでを定義しています。実際にインターネットへ接続するには、ルートテーブルの設定を追加してください。
 
 VPCモジュールのTerraformテストは、`bun run tf:test:init`でテスト用のproviderを初期化してから`bun run tf:test`で実行します。テストはAWSをモックするためAWS認証情報は不要ですが、`tf:test:init`はルートの`infra/.terraform/providers`をproviderの取得元に使うため、先に`bun run tf:init`または`bun run tf:init:no-backend`を実行しておく必要があります。`tf:test`はCIの`Terraform Checks`でも実行します。
 
