@@ -159,3 +159,14 @@ variable "subnet_additional_tags" {
     error_message = "キーのName、Env、AvailabilityZone、Scopeは予約済みのため指定できません。"
   }
 }
+
+variable "igw_additional_tags" {
+  type        = map(string)
+  default     = {}
+  description = "インターネットゲートウェイに付与したい追加タグ (Name, Env, VpcIdは除く)"
+
+  validation {
+    condition     = length(setintersection(keys(var.igw_additional_tags), ["Name", "Env", "VpcId"])) == 0
+    error_message = "キーのName、Env、VpcIdは予約済みのため指定できません。"
+  }
+}
