@@ -21,6 +21,7 @@ resource "aws_eip" "eips" {
 
   tags = {
     Name             = "${var.service_name}-${var.env}-${each.key}-eip"
+    Env              = var.env
     AvailabilityZone = each.key
     Usage            = "NAT"
   }
@@ -35,6 +36,7 @@ resource "aws_nat_gateway" "nat_gateways" {
 
   tags = {
     Name             = "${var.service_name}-${var.env}-${each.key}-nat-gateway"
+    Env              = var.env
     AvailabilityZone = each.key
   }
 }
