@@ -57,6 +57,18 @@ run "one_nat_gateway_per_az" {
   }
 }
 
+run "nat_gateway_uses_selected_public_subnet" {
+  command = apply
+
+  assert {
+    condition = alltrue([
+      for availability_zone, cidr_block in local.nat_gateway_subnet_cidr_by_az :
+      aws_nat_gateway.nat_gateways[availability_zone].subnet_id == aws_subnet.public_subnets[cidr_block].id
+    ])
+    error_message = "NAT Gatewayは各AZで選択したpublic subnetへ配置する必要があります。"
+  }
+}
+
 run "multiple_public_subnets_in_same_az" {
   command = plan
 
