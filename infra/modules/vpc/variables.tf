@@ -60,7 +60,7 @@ variable "excluded_availability_zones" {
 }
 
 variable "subnets" {
-  description = "public/privateサブネットのCIDRと配置先AZ。それぞれ2個以上かつ同数で指定し、各種別を2つ以上のAZへ分散する"
+  description = "public/privateサブネットのCIDRと配置先AZ。それぞれ2個以上かつ同数で指定し、同じ2つ以上のAZへ分散する"
   nullable    = false
   type = object({
     public = list(object({
@@ -135,6 +135,15 @@ variable "subnets" {
       length(distinct([for subnet in subnets : subnet.availability_zone])) >= 2
     ]), false)
     error_message = "public/privateサブネットは、それぞれ2つ以上の異なるAZへ配置してください。"
+  }
+
+  validation {
+    condition = try(
+      toset([for subnet in var.subnets.public : subnet.availability_zone]) ==
+      toset([for subnet in var.subnets.private : subnet.availability_zone]),
+      false
+    )
+    error_message = "public/privateサブネットは同じAZの組み合わせへ配置してください。"
   }
 
   validation {

@@ -1,5 +1,5 @@
 variable "subnets" {
-  description = "VPC内に作成するpublic/privateサブネットのCIDRと配置先AZ"
+  description = "VPC内の同じAZ集合に作成するpublic/privateサブネットのCIDRと配置先AZ"
   nullable    = false
   type = object({
     public = list(object({
