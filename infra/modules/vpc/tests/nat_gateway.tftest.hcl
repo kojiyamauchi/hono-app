@@ -81,6 +81,6 @@ run "multiple_public_subnets_in_same_az" {
       local.nat_gateway_subnet_cidr_by_az["ap-northeast-1a"] == "10.0.0.0/24" &&
       local.nat_gateway_subnet_cidr_by_az["ap-northeast-1c"] == "10.0.1.0/24"
     )
-    error_message = "NAT GatewayはAZごとに1つ作成し、CIDR順で先頭のpublic subnetへ配置する必要があります。"
+    error_message = "NAT GatewayはAZごとに1つ作成し、CIDRの辞書順で先頭のpublic subnetへ配置する必要があります。"
   }
 }
