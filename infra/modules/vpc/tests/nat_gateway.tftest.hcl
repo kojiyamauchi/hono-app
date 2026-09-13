@@ -2,7 +2,7 @@
 mock_provider "aws" {
   mock_data "aws_availability_zones" {
     defaults = {
-      names = ["ap-northeast-1a", "ap-northeast-1c"]
+      names = ["ap-northeast-1a", "ap-northeast-1c", "ap-northeast-1d"]
     }
   }
 }
@@ -14,10 +14,12 @@ variables {
     public = [
       { cidr_block = "10.0.0.0/24", availability_zone = "ap-northeast-1a" },
       { cidr_block = "10.0.1.0/24", availability_zone = "ap-northeast-1c" },
+      { cidr_block = "10.0.4.0/24", availability_zone = "ap-northeast-1d" },
     ]
     private = [
       { cidr_block = "10.0.2.0/24", availability_zone = "ap-northeast-1a" },
       { cidr_block = "10.0.3.0/24", availability_zone = "ap-northeast-1c" },
+      { cidr_block = "10.0.5.0/24", availability_zone = "ap-northeast-1d" },
     ]
   }
 }
@@ -27,8 +29,9 @@ run "one_nat_gateway_per_az" {
 
   assert {
     condition = (
-      length(aws_eip.eips) == 2 &&
-      length(aws_nat_gateway.nat_gateways) == 2
+      length(aws_eip.eips) == 3 &&
+      length(aws_nat_gateway.nat_gateways) == 3 &&
+      local.nat_gateway_subnet_cidr_by_az["ap-northeast-1d"] == "10.0.4.0/24"
     )
     error_message = "EIPとNAT GatewayはAZごとに1つ作成する必要があります。"
   }
@@ -45,8 +48,8 @@ run "one_nat_gateway_per_az" {
 
   assert {
     condition = (
-      aws_nat_gateway.nat_gateways["ap-northeast-1c"].tags["Name"] == "nat-gateway-test-dev-ap-northeast-1c-nat-gateway" &&
-      aws_nat_gateway.nat_gateways["ap-northeast-1c"].tags["AvailabilityZone"] == "ap-northeast-1c"
+      aws_nat_gateway.nat_gateways["ap-northeast-1d"].tags["Name"] == "nat-gateway-test-dev-ap-northeast-1d-nat-gateway" &&
+      aws_nat_gateway.nat_gateways["ap-northeast-1d"].tags["AvailabilityZone"] == "ap-northeast-1d"
     )
     error_message = "NAT Gatewayは配置先AZに対応するタグを持つ必要があります。"
   }
