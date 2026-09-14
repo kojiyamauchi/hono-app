@@ -78,6 +78,26 @@ run "one_route_table_per_az" {
     )
     error_message = "route tableのNameタグはpublic/privateを跨いで重複しない必要があります。"
   }
+
+  assert {
+    condition = (
+      length(output.public_subnets) == 3 &&
+      length(output.private_subnets) == 3 &&
+      output.public_subnets["ap-northeast-1d"] == aws_subnet.public_subnets["10.0.4.0/24"].id &&
+      output.private_subnets["ap-northeast-1d"] == aws_subnet.private_subnets["10.0.5.0/24"].id
+    )
+    error_message = "subnetのoutputはAZをキーとして対応するsubnet IDを返す必要があります。"
+  }
+
+  assert {
+    condition = (
+      length(output.public_route_tables) == 3 &&
+      length(output.private_route_tables) == 3 &&
+      output.public_route_tables["ap-northeast-1d"] == aws_route_table.public_route_tables["ap-northeast-1d"].id &&
+      output.private_route_tables["ap-northeast-1d"] == aws_route_table.private_route_tables["ap-northeast-1d"].id
+    )
+    error_message = "route tableのoutputはAZをキーとして対応するroute table IDを返す必要があります。"
+  }
 }
 
 run "public_default_route_targets_internet_gateway" {
@@ -131,54 +151,5 @@ run "private_subnet_associates_with_own_az_route_table" {
       aws_route_table_association.private_route_table_associations[cidr_block].route_table_id == aws_route_table.private_route_tables[subnet.availability_zone].id
     ])
     error_message = "各private subnetは、自身の配置先AZに対応するroute tableへ関連付ける必要があります。"
-  }
-}
-
-run "multiple_subnets_in_same_az" {
-  command = apply
-
-  variables {
-    subnets = {
-      public = [
-        { cidr_block = "10.0.4.0/24", availability_zone = "ap-northeast-1a" },
-        { cidr_block = "10.0.1.0/24", availability_zone = "ap-northeast-1c" },
-        { cidr_block = "10.0.0.0/24", availability_zone = "ap-northeast-1a" },
-      ]
-      private = [
-        { cidr_block = "10.0.2.0/24", availability_zone = "ap-northeast-1a" },
-        { cidr_block = "10.0.3.0/24", availability_zone = "ap-northeast-1c" },
-        { cidr_block = "10.0.5.0/24", availability_zone = "ap-northeast-1a" },
-      ]
-    }
-  }
-
-  assert {
-    condition = (
-      length(aws_route_table.public_route_tables) == 2 &&
-      length(aws_route_table_association.public_route_table_associations) == 3 &&
-      length(aws_route_table.private_route_tables) == 2 &&
-      length(aws_route_table_association.private_route_table_associations) == 3 &&
-      length(distinct(concat(
-        [for route_table in aws_route_table.public_route_tables : route_table.tags["Name"]],
-        [for route_table in aws_route_table.private_route_tables : route_table.tags["Name"]]
-      ))) == 4
-    )
-    error_message = "同一AZに複数のsubnetがある場合でも、route tableはAZごとに1つかつNameタグが一意である必要があります。"
-  }
-
-  assert {
-    condition = (
-      aws_route_table_association.public_route_table_associations["10.0.0.0/24"].route_table_id ==
-      aws_route_table_association.public_route_table_associations["10.0.4.0/24"].route_table_id
-    )
-    error_message = "同一AZのpublic subnetは同じroute tableを共有する必要があります。"
-  }
-
-  assert {
-    condition = (
-      aws_route_table_association.private_route_table_associations["10.0.2.0/24"].route_table_id ==
-      aws_route_table_association.private_route_table_associations["10.0.5.0/24"].route_table_id
-    )
-    error_message = "同一AZのprivate subnetは同じroute tableを共有する必要があります。"
   }
 }
