@@ -485,7 +485,7 @@ dev環境のplanでは、必須のサブネット入力を含むtfvarsファイ�
 terraform -chdir=infra plan -var-file=env/dev.tfvars
 ```
 
-現時点ではサブネット、Internet Gateway、AZごとのNAT GatewayとEIPまでを定義しています。実際にインターネットへ接続するには、ルートテーブルの設定を追加してください。
+現時点ではサブネット、Internet Gateway、AZごとのNAT GatewayとEIP、public/private subnetのルートテーブルまでを定義しています。ルートテーブルはpublic/privateそれぞれAZごとに1つ作成し、各サブネットを自身のAZに対応するルートテーブルへ関連付けます。publicのデフォルトルートはInternet Gatewayへ、privateのデフォルトルートは自身のAZのNAT Gatewayへ向けています。privateを自身のAZのNAT Gatewayへ向けることで、あるAZの障害を他のAZへ波及させず、クロスAZのデータ転送料も避けています。
 
 VPCモジュールのTerraformテストは、`bun run tf:test:init`でテスト用のproviderを初期化してから`bun run tf:test`で実行します。テストはAWSをモックするためAWS認証情報は不要ですが、`tf:test:init`はルートの`infra/.terraform/providers`をproviderの取得元に使うため、先に`bun run tf:init`または`bun run tf:init:no-backend`を実行しておく必要があります。`tf:test`はCIの`Terraform Checks`でも実行します。
 
