@@ -4,7 +4,7 @@ locals {
   private_availability_zones = toset([for subnet in var.subnets.private : subnet.availability_zone])
 }
 
-# route tableはAZ単位で1つ作り、同一AZに複数のpublic subnetがあっても重複させない。
+# public subnetを配置するAZごとにroute tableを1つ作成する。
 # privateがAZごとのNAT Gatewayへ向く構成と対称に保つため、publicもAZ単位へ揃える。
 resource "aws_route_table" "public_route_tables" {
   for_each = local.public_availability_zones
@@ -33,7 +33,7 @@ resource "aws_route_table_association" "public_route_table_associations" {
   subnet_id      = each.value.id
 }
 
-# private側もAZ単位で1つ作り、同一AZに複数のprivate subnetがあっても重複させない。
+# private subnetを配置するAZごとにroute tableを1つ作成する。
 resource "aws_route_table" "private_route_tables" {
   for_each = local.private_availability_zones
   vpc_id   = aws_vpc.vpc.id
