@@ -3,7 +3,7 @@
 mock_provider "aws" {
   mock_data "aws_availability_zones" {
     defaults = {
-      names = ["ap-northeast-1a", "ap-northeast-1c"]
+      names = ["ap-northeast-1a", "ap-northeast-1c", "ap-northeast-1d"]
     }
   }
 }
@@ -60,12 +60,12 @@ run "valid_three_each" {
       public = [
         { cidr_block = "10.0.0.0/24", availability_zone = "ap-northeast-1a" },
         { cidr_block = "10.0.1.0/24", availability_zone = "ap-northeast-1c" },
-        { cidr_block = "10.0.4.0/24", availability_zone = "ap-northeast-1a" },
+        { cidr_block = "10.0.4.0/24", availability_zone = "ap-northeast-1d" },
       ]
       private = [
         { cidr_block = "10.0.2.0/24", availability_zone = "ap-northeast-1a" },
         { cidr_block = "10.0.3.0/24", availability_zone = "ap-northeast-1c" },
-        { cidr_block = "10.0.5.0/24", availability_zone = "ap-northeast-1a" },
+        { cidr_block = "10.0.5.0/24", availability_zone = "ap-northeast-1d" },
       ]
     }
   }
@@ -75,7 +75,7 @@ run "valid_three_each" {
       length(distinct([for subnet in aws_subnet.public_subnets : subnet.tags["Name"]])) == length(aws_subnet.public_subnets) &&
       length(distinct([for subnet in aws_subnet.private_subnets : subnet.tags["Name"]])) == length(aws_subnet.private_subnets)
     )
-    error_message = "同一scope・同一AZに複数のサブネットを配置してもNameタグは一意である必要があります。"
+    error_message = "各scopeのサブネットのNameタグは一意である必要があります。"
   }
 }
 

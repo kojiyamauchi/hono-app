@@ -164,6 +164,27 @@ run "single_zone_private" {
   expect_failures = [var.subnets]
 }
 
+run "duplicate_zone_with_multiple_zones" {
+  command = plan
+
+  variables {
+    subnets = {
+      public = [
+        { cidr_block = "10.0.0.0/24", availability_zone = "ap-northeast-1a" },
+        { cidr_block = "10.0.1.0/24", availability_zone = "ap-northeast-1c" },
+        { cidr_block = "10.0.4.0/24", availability_zone = "ap-northeast-1a" },
+      ]
+      private = [
+        { cidr_block = "10.0.2.0/24", availability_zone = "ap-northeast-1a" },
+        { cidr_block = "10.0.3.0/24", availability_zone = "ap-northeast-1c" },
+        { cidr_block = "10.0.5.0/24", availability_zone = "ap-northeast-1a" },
+      ]
+    }
+  }
+
+  expect_failures = [var.subnets]
+}
+
 run "different_public_private_zones" {
   command = plan
 
