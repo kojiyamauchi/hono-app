@@ -1,19 +1,12 @@
-# public subnetをAZ単位へまとめ、AZごとに1つのNAT Gatewayを決定的に配置する。
-# 同一AZに複数のpublic subnetがある場合は、入力順に依存しないようCIDRの辞書順で先頭を選ぶ。
-# 辞書順で先頭になるCIDRを後から追加すると配置先変更でNAT Gatewayが置換されるため、変更前にplanを確認する。
+# AZごとに一意なpublic subnetへNAT Gatewayを1つ配置する。
 locals {
-  public_subnet_cidrs_by_az = {
+  public_subnet_cidr_by_az = {
     for subnet in var.subnets.public :
-    subnet.availability_zone => subnet.cidr_block...
-  }
-
-  nat_gateway_subnet_cidr_by_az = {
-    for availability_zone, cidr_blocks in local.public_subnet_cidrs_by_az :
-    availability_zone => sort(cidr_blocks)[0]
+    subnet.availability_zone => subnet.cidr_block
   }
 
   nat_gateway_subnet_id_by_az = {
-    for availability_zone, cidr_block in local.nat_gateway_subnet_cidr_by_az :
+    for availability_zone, cidr_block in local.public_subnet_cidr_by_az :
     availability_zone => aws_subnet.public_subnets[cidr_block].id
   }
 }
