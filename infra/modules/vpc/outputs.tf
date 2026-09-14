@@ -19,11 +19,11 @@ output "private_subnets" {
 }
 
 output "public_route_tables" {
-  value       = { for route_table in aws_route_table.public_route_tables : route_table.tags["AvailabilityZone"] => route_table.id }
+  value       = { for availability_zone, route_table in aws_route_table.public_route_tables : availability_zone => route_table.id }
   description = "パブリックサブネットのアベイラビリティゾーンに紐づくルートテーブルID"
 }
 
 output "private_route_tables" {
-  value       = { for route_table in aws_route_table.private_route_tables : route_table.tags["AvailabilityZone"] => route_table.id }
+  value       = { for availability_zone, route_table in aws_route_table.private_route_tables : availability_zone => route_table.id }
   description = "プライベートサブネットのアベイラビリティゾーンに紐づくルートテーブルID"
 }
