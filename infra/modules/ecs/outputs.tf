@@ -7,4 +7,3 @@ output "cluster_arn" {
   value       = aws_ecs_cluster.cluster.arn
   description = "作成したクラスターのARN"
 }
-
