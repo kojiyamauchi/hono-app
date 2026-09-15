@@ -100,10 +100,10 @@ jobs:
       - name: Validate Terraform
         run: bun run tf:validate
 
-      - name: Initialize VPC Module Tests
+      - name: Initialize Terraform Module Tests
         run: bun run tf:test:init
 
-      - name: Test VPC Module
+      - name: Test Terraform Modules
         run: bun run tf:test
 
   build:
