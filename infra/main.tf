@@ -1,3 +1,7 @@
+locals {
+  service_name = "hono-app"
+}
+
 terraform {
   required_version = "~> 1.15"
 
@@ -24,7 +28,7 @@ provider "aws" {
 module "vpc" {
   source = "./modules/vpc"
 
-  service_name                = "hono-app"
+  service_name                = local.service_name
   env                         = terraform.workspace
   vpc_cidr_block              = "10.0.0.0/16"
   subnets                     = var.subnets
@@ -36,6 +40,6 @@ module "vpc" {
 
 module "ecs_cluster" {
   source       = "./modules/ecs"
-  service_name = "hono-app"
+  service_name = local.service_name
   env          = terraform.workspace
 }
