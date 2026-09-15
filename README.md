@@ -488,7 +488,7 @@ terraform -chdir=infra plan -var-file=env/dev.tfvars
 
 現時点ではサブネット、Internet Gateway、AZごとのNAT GatewayとEIP、public/private subnetのルートテーブルまでを定義しています。ルートテーブルはpublic/privateそれぞれAZごとに1つ作成し、各サブネットを自身のAZに対応するルートテーブルへ関連付けます。publicのデフォルトルートはInternet Gatewayへ、privateのデフォルトルートは自身のAZのNAT Gatewayへ向けています。privateを自身のAZのNAT Gatewayへ向けることで、あるAZの障害を他のAZへ波及させず、クロスAZのデータ転送料も避けています。
 
-ECSモジュールは、Fargateでコンテナを動かすためのECSクラスターを定義しています。クラスター名は`<service_name>-<env>-cluster`の形式で、Container Insightsを有効化し、capacity providerは`FARGATE`のみを登録してデフォルト戦略にも設定しています。クラスターには`ServiceName`と`Env`のタグを必ず付与し、`cluster_additional_tags`で追加のタグを指定できます。`ServiceName`と`Env`は予約済みキーのため、`cluster_additional_tags`へ指定すると検証エラーになります。root moduleは、作成したクラスターの名前とARNを`ecs_cluster_name` / `ecs_cluster_arn`として出力します。現時点ではクラスターのみを定義しており、タスク定義・サービス・ロードバランサーは未定義です。
+ECSモジュールは、Fargateでコンテナを動かすためのECSクラスターを定義しています。クラスター名は`<service_name>-<env>-cluster`の形式で、Container Insightsを有効化し、capacity providerは`FARGATE`のみを登録してデフォルト戦略にも設定しています。Container Insightsはdevを含む全workspaceで有効になり、CloudWatchの利用量に応じた料金が発生し得ます。クラスターには`ServiceName`と`Env`のタグを必ず付与し、`cluster_additional_tags`で追加のタグを指定できます。`ServiceName`と`Env`は予約済みキーのため、`cluster_additional_tags`へ指定すると検証エラーになります。root moduleは、作成したクラスターの名前とARNを`ecs_cluster_name` / `ecs_cluster_arn`として出力します。現時点ではクラスターのみを定義しており、タスク定義・サービス・ロードバランサーは未定義です。
 
 VPC・ECSモジュールのTerraformテストは、`bun run tf:test:init`でテスト用のproviderを初期化してから`bun run tf:test`で実行します。テストはAWSをモックするためAWS認証情報は不要ですが、`tf:test:init`はルートの`infra/.terraform/providers`をproviderの取得元に使うため、先に`bun run tf:init`または`bun run tf:init:no-backend`を実行しておく必要があります。`tf:test`はCIの`Terraform Checks`でも実行します。
 
@@ -552,8 +552,12 @@ bun run tf:fmt:check        # Terraform構成のフォーマットを検証
 bun run tf:lint:init        # TFLint pluginを初期化
 bun run tf:lint             # Terraform構成をTFLintで検査
 bun run tf:validate         # Terraform構成を検証
-bun run tf:test:init        # VPCモジュールのTerraformテスト用にproviderを初期化
-bun run tf:test             # VPCモジュールのTerraformテストを実行
+bun run tf:test:vpc:init    # VPCモジュールのTerraformテスト用にproviderを初期化
+bun run tf:test:ecs:init    # ECSモジュールのTerraformテスト用にproviderを初期化
+bun run tf:test:init        # 全Terraformモジュールのテスト用にproviderを初期化
+bun run tf:test:vpc         # VPCモジュールのTerraformテストを実行
+bun run tf:test:ecs         # ECSモジュールのTerraformテストを実行
+bun run tf:test             # 全TerraformモジュールのTerraformテストを実行
 ```
 
 ## Environment
