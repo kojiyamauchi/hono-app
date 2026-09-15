@@ -35,8 +35,12 @@
     "tf:lint:init": "tflint --chdir=infra --init",
     "tf:lint": "tflint --chdir=infra",
     "tf:validate": "terraform -chdir=infra validate",
-    "tf:test:init": "terraform -chdir=infra/modules/vpc init -backend=false -plugin-dir=../../.terraform/providers",
-    "tf:test": "terraform -chdir=infra/modules/vpc test"
+    "tf:test:vpc:init": "terraform -chdir=infra/modules/vpc init -backend=false -plugin-dir=../../.terraform/providers",
+    "tf:test:ecs:init": "terraform -chdir=infra/modules/ecs init -backend=false -plugin-dir=../../.terraform/providers",
+    "tf:test:init": "bun run tf:test:vpc:init && bun run tf:test:ecs:init",
+    "tf:test:vpc": "terraform -chdir=infra/modules/vpc test",
+    "tf:test:ecs": "terraform -chdir=infra/modules/ecs test",
+    "tf:test": "bun run tf:test:vpc && bun run tf:test:ecs"
   },
   "dependencies": {
     "@hono/otel": "1.1.2",
