@@ -33,3 +33,9 @@ module "vpc" {
     Usage = "hono web server"
   }
 }
+
+module "ecs_cluster" {
+  source       = "./modules/ecs"
+  service_name = "hono-app"
+  env          = terraform.workspace
+}
