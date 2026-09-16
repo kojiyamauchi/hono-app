@@ -29,6 +29,14 @@ variable "image_tag_mutability" {
   DESC
   type        = string
   default     = "MUTABLE"
+
+  validation {
+    condition = contains(
+      ["MUTABLE", "IMMUTABLE"],
+      var.image_tag_mutability
+    )
+    error_message = "タグの上書き可否はMUTABLEまたはIMMUTABLEを指定してください。"
+  }
 }
 
 variable "repository_lifecycle_policy" {
