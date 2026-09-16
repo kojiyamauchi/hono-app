@@ -98,3 +98,13 @@ run "file_lifecycle_policy" {
     error_message = "ファイルのポリシーはデフォルトと同じ条件でタグなしイメージを削除する必要があります。"
   }
 }
+
+run "invalid_image_tag_mutability" {
+  command = plan
+
+  variables {
+    image_tag_mutability = "Mutable"
+  }
+
+  expect_failures = [var.image_tag_mutability]
+}
