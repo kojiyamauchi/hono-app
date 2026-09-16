@@ -149,3 +149,22 @@ run "reserved_env" {
 
   expect_failures = [var.repository_additional_tags]
 }
+
+run "repository_outputs" {
+  command = apply
+
+  assert {
+    condition     = output.repository_name == aws_ecr_repository.repository.name
+    error_message = "リポジトリ名の出力は作成したリポジトリと一致する必要があります。"
+  }
+
+  assert {
+    condition     = output.repository_arn == aws_ecr_repository.repository.arn
+    error_message = "リポジトリARNの出力は作成したリポジトリと一致する必要があります。"
+  }
+
+  assert {
+    condition     = output.repository_url == aws_ecr_repository.repository.repository_url
+    error_message = "リポジトリURLの出力は作成したリポジトリと一致する必要があります。"
+  }
+}
