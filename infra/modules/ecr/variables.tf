@@ -21,6 +21,19 @@ variable "role" {
   description = "リポジトリに格納するイメージのサービス内でのロール"
 }
 
+variable "repository_additional_tags" {
+  type        = map(string)
+  description = "ECRリポジトリに付与したい追加タグ"
+  default     = {}
+
+  validation {
+    condition = (
+      length(setintersection(keys(var.repository_additional_tags), ["ServiceName", "Env"])) == 0
+    )
+    error_message = "キーのServiceNameおよびEnvは予約済みです。使用することはできません。"
+  }
+}
+
 variable "image_tag_mutability" {
   description = <<DESC
   タグの上書きを許容するか否かを指定します。
