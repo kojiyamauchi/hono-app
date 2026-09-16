@@ -33,9 +33,9 @@ variable "image_tag_mutability" {
 
 variable "repository_lifecycle_policy" {
   description = <<DESC
-  リポジトリのライフサイクルポリシーをJSON形式で指定します。デフォルト値を指定した場合は
-  タグのないイメージのうちプッシュから30日以上経過したイメージを削除します。具体的な記述内容はヒアドキュメントか
-  `lifecycle_policy/default_policy.json`を参照してください。
+  リポジトリのライフサイクルポリシーをJSON形式で指定します。デフォルトでは
+  タグのないイメージのうちプッシュから30日以上経過したイメージを削除します。
+  空文字を指定した場合はlifecycle_policy/default_policy.jsonを読み込みます。
   参考: https://docs.aws.amazon.com/jp_ja/AmazonECR/latest/userguide/LifecyclePolicy.html
   DESC
   type        = string
