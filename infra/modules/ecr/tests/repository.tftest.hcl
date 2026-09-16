@@ -25,6 +25,14 @@ run "default_repository" {
 
   assert {
     condition = (
+      aws_ecr_repository.repository.tags["ServiceName"] == "ecr-test" &&
+      aws_ecr_repository.repository.tags["Env"] == "dev"
+    )
+    error_message = "ECRリポジトリはサービス名と環境の標準タグを持つ必要があります。"
+  }
+
+  assert {
+    condition = (
       length(jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules) == 1 &&
       jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules[0].rulePriority == 1 &&
       jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules[0].selection.tagStatus == "untagged" &&
@@ -107,4 +115,37 @@ run "invalid_image_tag_mutability" {
   }
 
   expect_failures = [var.image_tag_mutability]
+}
+
+run "custom_tags" {
+  command = plan
+
+  variables {
+    repository_additional_tags = { Usage = "test" }
+  }
+
+  assert {
+    condition     = aws_ecr_repository.repository.tags["Usage"] == "test"
+    error_message = "ECRリポジトリへ任意の追加タグを設定できる必要があります。"
+  }
+}
+
+run "reserved_service_name" {
+  command = plan
+
+  variables {
+    repository_additional_tags = { ServiceName = "test" }
+  }
+
+  expect_failures = [var.repository_additional_tags]
+}
+
+run "reserved_env" {
+  command = plan
+
+  variables {
+    repository_additional_tags = { Env = "test" }
+  }
+
+  expect_failures = [var.repository_additional_tags]
 }
