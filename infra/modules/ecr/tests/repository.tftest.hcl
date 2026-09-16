@@ -26,6 +26,7 @@ run "default_repository" {
   assert {
     condition = (
       length(jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules) == 1 &&
+      jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules[0].rulePriority == 1 &&
       jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules[0].selection.tagStatus == "untagged" &&
       jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules[0].selection.countType == "sinceImagePushed" &&
       jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules[0].selection.countUnit == "days" &&
@@ -75,4 +76,25 @@ run "invalid_env" {
   }
 
   expect_failures = [var.env]
+}
+
+run "file_lifecycle_policy" {
+  command = plan
+
+  variables {
+    repository_lifecycle_policy = ""
+  }
+
+  assert {
+    condition = (
+      length(jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules) == 1 &&
+      jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules[0].rulePriority == 1 &&
+      jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules[0].selection.tagStatus == "untagged" &&
+      jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules[0].selection.countType == "sinceImagePushed" &&
+      jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules[0].selection.countUnit == "days" &&
+      jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules[0].selection.countNumber == 30 &&
+      jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules[0].action.type == "expire"
+    )
+    error_message = "ファイルのポリシーはデフォルトと同じ条件でタグなしイメージを削除する必要があります。"
+  }
 }
