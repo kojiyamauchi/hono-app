@@ -159,6 +159,7 @@ flowchart LR
 |   |-- .tflint.hcl                  # TFLint設定
 |   |-- env/                         # 将来の環境別Terraform変数値
 |   |-- modules/
+|   |   |-- ecr/                     # ECR module
 |   |   |-- ecs/                     # ECS module
 |   |   `-- vpc/                     # VPC module
 |   |-- main.tf                      # AWS providerとmodule設定
@@ -490,7 +491,9 @@ terraform -chdir=infra plan -var-file=env/dev.tfvars
 
 ECSモジュールは、Fargateでコンテナを動かすためのECSクラスターを定義しています。クラスター名は`<service_name>-<env>-cluster`の形式で、Container Insightsを有効化し、capacity providerは`FARGATE`のみを登録してデフォルト戦略にも設定しています。Container Insightsはdevを含む全workspaceで有効になり、CloudWatchの利用量に応じた料金が発生し得ます。クラスターには`ServiceName`と`Env`のタグを必ず付与し、`cluster_additional_tags`で追加のタグを指定できます。`ServiceName`と`Env`は予約済みキーのため、`cluster_additional_tags`へ指定すると検証エラーになります。root moduleは、作成したクラスターの名前とARNを`ecs_cluster_name` / `ecs_cluster_arn`として出力します。現時点ではクラスターのみを定義しており、タスク定義・サービス・ロードバランサーは未定義です。
 
-VPC・ECSモジュールのTerraformテストは、`bun run tf:test:init`でテスト用のproviderを初期化してから`bun run tf:test`で実行します。テストはAWSをモックするためAWS認証情報は不要ですが、`tf:test:init`はルートの`infra/.terraform/providers`をproviderの取得元に使うため、先に`bun run tf:init`または`bun run tf:init:no-backend`を実行しておく必要があります。`tf:test`はCIの`Terraform Checks`でも実行します。
+ECRモジュールは、`<service_name>-<env>-<role>`という名前のリポジトリと、プッシュから30日以上経過したタグなしイメージを削除対象にするライフサイクルポリシーを定義しています。イメージタグはデフォルトで上書き可能です。現時点ではroot moduleから呼び出していないため、ECRリポジトリは作成されません。
+
+VPC・ECS・ECRモジュールのTerraformテストは、`bun run tf:test:init`でテスト用のproviderを初期化してから`bun run tf:test`で実行します。テストはAWSをモックするためAWS認証情報は不要ですが、`tf:test:init`はルートの`infra/.terraform/providers`をproviderの取得元に使うため、先に`bun run tf:init`または`bun run tf:init:no-backend`を実行しておく必要があります。`tf:test`はCIの`Terraform Checks`でも実行します。
 
 ローカルではAWS CLIのprofileで対象AWSアカウントを確認してから`tf:init`を実行し、`bun run tf:workspace:dev`で`dev` workspaceを選択してから`tf:plan` / `tf:apply`を実行してください。`bun run tf:init`はS3 backendへ接続するため、AWS認証情報が未設定の状態では失敗します。CIの静的検証では`TF_WORKSPACE=dev`と`bun run tf:init:no-backend`を使用し、remote backendへ接続しません。stg / prod環境を追加する場合は、対応するworkspaceを作成してstateを分離してください。
 
@@ -554,9 +557,11 @@ bun run tf:lint             # Terraform構成をTFLintで検査
 bun run tf:validate         # Terraform構成を検証
 bun run tf:test:vpc:init    # VPCモジュールのTerraformテスト用にproviderを初期化
 bun run tf:test:ecs:init    # ECSモジュールのTerraformテスト用にproviderを初期化
+bun run tf:test:ecr:init    # ECRモジュールのTerraformテスト用にproviderを初期化
 bun run tf:test:init        # 全Terraformモジュールのテスト用にproviderを初期化
 bun run tf:test:vpc         # VPCモジュールのTerraformテストを実行
 bun run tf:test:ecs         # ECSモジュールのTerraformテストを実行
+bun run tf:test:ecr         # ECRモジュールのTerraformテストを実行
 bun run tf:test             # 全TerraformモジュールのTerraformテストを実行
 ```
 
