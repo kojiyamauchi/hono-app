@@ -17,3 +17,8 @@ output "ecs_cluster_arn" {
   value       = module.ecs_cluster.cluster_arn
   description = "作成したクラスターのARN"
 }
+
+output "github_ecr_push_role_arn" {
+  value       = module.github_ecr_push.iam_role_arn
+  description = "GitHub ActionsがECRへイメージを登録するIAMロールのARN"
+}

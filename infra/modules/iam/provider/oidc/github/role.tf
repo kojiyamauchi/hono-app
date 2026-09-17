@@ -6,37 +6,27 @@ locals {
   })
 }
 
-data "aws_iam_policy_document" "assume_role_policy" {
-  statement {
-    effect = "Allow"
-    principals {
-      type = "Federated"
-      identifiers = [
-        aws_iam_openid_connect_provider.github.arn
-      ]
-    }
-    actions = [
-      "sts:AssumeRoleWithWebIdentity"
-    ]
-    condition {
-      test     = "StringEquals"
-      variable = "token.actions.githubusercontent.com:sub"
-      values = [
-        "repo:${var.github_organization_name}/${var.github_repository_name}:ref:refs/heads/main"
-      ]
-    }
-    condition {
-      test     = "StringEquals"
-      variable = "token.actions.githubusercontent.com:aud"
-      values = [
-        "sts.amazonaws.com"
-      ]
-    }
-  }
+locals {
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Federated = var.oidc_provider_arn
+      }
+      Action = "sts:AssumeRoleWithWebIdentity"
+      Condition = {
+        StringEquals = {
+          "token.actions.githubusercontent.com:sub" = "repo:${var.github_organization_name}/${var.github_repository_name}:ref:refs/heads/main"
+          "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
+        }
+      }
+    }]
+  })
 }
 
 resource "aws_iam_role" "role" {
   name               = "${var.service_name}-${var.env}-role"
-  assume_role_policy = data.aws_iam_policy_document.assume_role_policy.json
+  assume_role_policy = local.assume_role_policy
   tags               = local.iam_role_tags
 }

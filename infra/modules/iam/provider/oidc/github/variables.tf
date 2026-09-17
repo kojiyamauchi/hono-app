@@ -30,11 +30,18 @@ variable "iam_role_additional_tags" {
 }
 
 variable "github_organization_name" {
-  type = string
+  type        = string
+  description = "IAMロールの信頼対象となるGitHub organization名"
 }
 
 variable "github_repository_name" {
-  type = string
+  type        = string
+  description = "IAMロールの信頼対象となるGitHubリポジトリ名"
+}
+
+variable "oidc_provider_arn" {
+  type        = string
+  description = "アカウント単位で管理するGitHub OIDCプロバイダーのARN"
 }
 
 variable "managed_iam_policy_arns" {
