@@ -28,7 +28,7 @@ resource "aws_route" "public_default_routes" {
 
 # 各public subnetを、自身の配置先AZに対応するroute tableへ関連付ける。
 resource "aws_route_table_association" "public_route_table_associations" {
-  for_each       = { for subnet in var.subnets.public : subnet.cidr_block => subnet }
+  for_each       = local.public_subnets_by_cidr
   route_table_id = aws_route_table.public_route_tables[each.value.availability_zone].id
   subnet_id      = aws_subnet.public_subnets[each.key].id
 }
@@ -58,7 +58,7 @@ resource "aws_route" "private_default_routes" {
 
 # 各private subnetを、自身の配置先AZに対応するroute tableへ関連付ける。
 resource "aws_route_table_association" "private_route_table_associations" {
-  for_each       = { for subnet in var.subnets.private : subnet.cidr_block => subnet }
+  for_each       = local.private_subnets_by_cidr
   route_table_id = aws_route_table.private_route_tables[each.value.availability_zone].id
   subnet_id      = aws_subnet.private_subnets[each.key].id
 }

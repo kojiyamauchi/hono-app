@@ -1,6 +1,11 @@
 # CIDRをリソースのキーに保ち、入力順や取得したAZ一覧の変化で配置先を変えない。
+locals {
+  public_subnets_by_cidr  = { for subnet in var.subnets.public : subnet.cidr_block => subnet }
+  private_subnets_by_cidr = { for subnet in var.subnets.private : subnet.cidr_block => subnet }
+}
+
 resource "aws_subnet" "public_subnets" {
-  for_each   = { for subnet in var.subnets.public : subnet.cidr_block => subnet }
+  for_each   = local.public_subnets_by_cidr
   cidr_block = each.key
   vpc_id     = aws_vpc.vpc.id
 
@@ -16,7 +21,7 @@ resource "aws_subnet" "public_subnets" {
 }
 
 resource "aws_subnet" "private_subnets" {
-  for_each   = { for subnet in var.subnets.private : subnet.cidr_block => subnet }
+  for_each   = local.private_subnets_by_cidr
   cidr_block = each.key
   vpc_id     = aws_vpc.vpc.id
 
