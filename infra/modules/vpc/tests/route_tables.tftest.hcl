@@ -24,6 +24,20 @@ variables {
   }
 }
 
+run "route_keys_available_during_plan" {
+  command = plan
+
+  assert {
+    condition = (
+      keys(aws_route.public_default_routes) == ["ap-northeast-1a", "ap-northeast-1c", "ap-northeast-1d"] &&
+      keys(aws_route.private_default_routes) == ["ap-northeast-1a", "ap-northeast-1c", "ap-northeast-1d"] &&
+      keys(aws_route_table_association.public_route_table_associations) == ["10.0.0.0/24", "10.0.1.0/24", "10.0.4.0/24"] &&
+      keys(aws_route_table_association.private_route_table_associations) == ["10.0.2.0/24", "10.0.3.0/24", "10.0.5.0/24"]
+    )
+    error_message = "ルートと関連付けのキーは、AWSリソース作成前のplan時に確定する必要があります。"
+  }
+}
+
 # vpc_idはplan時に未確定のため、route table自体の検証はapplyで行う。
 run "one_route_table_per_az" {
   command = apply
