@@ -33,7 +33,7 @@ run "default_repository" {
 
   assert {
     condition = (
-      length(jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules) == 2 &&
+      length(jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules) == 3 &&
       jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules[0].rulePriority == 1 &&
       jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules[0].selection.tagStatus == "untagged" &&
       jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules[0].selection.countType == "sinceImagePushed" &&
@@ -54,6 +54,19 @@ run "default_repository" {
       jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules[1].action.type == "expire"
     )
     error_message = "デフォルトのポリシーはmain-*タグのイメージを最新10件だけ残す必要があります。"
+  }
+
+  assert {
+    condition = (
+      jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules[2].rulePriority == 3 &&
+      jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules[2].selection.tagStatus == "tagged" &&
+      jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules[2].selection.tagPatternList == ["manual-*"] &&
+      jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules[2].selection.countType == "sinceImagePushed" &&
+      jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules[2].selection.countUnit == "days" &&
+      jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules[2].selection.countNumber == 30 &&
+      jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules[2].action.type == "expire"
+    )
+    error_message = "デフォルトのポリシーは手動実行イメージを30日後に削除する必要があります。"
   }
 }
 
@@ -107,7 +120,7 @@ run "file_lifecycle_policy" {
 
   assert {
     condition = (
-      length(jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules) == 2 &&
+      length(jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules) == 3 &&
       jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules[0].rulePriority == 1 &&
       jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules[0].selection.tagStatus == "untagged" &&
       jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules[0].selection.countType == "sinceImagePushed" &&
@@ -128,6 +141,16 @@ run "file_lifecycle_policy" {
       jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules[1].action.type == "expire"
     )
     error_message = "ファイルのポリシーはmain-*タグのイメージを最新10件だけ残す必要があります。"
+  }
+
+  assert {
+    condition = (
+      jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules[2].rulePriority == 3 &&
+      jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules[2].selection.tagPatternList == ["manual-*"] &&
+      jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules[2].selection.countType == "sinceImagePushed" &&
+      jsondecode(aws_ecr_lifecycle_policy.policy.policy).rules[2].selection.countNumber == 30
+    )
+    error_message = "ファイルのポリシーは手動実行イメージを30日後に削除する必要があります。"
   }
 }
 

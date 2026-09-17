@@ -25,6 +25,20 @@
       "action": {
         "type": "expire"
       }
+    },
+    {
+      "rulePriority": 3,
+      "description": "Expire manual images older than 30 days",
+      "selection": {
+        "tagStatus": "tagged",
+        "tagPatternList": ["manual-*"],
+        "countType": "sinceImagePushed",
+        "countUnit": "days",
+        "countNumber": 30
+      },
+      "action": {
+        "type": "expire"
+      }
     }
   ]
 }
