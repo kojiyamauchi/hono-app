@@ -493,7 +493,7 @@ ECSモジュールは、Fargateでコンテナを動かすためのECSクラス�
 
 ECRモジュールは、`<service_name>-<env>-<role>`という名前のリポジトリを定義します。`role`には格納するイメージのサービス内での役割を指定し、イメージタグはデフォルトで上書き可能です。`ServiceName`と`Env`のタグを必ず付与し、`repository_additional_tags`で追加のタグを指定できます。これら2つのキーは追加タグでは使用できません。モジュールはリポジトリの名前・ARN・URLを出力します。root moduleは`role = "web"`で呼び出し、選択中のworkspaceに対応する`hono-app-<env>-web`リポジトリを作成します。
 
-ライフサイクルポリシーは、プッシュから30日以上経過したタグなしイメージを削除対象にします。通常は`repository_lifecycle_policy`のヒアドキュメントを使用し、空文字を指定した場合は`lifecycle_policy/default_policy.json`を読み込みます。任意のJSON文字列で上書きすることもできます。push時スキャンと`force_delete`はこのモジュールでは設定していません。スキャンの実行条件はECRレジストリ側の設定に従い、イメージが残るリポジトリの強制削除は行いません。
+ライフサイクルポリシーは、プッシュから30日以上経過したタグなしイメージを削除し、`main-*`タグのイメージは最新10件を残して古いものを削除します。通常は`repository_lifecycle_policy`のヒアドキュメントを使用し、空文字を指定した場合は`lifecycle_policy/default_policy.json`を読み込みます。任意のJSON文字列で上書きすることもできます。push時スキャンと`force_delete`はこのモジュールでは設定していません。スキャンの実行条件はECRレジストリ側の設定に従い、イメージが残るリポジトリの強制削除は行いません。
 
 VPC・ECS・ECRモジュールのTerraformテストは、`bun run tf:test:init`でテスト用のproviderを初期化してから`bun run tf:test`で実行します。テストはAWSをモックするためAWS認証情報は不要ですが、`tf:test:init`はルートの`infra/.terraform/providers`をproviderの取得元に使うため、先に`bun run tf:init`または`bun run tf:init:no-backend`を実行しておく必要があります。`tf:test`はCIの`Terraform Checks`でも実行します。
 

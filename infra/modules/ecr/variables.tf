@@ -55,7 +55,8 @@ variable "image_tag_mutability" {
 variable "repository_lifecycle_policy" {
   description = <<DESC
   リポジトリのライフサイクルポリシーをJSON形式で指定します。デフォルトでは
-  タグのないイメージのうちプッシュから30日以上経過したイメージを削除します。
+  タグのないイメージのうちプッシュから30日以上経過したイメージを削除し、
+  main-*タグのイメージは最新10件だけを残します。
   空文字を指定した場合はlifecycle_policy/default_policy.jsonを読み込みます。
   参考: https://docs.aws.amazon.com/jp_ja/AmazonECR/latest/userguide/LifecyclePolicy.html
   DESC
@@ -71,6 +72,19 @@ variable "repository_lifecycle_policy" {
         "countType": "sinceImagePushed",
         "countUnit": "days",
         "countNumber": 30
+      },
+      "action": {
+        "type": "expire"
+      }
+    },
+    {
+      "rulePriority": 2,
+      "description": "Keep the 10 most recent main images",
+      "selection": {
+        "tagStatus": "tagged",
+        "tagPatternList": ["main-*"],
+        "countType": "imageCountMoreThan",
+        "countNumber": 10
       },
       "action": {
         "type": "expire"
