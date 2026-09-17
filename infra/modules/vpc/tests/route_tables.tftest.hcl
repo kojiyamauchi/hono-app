@@ -24,7 +24,10 @@ variables {
   }
 }
 
-run "route_keys_available_during_plan" {
+# mock_providerはcomputed属性へモック値を与えるため、for_eachへリソース参照を戻しても
+# plan時にキーが既知になる。実providerでの初回plan失敗はterraform testでは再現できないため、
+# ここでは各リソースのキー（stateアドレス）が入力値どおりに固定されることを確認する。
+run "route_keys_match_input_values" {
   command = plan
 
   assert {
@@ -34,7 +37,7 @@ run "route_keys_available_during_plan" {
       keys(aws_route_table_association.public_route_table_associations) == ["10.0.0.0/24", "10.0.1.0/24", "10.0.4.0/24"] &&
       keys(aws_route_table_association.private_route_table_associations) == ["10.0.2.0/24", "10.0.3.0/24", "10.0.5.0/24"]
     )
-    error_message = "ルートと関連付けのキーは、AWSリソース作成前のplan時に確定する必要があります。"
+    error_message = "ルートと関連付けのキーは、入力値から決まる値で固定する必要があります。"
   }
 }
 
