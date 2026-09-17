@@ -23,12 +23,13 @@ src/generated
 .husky
 .vscode
 
-# ドキュメント・ローカルDB（実行に不要）
+# ドキュメント・ローカルDB・Terraform（実行に不要）
 docs
 README.md
 AGENTS.md
 CLAUDE.md
 supabase
+infra
 
 # Docker関連（ビルドコンテキストへ含めない）
 Dockerfile

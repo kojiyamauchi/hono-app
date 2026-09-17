@@ -147,6 +147,7 @@ flowchart LR
 |   |-- pull_request_template.md     # PRテンプレート
 |   `-- workflows/
 |       |-- ci.yml                   # GitHub Actions CI
+|       |-- cd.yml                   # ECRへのイメージ登録
 |       `-- comment-ops.yml          # PRコメント操作
 |-- .husky/
 |   `-- pre-commit                   # pre-commit hook
@@ -157,11 +158,14 @@ flowchart LR
 |-- infra/
 |   |-- .terraform.lock.hcl          # Terraform provider依存ロック
 |   |-- .tflint.hcl                  # TFLint設定
+|   |-- account/                     # AWSアカウント共通のGitHub OIDCプロバイダー
 |   |-- env/                         # 将来の環境別Terraform変数値
 |   |-- modules/
 |   |   |-- ecr/                     # ECR module
 |   |   |-- ecs/                     # ECS module
+|   |   |-- iam/                     # GitHub OIDC用IAMロールmodule
 |   |   `-- vpc/                     # VPC module
+|   |-- iam.tf                       # 環境別のECR pushロールと権限
 |   |-- main.tf                      # AWS providerとmodule設定
 |   |-- outputs.tf                   # root moduleの出力値
 |   `-- variables.tf                 # root moduleの入力変数
@@ -464,6 +468,19 @@ bun run tf:lint:init
 
 Terraform stateは、`ap-northeast-1`のS3バケット`terraform-state-hono-app`へ保存し、S3 lockfileによるstate lockingを有効にしています。環境ごとのstateはTerraform workspaceで分離し、現時点では`dev` workspaceを使用します。`tf:plan` / `tf:apply`は選択中のworkspaceを対象とし、特定のtfvarsファイルを自動では読み込みません。`infra/env/*.tfvars`は将来の環境別入力値の仮置きであり、利用する場合は`-var-file=env/<workspace>.tfvars`を明示的に指定してください。
 
+GitHub Actions用OIDCプロバイダーはAWSアカウントで共通のため、`infra/account`を独立したrootとして管理します。`default` workspaceの`hono-app/account/terraform.tfstate`に保存し、最初に一度だけ適用してください。その後、環境別rootの`infra`でECRとIAMロールを管理します。`infra`は既存OIDCプロバイダーをdata sourceで参照するため、プロバイダー未作成の状態ではplanできません。stg/prodを同じAWSアカウントへ追加するときも、プロバイダーを再作成せず同じARNを参照します。
+
+```bash
+aws sts get-caller-identity
+terraform -chdir=infra/account init
+terraform -chdir=infra/account workspace show  # defaultを確認
+terraform -chdir=infra/account plan
+terraform -chdir=infra/account apply
+terraform -chdir=infra init
+terraform -chdir=infra workspace show          # devを確認
+terraform -chdir=infra plan -var-file=env/dev.tfvars
+```
+
 サブネットは必須変数 `subnets` でCIDRと配置先AZを明示します。以下は最小構成となる2AZのtfvarsファイル入力例です。AZは対象アカウントで利用可能な名前に合わせてください。public/privateはそれぞれ2個以上かつ同数とし、同じ2つ以上のAZの組み合わせへ分散します。
 
 ```hcl
@@ -491,11 +508,33 @@ terraform -chdir=infra plan -var-file=env/dev.tfvars
 
 ECSモジュールは、Fargateでコンテナを動かすためのECSクラスターを定義しています。クラスター名は`<service_name>-<env>-cluster`の形式で、Container Insightsを有効化し、capacity providerは`FARGATE`のみを登録してデフォルト戦略にも設定しています。Container Insightsはdevを含む全workspaceで有効になり、CloudWatchの利用量に応じた料金が発生し得ます。クラスターには`ServiceName`と`Env`のタグを必ず付与し、`cluster_additional_tags`で追加のタグを指定できます。`ServiceName`と`Env`は予約済みキーのため、`cluster_additional_tags`へ指定すると検証エラーになります。root moduleは、作成したクラスターの名前とARNを`ecs_cluster_name` / `ecs_cluster_arn`として出力します。現時点ではクラスターのみを定義しており、タスク定義・サービス・ロードバランサーは未定義です。
 
-ECRモジュールは、`<service_name>-<env>-<role>`という名前のリポジトリを定義します。`role`には格納するイメージのサービス内での役割を指定し、イメージタグはデフォルトで上書き可能です。`ServiceName`と`Env`のタグを必ず付与し、`repository_additional_tags`で追加のタグを指定できます。これら2つのキーは追加タグでは使用できません。モジュールはリポジトリの名前・ARN・URLを出力しますが、現時点ではroot moduleから呼び出していないため、ECRリポジトリは作成されません。
+ECRモジュールは、`<service_name>-<env>-<role>`という名前のリポジトリを定義します。`role`には格納するイメージのサービス内での役割を指定し、イメージタグはデフォルトで上書き可能です。`ServiceName`と`Env`のタグを必ず付与し、`repository_additional_tags`で追加のタグを指定できます。これら2つのキーは追加タグでは使用できません。モジュールはリポジトリの名前・ARN・URLを出力します。root moduleは`role = "web"`で呼び出し、選択中のworkspaceに対応する`hono-app-<env>-web`リポジトリを作成します。
 
-ライフサイクルポリシーは、プッシュから30日以上経過したタグなしイメージを削除対象にします。通常は`repository_lifecycle_policy`のヒアドキュメントを使用し、空文字を指定した場合は`lifecycle_policy/default_policy.json`を読み込みます。任意のJSON文字列で上書きすることもできます。push時スキャンと`force_delete`はこのモジュールでは設定していません。スキャンの実行条件はECRレジストリ側の設定に従い、イメージが残るリポジトリの強制削除は行いません。
+ライフサイクルポリシーは、プッシュから30日以上経過したタグなしイメージと`manual-*`タグのイメージを削除し、`main-*`タグのイメージは最新10件を残して古いものを削除します。通常は`repository_lifecycle_policy`のヒアドキュメントを使用し、空文字を指定した場合は`lifecycle_policy/default_policy.json`を読み込みます。任意のJSON文字列で上書きすることもできます。push時スキャンと`force_delete`はこのモジュールでは設定していません。スキャンの実行条件はECRレジストリ側の設定に従い、イメージが残るリポジトリの強制削除は行いません。
 
-VPC・ECS・ECRモジュールのTerraformテストは、`bun run tf:test:init`でテスト用のproviderを初期化してから`bun run tf:test`で実行します。テストはAWSをモックするためAWS認証情報は不要ですが、`tf:test:init`はルートの`infra/.terraform/providers`をproviderの取得元に使うため、先に`bun run tf:init`または`bun run tf:init:no-backend`を実行しておく必要があります。`tf:test`はCIの`Terraform Checks`でも実行します。
+IAMモジュールは、指定したGitHubリポジトリの`main`ブランチだけが引き受けられるロールを定義します。rootの`infra/iam.tf`がアカウント共通OIDCプロバイダーのARNを渡し、`module.ecr_web.repository_arn`を使って対象ECRリポジトリだけにpush権限を付けます。作成したロールのARNは`github_ecr_push_role_arn`に出力します。`ecr:GetAuthorizationToken`のみAWSの仕様上、リソースを`*`に指定します。
+
+以前に`infra/modules/iam/provider/oidc/github`を単独で適用した環境には、ローカルstateが存在します。この環境では既存リソースを新しいrootのstateへimportしてから、旧stateの登録を外してください。**importとstate移行が終わるまで新しい構成でapplyしないでください。** 作業前に旧stateをバックアップし、対象アカウントとworkspaceを確認します。次の例はdev環境の既存リソース名を使います。
+
+```bash
+cp infra/modules/iam/provider/oidc/github/terraform.tfstate /tmp/hono-app-iam-before-migration.tfstate
+AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+terraform -chdir=infra/account init
+terraform -chdir=infra/account import aws_iam_openid_connect_provider.github "arn:aws:iam::${AWS_ACCOUNT_ID}:oidc-provider/token.actions.githubusercontent.com"
+terraform -chdir=infra init
+terraform -chdir=infra workspace select dev
+terraform -chdir=infra import -var-file=env/dev.tfvars 'module.github_ecr_push.aws_iam_role.role' hono-app-dev-role
+terraform -chdir=infra import -var-file=env/dev.tfvars 'module.github_ecr_push.aws_iam_role_policy.inline_policies["hono-app-dev-ecr-web-push"]' 'hono-app-dev-role:hono-app-dev-ecr-web-push'
+terraform -chdir=infra/modules/iam/provider/oidc/github state rm aws_iam_openid_connect_provider.github aws_iam_role.role aws_iam_role_policy.ecr_web_push
+terraform -chdir=infra/account plan
+terraform -chdir=infra plan -var-file=env/dev.tfvars
+```
+
+最後のplanでOIDCプロバイダーとロールの重複作成・削除がないことを確認してからapplyしてください。旧stateのdata sourceはAWSリソースの所有権を持たないため、移行対象に含めません。
+
+CDワークフローは`main`へのpushでECRへ`main-<短縮SHA>`タグを登録します。手動実行は**ワークフローの実行ブランチをmain**にし、`build_target`でビルドするブランチまたはタグを指定します。手動登録分には`manual-*`タグが付くため、30日経過後に削除されます。現時点で選べる環境はdevのみです。事前にGitHubのSettings → Secrets and variables → ActionsでRepository secret `IAM_ARN_TO_PUSH_IMAGE`へ`github_ecr_push_role_arn`の値を設定してください。ビルド先は`linux/amd64`で、GitHub Actionsのビルドキャッシュを利用します。短時間に連続pushした場合は同じ環境の実行を直列化し、待機中の古い実行が新しい実行に置き換わることがあります。ECSへの反映はこのワークフローには含まれません。
+
+VPC・ECS・ECR・IAMモジュールと環境別rootのTerraformテストは、`bun run tf:test:init`でテスト用のproviderを初期化してから`bun run tf:test`で実行します。テストはAWSをモックするためAWS認証情報は不要です。VPC・ECS・ECRの初期化はルートの`infra/.terraform/providers`をproviderの取得元に使うため、先に`bun run tf:init`または`bun run tf:init:no-backend`を実行しておく必要があります。`tf:test`はCIの`Terraform Checks`でも実行します。
 
 ローカルではAWS CLIのprofileで対象AWSアカウントを確認してから`tf:init`を実行し、`bun run tf:workspace:dev`で`dev` workspaceを選択してから`tf:plan` / `tf:apply`を実行してください。`bun run tf:init`はS3 backendへ接続するため、AWS認証情報が未設定の状態では失敗します。CIの静的検証では`TF_WORKSPACE=dev`と`bun run tf:init:no-backend`を使用し、remote backendへ接続しません。stg / prod環境を追加する場合は、対応するworkspaceを作成してstateを分離してください。
 
@@ -549,6 +588,8 @@ bun run prisma:format       # Prisma schemaをフォーマット
 bun run prisma:studio       # Prisma Studioを起動
 bun run tf:init             # Terraform providerを初期化
 bun run tf:init:no-backend  # remote backendへ接続せずTerraform providerを初期化
+bun run tf:account:init:no-backend # アカウント共通rootをbackendなしで初期化
+bun run tf:account:validate        # アカウント共通rootを検証
 bun run tf:workspace:dev    # dev workspaceを作成または選択
 bun run tf:plan             # 選択中のworkspaceのTerraform変更計画を確認
 bun run tf:apply            # 選択中のworkspaceへTerraform変更を適用
@@ -560,10 +601,13 @@ bun run tf:validate         # Terraform構成を検証
 bun run tf:test:vpc:init    # VPCモジュールのTerraformテスト用にproviderを初期化
 bun run tf:test:ecs:init    # ECSモジュールのTerraformテスト用にproviderを初期化
 bun run tf:test:ecr:init    # ECRモジュールのTerraformテスト用にproviderを初期化
+bun run tf:test:iam:init    # IAMモジュールのTerraformテスト用にproviderを初期化
 bun run tf:test:init        # 全Terraformモジュールのテスト用にproviderを初期化
 bun run tf:test:vpc         # VPCモジュールのTerraformテストを実行
 bun run tf:test:ecs         # ECSモジュールのTerraformテストを実行
 bun run tf:test:ecr         # ECRモジュールのTerraformテストを実行
+bun run tf:test:iam         # IAMモジュールのTerraformテストを実行
+bun run tf:test:root        # 環境別rootのIAM・ECR依存テストを実行
 bun run tf:test             # 全TerraformモジュールのTerraformテストを実行
 ```
 

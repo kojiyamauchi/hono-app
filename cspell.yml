@@ -5,6 +5,7 @@ words:
   - bun
   - Bun
   - bunx
+  - buildx
   - chdir
   - datasource
   - dotenv
@@ -32,6 +33,7 @@ flagWords:
   - null
 ignorePaths:
   - ./**/.terraform/**
+  - ./**/*.tfstate*
   - ./**/node_modules/**
   - .claude/settings.local.json
   - .git/**

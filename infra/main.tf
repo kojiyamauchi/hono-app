@@ -43,3 +43,10 @@ module "ecs_cluster" {
   service_name = local.service_name
   env          = terraform.workspace
 }
+
+module "ecr_web" {
+  source       = "./modules/ecr"
+  service_name = local.service_name
+  env          = terraform.workspace
+  role         = "web"
+}

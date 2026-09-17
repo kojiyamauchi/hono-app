@@ -1,0 +1,63 @@
+name: build-and-push-container-image
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: ECRリポジトリの環境名（現在はdevのみ）
+        required: true
+        type: choice
+        default: dev
+        options:
+          - dev
+      build_target:
+        description: ビルドするブランチまたはタグ。ワークフロー自体はIAMの信頼条件によりmainから実行してください
+        required: true
+        default: main
+permissions:
+  id-token: write
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.environment || 'dev' }}
+  cancel-in-progress: false
+jobs:
+  build-and-push-container-image:
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.build_target || github.sha }}
+      - name: Get image tag
+        id: get-image-tag
+        env:
+          BUILD_TARGET: ${{ inputs.build_target || github.ref_name }}
+        run: |
+          SHORT_COMMIT_ID=$(git rev-parse --short HEAD)
+          REF=$(printf '%s' "$BUILD_TARGET" | sed 's#/#-#g')
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            REF="manual-${REF}"
+          fi
+          echo "image-tag=${REF}-${SHORT_COMMIT_ID}" >> "$GITHUB_OUTPUT"
+      - name: Assume role
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.IAM_ARN_TO_PUSH_IMAGE }}
+          aws-region: ap-northeast-1
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build and push image to Amazon ECR
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: ${{ steps.login-ecr.outputs.registry }}/hono-app-${{ inputs.environment || 'dev' }}-web:${{ steps.get-image-tag.outputs.image-tag }}
