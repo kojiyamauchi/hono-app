@@ -19,8 +19,8 @@ resource "aws_route_table" "public_route_tables" {
 }
 
 resource "aws_route" "public_default_routes" {
-  for_each       = aws_route_table.public_route_tables
-  route_table_id = each.value.id
+  for_each       = local.public_availability_zones
+  route_table_id = aws_route_table.public_route_tables[each.key].id
 
   destination_cidr_block = "0.0.0.0/0"
   gateway_id             = aws_internet_gateway.igw.id
@@ -28,9 +28,9 @@ resource "aws_route" "public_default_routes" {
 
 # 各public subnetを、自身の配置先AZに対応するroute tableへ関連付ける。
 resource "aws_route_table_association" "public_route_table_associations" {
-  for_each       = aws_subnet.public_subnets
+  for_each       = { for subnet in var.subnets.public : subnet.cidr_block => subnet }
   route_table_id = aws_route_table.public_route_tables[each.value.availability_zone].id
-  subnet_id      = each.value.id
+  subnet_id      = aws_subnet.public_subnets[each.key].id
 }
 
 # private subnetを配置するAZごとにroute tableを1つ作成する。
@@ -49,8 +49,8 @@ resource "aws_route_table" "private_route_tables" {
 # デフォルトルートは自身のAZのNAT Gatewayへ向ける。他AZのNAT Gatewayへ向けると、
 # そのAZの障害が他AZへ波及し、クロスAZのデータ転送料も発生するため。
 resource "aws_route" "private_default_routes" {
-  for_each       = aws_route_table.private_route_tables
-  route_table_id = each.value.id
+  for_each       = local.private_availability_zones
+  route_table_id = aws_route_table.private_route_tables[each.key].id
 
   destination_cidr_block = "0.0.0.0/0"
   nat_gateway_id         = aws_nat_gateway.nat_gateways[each.key].id
@@ -58,7 +58,7 @@ resource "aws_route" "private_default_routes" {
 
 # 各private subnetを、自身の配置先AZに対応するroute tableへ関連付ける。
 resource "aws_route_table_association" "private_route_table_associations" {
-  for_each       = aws_subnet.private_subnets
+  for_each       = { for subnet in var.subnets.private : subnet.cidr_block => subnet }
   route_table_id = aws_route_table.private_route_tables[each.value.availability_zone].id
-  subnet_id      = each.value.id
+  subnet_id      = aws_subnet.private_subnets[each.key].id
 }
