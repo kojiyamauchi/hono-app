@@ -506,6 +506,8 @@ terraform -chdir=infra plan -var-file=env/dev.tfvars
 
 現時点ではサブネット、Internet Gateway、AZごとのNAT GatewayとEIP、public/private subnetのルートテーブルまでを定義しています。ルートテーブルはpublic/privateそれぞれAZごとに1つ作成し、各サブネットを自身のAZに対応するルートテーブルへ関連付けます。publicのデフォルトルートはInternet Gatewayへ、privateのデフォルトルートは自身のAZのNAT Gatewayへ向けています。privateを自身のAZのNAT Gatewayへ向けることで、あるAZの障害を他のAZへ波及させず、クロスAZのデータ転送料も避けています。
 
+VPCモジュールで`for_each`のキーを作るときは、入力値から決まる値を使います。作成前のリソースを`for_each`へ渡すと、初回planでキーを確定できない場合があります。リソースIDは各resourceの本文で参照してください。
+
 ECSモジュールは、Fargateでコンテナを動かすためのECSクラスターを定義しています。クラスター名は`<service_name>-<env>-cluster`の形式で、Container Insightsを有効化し、capacity providerは`FARGATE`のみを登録してデフォルト戦略にも設定しています。Container Insightsはdevを含む全workspaceで有効になり、CloudWatchの利用量に応じた料金が発生し得ます。クラスターには`ServiceName`と`Env`のタグを必ず付与し、`cluster_additional_tags`で追加のタグを指定できます。`ServiceName`と`Env`は予約済みキーのため、`cluster_additional_tags`へ指定すると検証エラーになります。root moduleは、作成したクラスターの名前とARNを`ecs_cluster_name` / `ecs_cluster_arn`として出力します。現時点ではクラスターのみを定義しており、タスク定義・サービス・ロードバランサーは未定義です。
 
 ECRモジュールは、`<service_name>-<env>-<role>`という名前のリポジトリを定義します。`role`には格納するイメージのサービス内での役割を指定し、イメージタグはデフォルトで上書き可能です。`ServiceName`と`Env`のタグを必ず付与し、`repository_additional_tags`で追加のタグを指定できます。これら2つのキーは追加タグでは使用できません。モジュールはリポジトリの名前・ARN・URLを出力します。root moduleは`role = "web"`で呼び出し、選択中のworkspaceに対応する`hono-app-<env>-web`リポジトリを作成します。
