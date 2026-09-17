@@ -4,15 +4,10 @@ locals {
     for subnet in var.subnets.public :
     subnet.availability_zone => subnet.cidr_block
   }
-
-  nat_gateway_subnet_id_by_az = {
-    for availability_zone, cidr_block in local.public_subnet_cidr_by_az :
-    availability_zone => aws_subnet.public_subnets[cidr_block].id
-  }
 }
 
 resource "aws_eip" "eips" {
-  for_each = local.nat_gateway_subnet_id_by_az
+  for_each = local.public_subnet_cidr_by_az
   domain   = "vpc"
 
   tags = {
@@ -24,9 +19,9 @@ resource "aws_eip" "eips" {
 }
 
 resource "aws_nat_gateway" "nat_gateways" {
-  for_each      = local.nat_gateway_subnet_id_by_az
+  for_each      = local.public_subnet_cidr_by_az
   allocation_id = aws_eip.eips[each.key].allocation_id
-  subnet_id     = each.value
+  subnet_id     = aws_subnet.public_subnets[each.value].id
 
   depends_on = [aws_internet_gateway.igw]
 

@@ -24,6 +24,23 @@ variables {
   }
 }
 
+# mock_providerはcomputed属性へモック値を与えるため、for_eachへリソース参照を戻しても
+# plan時にキーが既知になる。実providerでの初回plan失敗はterraform testでは再現できないため、
+# ここでは各リソースのキー（stateアドレス）が入力値どおりに固定されることを確認する。
+run "route_keys_match_input_values" {
+  command = plan
+
+  assert {
+    condition = (
+      keys(aws_route.public_default_routes) == ["ap-northeast-1a", "ap-northeast-1c", "ap-northeast-1d"] &&
+      keys(aws_route.private_default_routes) == ["ap-northeast-1a", "ap-northeast-1c", "ap-northeast-1d"] &&
+      keys(aws_route_table_association.public_route_table_associations) == ["10.0.0.0/24", "10.0.1.0/24", "10.0.4.0/24"] &&
+      keys(aws_route_table_association.private_route_table_associations) == ["10.0.2.0/24", "10.0.3.0/24", "10.0.5.0/24"]
+    )
+    error_message = "ルートと関連付けのキーは、入力値から決まる値で固定する必要があります。"
+  }
+}
+
 # vpc_idはplan時に未確定のため、route table自体の検証はapplyで行う。
 run "one_route_table_per_az" {
   command = apply
