@@ -491,7 +491,7 @@ terraform -chdir=infra plan -var-file=env/dev.tfvars
 
 ECSモジュールは、Fargateでコンテナを動かすためのECSクラスターを定義しています。クラスター名は`<service_name>-<env>-cluster`の形式で、Container Insightsを有効化し、capacity providerは`FARGATE`のみを登録してデフォルト戦略にも設定しています。Container Insightsはdevを含む全workspaceで有効になり、CloudWatchの利用量に応じた料金が発生し得ます。クラスターには`ServiceName`と`Env`のタグを必ず付与し、`cluster_additional_tags`で追加のタグを指定できます。`ServiceName`と`Env`は予約済みキーのため、`cluster_additional_tags`へ指定すると検証エラーになります。root moduleは、作成したクラスターの名前とARNを`ecs_cluster_name` / `ecs_cluster_arn`として出力します。現時点ではクラスターのみを定義しており、タスク定義・サービス・ロードバランサーは未定義です。
 
-ECRモジュールは、`<service_name>-<env>-<role>`という名前のリポジトリを定義します。`role`には格納するイメージのサービス内での役割を指定し、イメージタグはデフォルトで上書き可能です。`ServiceName`と`Env`のタグを必ず付与し、`repository_additional_tags`で追加のタグを指定できます。これら2つのキーは追加タグでは使用できません。モジュールはリポジトリの名前・ARN・URLを出力しますが、現時点ではroot moduleから呼び出していないため、ECRリポジトリは作成されません。
+ECRモジュールは、`<service_name>-<env>-<role>`という名前のリポジトリを定義します。`role`には格納するイメージのサービス内での役割を指定し、イメージタグはデフォルトで上書き可能です。`ServiceName`と`Env`のタグを必ず付与し、`repository_additional_tags`で追加のタグを指定できます。これら2つのキーは追加タグでは使用できません。モジュールはリポジトリの名前・ARN・URLを出力します。root moduleは`role = "web"`で呼び出し、選択中のworkspaceに対応する`hono-app-<env>-web`リポジトリを作成します。
 
 ライフサイクルポリシーは、プッシュから30日以上経過したタグなしイメージを削除対象にします。通常は`repository_lifecycle_policy`のヒアドキュメントを使用し、空文字を指定した場合は`lifecycle_policy/default_policy.json`を読み込みます。任意のJSON文字列で上書きすることもできます。push時スキャンと`force_delete`はこのモジュールでは設定していません。スキャンの実行条件はECRレジストリ側の設定に従い、イメージが残るリポジトリの強制削除は行いません。
 
