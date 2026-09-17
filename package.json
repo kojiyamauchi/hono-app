@@ -27,6 +27,8 @@
     "prisma:studio": "bunx prisma studio",
     "tf:init": "terraform -chdir=infra init",
     "tf:init:no-backend": "terraform -chdir=infra init -backend=false",
+    "tf:account:init:no-backend": "terraform -chdir=infra/account init -backend=false",
+    "tf:account:validate": "terraform -chdir=infra/account validate",
     "tf:workspace:dev": "terraform -chdir=infra workspace select -or-create dev",
     "tf:plan": "terraform -chdir=infra plan",
     "tf:apply": "terraform -chdir=infra apply",
@@ -38,11 +40,14 @@
     "tf:test:vpc:init": "terraform -chdir=infra/modules/vpc init -backend=false -plugin-dir=../../.terraform/providers",
     "tf:test:ecs:init": "terraform -chdir=infra/modules/ecs init -backend=false -plugin-dir=../../.terraform/providers",
     "tf:test:ecr:init": "terraform -chdir=infra/modules/ecr init -backend=false -plugin-dir=../../.terraform/providers",
-    "tf:test:init": "bun run tf:test:vpc:init && bun run tf:test:ecs:init && bun run tf:test:ecr:init",
+    "tf:test:iam:init": "terraform -chdir=infra/modules/iam/provider/oidc/github init -backend=false",
+    "tf:test:init": "bun run tf:test:vpc:init && bun run tf:test:ecs:init && bun run tf:test:ecr:init && bun run tf:test:iam:init",
     "tf:test:vpc": "terraform -chdir=infra/modules/vpc test",
     "tf:test:ecs": "terraform -chdir=infra/modules/ecs test",
     "tf:test:ecr": "terraform -chdir=infra/modules/ecr test",
-    "tf:test": "bun run tf:test:vpc && bun run tf:test:ecs && bun run tf:test:ecr"
+    "tf:test:iam": "terraform -chdir=infra/modules/iam/provider/oidc/github test",
+    "tf:test:root": "terraform -chdir=infra test",
+    "tf:test": "bun run tf:test:vpc && bun run tf:test:ecs && bun run tf:test:ecr && bun run tf:test:iam && bun run tf:test:root"
   },
   "dependencies": {
     "@hono/otel": "1.1.2",
