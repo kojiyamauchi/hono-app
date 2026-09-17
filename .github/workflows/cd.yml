@@ -1,0 +1,49 @@
+name: build-and-push-container-image
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: ECRリポジトリの環境名（現在はdev）
+        required: true
+        default: dev
+      build_target:
+        description: ビルドするブランチまたはタグ（例：main、feature/example、v1.0.0）
+        required: true
+        default: main
+permissions:
+  id-token: write
+  contents: read
+jobs:
+  build-and-push-container-image:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.build_target || github.sha }}
+      - name: Get image tag
+        id: get-image-tag
+        env:
+          BUILD_TARGET: ${{ inputs.build_target || github.ref_name }}
+        run: |
+          SHORT_COMMIT_ID=$(git rev-parse --short HEAD)
+          REF=$(printf '%s' "$BUILD_TARGET" | sed 's#/#-#g')
+          echo "image-tag=${REF}-${SHORT_COMMIT_ID}" >> "$GITHUB_OUTPUT"
+      - name: Assume role
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.IAM_ARN_TO_PUSH_IMAGE }}
+          aws-region: ap-northeast-1
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - name: Build and push image to Amazon ECR
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.login-ecr.outputs.registry }}/hono-app-${{ inputs.environment || 'dev' }}-web:${{ steps.get-image-tag.outputs.image-tag }}
