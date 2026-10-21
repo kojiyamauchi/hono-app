@@ -8,8 +8,10 @@ mock_provider "aws" {
 }
 
 variables {
-  service_name = "hono-app"
-  env          = "dev"
+  service_name                       = "hono-app"
+  env                                = "dev"
+  task_exec_role_ecr_repository_arns = ["arn:aws:ecr:ap-northeast-1:123456789012:repository/hono-app-dev-web"]
+  task_exec_role_log_group_arns      = ["arn:aws:logs:ap-northeast-1:123456789012:log-group:hono-app-dev-log-group"]
 }
 
 run "ecs_trust_and_execution_permissions" {
@@ -28,19 +30,22 @@ run "ecs_trust_and_execution_permissions" {
 
   assert {
     condition = (
-      length(data.aws_iam_policy_document.task_exec_role_policy_document.statement) == 2 &&
+      length(data.aws_iam_policy_document.task_exec_role_policy_document.statement) == 3 &&
+      one([for statement in data.aws_iam_policy_document.task_exec_role_policy_document.statement : statement if statement.sid == "ECRAuthorization"]).actions == toset(["ecr:GetAuthorizationToken"]) &&
+      one([for statement in data.aws_iam_policy_document.task_exec_role_policy_document.statement : statement if statement.sid == "ECRAuthorization"]).resources == toset(["*"]) &&
       one([for statement in data.aws_iam_policy_document.task_exec_role_policy_document.statement : statement if statement.sid == "ECRPullImage"]).actions == toset([
-        "ecr:GetAuthorizationToken",
         "ecr:BatchCheckLayerAvailability",
         "ecr:GetDownloadUrlForLayer",
         "ecr:BatchGetImage",
       ]) &&
+      one([for statement in data.aws_iam_policy_document.task_exec_role_policy_document.statement : statement if statement.sid == "ECRPullImage"]).resources == toset(var.task_exec_role_ecr_repository_arns) &&
       one([for statement in data.aws_iam_policy_document.task_exec_role_policy_document.statement : statement if statement.sid == "CloudWatchPutLog"]).actions == toset([
         "logs:CreateLogStream",
         "logs:PutLogEvents",
-      ])
+      ]) &&
+      one([for statement in data.aws_iam_policy_document.task_exec_role_policy_document.statement : statement if statement.sid == "CloudWatchPutLog"]).resources == toset(["${var.task_exec_role_log_group_arns[0]}:*"])
     )
-    error_message = "実行ロールにはECRの取得とログ送信に必要な権限を定義する必要があります。"
+    error_message = "認証トークン以外の実行権限は指定したECRリポジトリとロググループへ限定する必要があります。"
   }
 }
 
@@ -104,4 +109,24 @@ run "eleven_managed_policies_are_rejected" {
   }
 
   expect_failures = [var.task_role_managed_policy_arns]
+}
+
+run "wildcard_repository_is_rejected" {
+  command = plan
+
+  variables {
+    task_exec_role_ecr_repository_arns = ["*"]
+  }
+
+  expect_failures = [var.task_exec_role_ecr_repository_arns]
+}
+
+run "wildcard_log_group_is_rejected" {
+  command = plan
+
+  variables {
+    task_exec_role_log_group_arns = ["*"]
+  }
+
+  expect_failures = [var.task_exec_role_log_group_arns]
 }

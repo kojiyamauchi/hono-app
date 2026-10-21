@@ -16,16 +16,21 @@ resource "aws_iam_role" "task_exec_role" {
 data "aws_iam_policy_document" "task_exec_role_policy_document" {
   version = "2012-10-17"
   statement {
+    sid = "ECRAuthorization"
+    actions = [
+      "ecr:GetAuthorizationToken"
+    ]
+    resources = ["*"]
+  }
+
+  statement {
     sid = "ECRPullImage"
     actions = [
-      "ecr:GetAuthorizationToken",
       "ecr:BatchCheckLayerAvailability",
       "ecr:GetDownloadUrlForLayer",
       "ecr:BatchGetImage"
     ]
-    resources = [
-      "*"
-    ]
+    resources = var.task_exec_role_ecr_repository_arns
   }
 
   statement {
@@ -34,9 +39,7 @@ data "aws_iam_policy_document" "task_exec_role_policy_document" {
       "logs:CreateLogStream",
       "logs:PutLogEvents"
     ]
-    resources = [
-      "*"
-    ]
+    resources = [for arn in var.task_exec_role_log_group_arns : "${arn}:*"]
   }
 }
 

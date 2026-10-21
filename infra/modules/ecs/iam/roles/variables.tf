@@ -16,6 +16,34 @@ variable "env" {
   }
 }
 
+variable "task_exec_role_ecr_repository_arns" {
+  type        = list(string)
+  nullable    = false
+  description = "実行ロールによるイメージ取得を許可するECRリポジトリARN"
+
+  validation {
+    condition = length(var.task_exec_role_ecr_repository_arns) > 0 && alltrue([
+      for arn in var.task_exec_role_ecr_repository_arns :
+      can(regex("^arn:[^:]+:ecr:[^:]+:[0-9]{12}:repository/.+$", arn)) && !strcontains(arn, "*")
+    ])
+    error_message = "ワイルドカードを含まないECRリポジトリARNを1件以上指定してください。"
+  }
+}
+
+variable "task_exec_role_log_group_arns" {
+  type        = list(string)
+  nullable    = false
+  description = "実行ロールによるログ送信を許可するロググループARN（末尾の:*を含めない）"
+
+  validation {
+    condition = length(var.task_exec_role_log_group_arns) > 0 && alltrue([
+      for arn in var.task_exec_role_log_group_arns :
+      can(regex("^arn:[^:]+:logs:[^:]+:[0-9]{12}:log-group:.+$", arn)) && !strcontains(arn, "*")
+    ])
+    error_message = "ワイルドカードを含まないロググループARNを1件以上指定してください。"
+  }
+}
+
 variable "task_role_managed_policy_arns" {
   description = "タスクロールに付与する管理ポリシーARNのリストを指定します"
   type        = list(string)
