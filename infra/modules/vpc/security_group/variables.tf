@@ -68,6 +68,8 @@ variable "security_group_egress_sgs" {
 
 locals {
   ingress_ports = [for v in var.security_group_ingress_ports : tostring(v)]
+  # CIDRとポートの組み合わせをキーにし、並び順の変更や重複でルールを作り直さない。
+  ingress_cidr_rules = { for v in setproduct(toset(local.ingress_ports), toset(var.security_group_ingress_cidrs)) : join(",", v) => v }
 }
 
 locals {
