@@ -1,5 +1,6 @@
 locals {
   service_name = "hono-app"
+  region       = "ap-northeast-1"
 
   container_definitions = jsonencode([
     {
@@ -18,7 +19,7 @@ locals {
         logDriver = "awslogs"
         options = {
           awslogs-group         = module.log_group.log_group_name
-          awslogs-region        = "ap-northeast-1"
+          awslogs-region        = local.region
           awslogs-stream-prefix = local.service_name
         }
       }
