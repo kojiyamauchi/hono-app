@@ -50,3 +50,29 @@ module "ecr_web" {
   env          = terraform.workspace
   role         = "web"
 }
+
+module "log_group" {
+  source       = "./modules/cloudwatch/logs"
+  service_name = local.service_name
+  env          = terraform.workspace
+}
+
+module "task" {
+  source             = "./modules/ecs/task"
+  service_name       = local.service_name
+  env                = terraform.workspace
+  task_role_arn      = module.roles.task_role_arn
+  task_exec_role_arn = module.roles.task_exec_role_arn
+  // CloudWatchLogsに対応したcontainer_definitionを作成して読み込ませる
+  container_definition = local.container_definitions
+}
+
+module "roles" {
+  source       = "./modules/ecs/iam/roles"
+  service_name = local.service_name
+  env          = terraform.workspace
+
+  # task_role_managed_policy_arns = {}
+  # task_role_inline_policies = {}
+  # task_exec_role_additional_tags = {}
+}
