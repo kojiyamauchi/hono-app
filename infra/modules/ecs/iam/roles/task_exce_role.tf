@@ -44,6 +44,7 @@ data "aws_iam_policy_document" "task_exec_role_policy_document" {
 }
 
 resource "aws_iam_role_policy" "task_exec_role_policy" {
+  name   = "${local.task_exec_role_name}-policy"
   role   = aws_iam_role.task_exec_role.id
   policy = data.aws_iam_policy_document.task_exec_role_policy_document.json
 }

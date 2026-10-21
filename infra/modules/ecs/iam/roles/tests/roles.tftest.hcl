@@ -70,6 +70,7 @@ run "role_names_tags_and_policy_bindings" {
     condition = (
       aws_iam_role.task_role.name == "hono-app-dev-task-role" &&
       aws_iam_role.task_exec_role.name == "hono-app-dev-task-exec-role" &&
+      aws_iam_role_policy.task_exec_role_policy.name == "hono-app-dev-task-exec-role-policy" &&
       aws_iam_role.task_role.tags["Name"] == "hono-app-dev-task-role" &&
       aws_iam_role.task_exec_role.tags["Name"] == "hono-app-dev-task-exec-role" &&
       aws_iam_role.task_role.tags["Env"] == "dev" &&
