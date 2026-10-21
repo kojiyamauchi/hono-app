@@ -536,7 +536,7 @@ terraform -chdir=infra plan -var-file=env/dev.tfvars
 
 CDワークフローは`main`へのpushでECRへ`main-<短縮SHA>`タグを登録します。手動実行は**ワークフローの実行ブランチをmain**にし、`build_target`でビルドするブランチまたはタグを指定します。手動登録分には`manual-*`タグが付くため、30日経過後に削除されます。現時点で選べる環境はdevのみです。事前にGitHubのSettings → Secrets and variables → ActionsでRepository secret `IAM_ARN_TO_PUSH_IMAGE`へ`github_ecr_push_role_arn`の値を設定してください。ビルド先は`linux/amd64`で、GitHub Actionsのビルドキャッシュを利用します。短時間に連続pushした場合は同じ環境の実行を直列化し、待機中の古い実行が新しい実行に置き換わることがあります。ECSへの反映はこのワークフローには含まれません。
 
-VPC・ECS・ECR・IAMモジュールと環境別rootのTerraformテストは、`bun run tf:test:init`でテスト用のproviderを初期化してから`bun run tf:test`で実行します。テストはAWSをモックするためAWS認証情報は不要です。VPC・ECS・ECRの初期化はルートの`infra/.terraform/providers`をproviderの取得元に使うため、先に`bun run tf:init`または`bun run tf:init:no-backend`を実行しておく必要があります。`tf:test`はCIの`Terraform Checks`でも実行します。
+VPC・ECS・ECR・IAM・CloudWatch Logsモジュールと環境別rootのTerraformテストは、`bun run tf:test:init`でテスト用のproviderを初期化してから`bun run tf:test`で実行します。`tf:test:vpc`はSG、`tf:test:ecs`はタスク定義とタスク用IAMロールのテストも含みます。テストはAWSをモックするためAWS認証情報は不要です。VPC・ECS・ECR・CloudWatch Logsの初期化はルートの`infra/.terraform/providers`をproviderの取得元に使うため、先に`bun run tf:init`または`bun run tf:init:no-backend`を実行しておく必要があります。`tf:test`はCIの`Terraform Checks`でも実行します。
 
 ローカルではAWS CLIのprofileで対象AWSアカウントを確認してから`tf:init`を実行し、`bun run tf:workspace:dev`で`dev` workspaceを選択してから`tf:plan` / `tf:apply`を実行してください。`bun run tf:init`はS3 backendへ接続するため、AWS認証情報が未設定の状態では失敗します。CIの静的検証では`TF_WORKSPACE=dev`と`bun run tf:init:no-backend`を使用し、remote backendへ接続しません。stg / prod環境を追加する場合は、対応するworkspaceを作成してstateを分離してください。
 
@@ -600,15 +600,17 @@ bun run tf:fmt:check        # Terraform構成のフォーマットを検証
 bun run tf:lint:init        # TFLint pluginを初期化
 bun run tf:lint             # Terraform構成をTFLintで検査
 bun run tf:validate         # Terraform構成を検証
-bun run tf:test:vpc:init    # VPCモジュールのTerraformテスト用にproviderを初期化
-bun run tf:test:ecs:init    # ECSモジュールのTerraformテスト用にproviderを初期化
+bun run tf:test:vpc:init    # VPC・SGモジュールのTerraformテスト用にproviderを初期化
+bun run tf:test:ecs:init    # ECS関連モジュールのTerraformテスト用にproviderを初期化
 bun run tf:test:ecr:init    # ECRモジュールのTerraformテスト用にproviderを初期化
 bun run tf:test:iam:init    # IAMモジュールのTerraformテスト用にproviderを初期化
+bun run tf:test:logs:init   # CloudWatch LogsモジュールのTerraformテスト用にproviderを初期化
 bun run tf:test:init        # 全Terraformモジュールのテスト用にproviderを初期化
-bun run tf:test:vpc         # VPCモジュールのTerraformテストを実行
-bun run tf:test:ecs         # ECSモジュールのTerraformテストを実行
+bun run tf:test:vpc         # VPC・SGモジュールのTerraformテストを実行
+bun run tf:test:ecs         # ECS関連モジュールのTerraformテストを実行
 bun run tf:test:ecr         # ECRモジュールのTerraformテストを実行
 bun run tf:test:iam         # IAMモジュールのTerraformテストを実行
+bun run tf:test:logs        # CloudWatch LogsモジュールのTerraformテストを実行
 bun run tf:test:root        # 環境別rootのIAM・ECR依存テストを実行
 bun run tf:test             # 全TerraformモジュールのTerraformテストを実行
 ```
