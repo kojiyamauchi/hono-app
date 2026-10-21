@@ -1,10 +1,10 @@
 locals {
   security_group_name = "${var.service_name}-${var.env}-sg"
-  security_group_tags = {
+  security_group_tags = merge(var.security_group_additional_tags, {
     Name        = local.security_group_name
     ServiceName = var.service_name
     Env         = var.env
-  }
+  })
 }
 
 resource "aws_security_group" "security_group" {

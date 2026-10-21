@@ -131,3 +131,44 @@ run "wildcard_log_group_is_rejected" {
 
   expect_failures = [var.task_exec_role_log_group_arns]
 }
+
+run "additional_tags_are_independent" {
+  command = plan
+
+  variables {
+    task_role_additional_tags      = { Usage = "application" }
+    task_exec_role_additional_tags = { Usage = "execution" }
+  }
+
+  assert {
+    condition = (
+      aws_iam_role.task_role.tags["Usage"] == "application" &&
+      aws_iam_role.task_exec_role.tags["Usage"] == "execution" &&
+      aws_iam_role.task_role.tags["Name"] == "hono-app-dev-task-role" &&
+      aws_iam_role.task_exec_role.tags["ServiceName"] == "hono-app" &&
+      aws_iam_role.task_role.tags["Env"] == "dev" &&
+      aws_iam_role.task_exec_role.tags["Env"] == "dev"
+    )
+    error_message = "用途別の追加タグを設定しつつ、標準タグを維持する必要があります。"
+  }
+}
+
+run "task_role_reserved_tags_are_rejected" {
+  command = plan
+
+  variables {
+    task_role_additional_tags = { Name = "other", ServiceName = "other", Env = "prod" }
+  }
+
+  expect_failures = [var.task_role_additional_tags]
+}
+
+run "task_exec_role_reserved_tags_are_rejected" {
+  command = plan
+
+  variables {
+    task_exec_role_additional_tags = { Name = "other", ServiceName = "other", Env = "prod" }
+  }
+
+  expect_failures = [var.task_exec_role_additional_tags]
+}

@@ -1,10 +1,10 @@
 locals {
   task_role_name = "${var.service_name}-${var.env}-task-role"
-  task_role_tags = {
+  task_role_tags = merge(var.task_role_additional_tags, {
     Name        = local.task_role_name
     ServiceName = var.service_name
     Env         = var.env
-  }
+  })
 }
 
 resource "aws_iam_role" "task_role" {

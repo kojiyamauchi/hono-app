@@ -3,6 +3,28 @@ variable "service_name" {
   description = "IAMロールが関連するサービス名"
 }
 
+variable "task_role_additional_tags" {
+  type        = map(string)
+  description = "タスクロールに付与する追加タグ"
+  default     = {}
+
+  validation {
+    condition     = length(setintersection(keys(var.task_role_additional_tags), ["Name", "ServiceName", "Env"])) == 0
+    error_message = "キーのName,ServiceNameおよびEnvは予約済みです。使用することはできません。"
+  }
+}
+
+variable "task_exec_role_additional_tags" {
+  type        = map(string)
+  description = "タスク実行ロールに付与する追加タグ"
+  default     = {}
+
+  validation {
+    condition     = length(setintersection(keys(var.task_exec_role_additional_tags), ["Name", "ServiceName", "Env"])) == 0
+    error_message = "キーのName,ServiceNameおよびEnvは予約済みです。使用することはできません。"
+  }
+}
+
 variable "env" {
   type        = string
   description = "環境識別子 (dev, stg, prod)"

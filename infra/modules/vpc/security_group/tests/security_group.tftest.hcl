@@ -167,3 +167,31 @@ run "duplicate_inputs_create_unique_rules" {
     error_message = "ポートやSGが重複していても、一意な組み合わせだけでルールを作成する必要があります。"
   }
 }
+
+run "additional_tags_preserve_standard_tags" {
+  command = plan
+
+  variables {
+    security_group_additional_tags = { Usage = "web" }
+  }
+
+  assert {
+    condition = (
+      aws_security_group.security_group.tags["Usage"] == "web" &&
+      aws_security_group.security_group.tags["Name"] == "hono-app-dev-sg" &&
+      aws_security_group.security_group.tags["ServiceName"] == "hono-app" &&
+      aws_security_group.security_group.tags["Env"] == "dev"
+    )
+    error_message = "追加タグを設定しつつ、標準タグを維持する必要があります。"
+  }
+}
+
+run "reserved_tags_are_rejected" {
+  command = plan
+
+  variables {
+    security_group_additional_tags = { Name = "other", ServiceName = "other", Env = "prod" }
+  }
+
+  expect_failures = [var.security_group_additional_tags]
+}
