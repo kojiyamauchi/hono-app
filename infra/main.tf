@@ -63,7 +63,7 @@ module "task" {
   env                = terraform.workspace
   task_role_arn      = module.roles.task_role_arn
   task_exec_role_arn = module.roles.task_exec_role_arn
-  // CloudWatchLogsに対応したcontainer_definitionを作成して読み込ませる
+  # ロググループへ出力するコンテナ定義を渡す。
   container_definition = local.container_definitions
 }
 
@@ -74,8 +74,4 @@ module "roles" {
 
   task_exec_role_ecr_repository_arns = [module.ecr_web.repository_arn]
   task_exec_role_log_group_arns      = [module.log_group.log_group_arn]
-
-  # task_role_managed_policy_arns = {}
-  # task_role_inline_policies = {}
-  # task_exec_role_additional_tags = {}
 }
