@@ -23,6 +23,15 @@ override_resource {
   }
 }
 
+# ECRプッシュ権限の検証対象外であるECS用IAMロールは、出力だけをモックする。
+override_module {
+  target = module.roles
+  outputs = {
+    task_role_arn      = "arn:aws:iam::123456789012:role/hono-app-dev-task-role"
+    task_exec_role_arn = "arn:aws:iam::123456789012:role/hono-app-dev-task-exec-role"
+  }
+}
+
 variables {
   subnets = {
     public = [
