@@ -105,7 +105,3 @@ locals {
     local.default_tags
   )
 }
-
-
-
-

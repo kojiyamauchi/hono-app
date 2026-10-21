@@ -13,4 +13,3 @@ resource "aws_ecs_task_definition" "task_definition" {
 
   tags = local.task_resource_tags
 }
-
