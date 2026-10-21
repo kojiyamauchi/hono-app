@@ -25,6 +25,15 @@ variable "security_group_ingress_ports" {
   type        = list(number)
   description = "内向き通信(ingress)として許可するポート番号のリストです"
   default     = [80]
+
+  validation {
+    condition = length(var.security_group_ingress_ports) > 0 || (
+      length(var.security_group_ingress_cidrs) == 0 &&
+      length(var.security_group_ingress_sgs) == 0 &&
+      !var.security_group_ingress_allow_self
+    )
+    error_message = "ingressの許可元を指定する場合は、ポートを1件以上指定してください。"
+  }
 }
 
 variable "security_group_ingress_cidrs" {

@@ -87,14 +87,11 @@ run "self_traffic_uses_configured_ports" {
   }
 }
 
-run "empty_ports_create_no_ingress_rules" {
+run "empty_ports_without_sources_create_no_ingress_rules" {
   command = plan
 
   variables {
-    security_group_ingress_ports      = []
-    security_group_ingress_cidrs      = ["10.0.0.0/24"]
-    security_group_ingress_sgs        = ["sg-12345678"]
-    security_group_ingress_allow_self = true
+    security_group_ingress_ports = []
   }
 
   assert {
@@ -103,8 +100,41 @@ run "empty_ports_create_no_ingress_rules" {
       length(aws_security_group_rule.ingress_sg_security_group_rules) == 0 &&
       length(aws_security_group_rule.ingress_self_security_group_rules) == 0
     )
-    error_message = "ポート未指定時はCIDR・SG・自己通信のingressルールを作成しない必要があります。"
+    error_message = "ポートと許可元が未指定ならingressルールを作成しない必要があります。"
   }
+}
+
+run "cidrs_require_ports" {
+  command = plan
+
+  variables {
+    security_group_ingress_ports = []
+    security_group_ingress_cidrs = ["10.0.0.0/24"]
+  }
+
+  expect_failures = [var.security_group_ingress_ports]
+}
+
+run "security_groups_require_ports" {
+  command = plan
+
+  variables {
+    security_group_ingress_ports = []
+    security_group_ingress_sgs   = ["sg-12345678"]
+  }
+
+  expect_failures = [var.security_group_ingress_ports]
+}
+
+run "self_traffic_requires_ports" {
+  command = plan
+
+  variables {
+    security_group_ingress_ports      = []
+    security_group_ingress_allow_self = true
+  }
+
+  expect_failures = [var.security_group_ingress_ports]
 }
 
 run "duplicate_inputs_create_unique_rules" {
