@@ -19,4 +19,3 @@ variable "excluded_availability_zones" {
   nullable    = false
   description = "サブネットの配置先から除外するAZ名"
 }
-
