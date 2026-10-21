@@ -14,7 +14,7 @@ resource "aws_security_group" "security_group" {
 }
 
 resource "aws_security_group_rule" "ingress_cidr_security_group_rules" {
-  for_each          = length(var.security_group_ingress_cidrs) > 0 ? toset(local.ingress_cidr_ports) : toset([])
+  for_each          = length(var.security_group_ingress_cidrs) > 0 ? toset(local.ingress_ports) : toset([])
   security_group_id = aws_security_group.security_group.id
   type              = "ingress"
   protocol          = "TCP"
@@ -34,7 +34,7 @@ resource "aws_security_group_rule" "ingress_sg_security_group_rules" {
 }
 
 resource "aws_security_group_rule" "ingress_self_security_group_rules" {
-  for_each          = var.security_group_ingress_allow_self ? toset(local.ingress_cidr_ports) : toset([])
+  for_each          = var.security_group_ingress_allow_self ? toset(local.ingress_ports) : toset([])
   security_group_id = aws_security_group.security_group.id
   type              = "ingress"
   protocol          = "TCP"

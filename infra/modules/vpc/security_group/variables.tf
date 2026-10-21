@@ -58,7 +58,7 @@ variable "security_group_egress_sgs" {
 }
 
 locals {
-  ingress_cidr_ports = [for v in var.security_group_ingress_ports : tostring(v)]
+  ingress_ports = [for v in var.security_group_ingress_ports : tostring(v)]
 }
 
 locals {
