@@ -1,7 +1,3 @@
-locals {
-  service_name = "hono-app"
-}
-
 terraform {
   required_version = "~> 1.15"
 
