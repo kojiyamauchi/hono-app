@@ -24,7 +24,7 @@ run "create_initial_task" {
 
   assert {
     condition = (
-      jsondecode(aws_ecs_task_definition.task_definition.container_definitions)[0].image == "nginx:1.21" &&
+      jsondecode(aws_ecs_task_definition.task_definition.container_definitions)[0].image == "public.ecr.aws/docker/library/nginx:1.30.6" &&
       jsondecode(aws_ecs_task_definition.task_definition.container_definitions)[0].portMappings[0].containerPort == 80 &&
       jsondecode(aws_ecs_task_definition.task_definition.container_definitions)[0].portMappings[0].hostPort == 80
     )
