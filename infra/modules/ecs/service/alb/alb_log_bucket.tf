@@ -59,6 +59,13 @@ data "aws_iam_policy_document" "log_bucket_policy_document" {
     }
     actions   = ["s3:PutObject"]
     resources = ["${aws_s3_bucket.log_bucket.arn}/AWSLogs/${data.aws_caller_identity.current.account_id}/*"]
+
+    # ログ配信元を自アカウントのロードバランサーに限定する。
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values   = ["arn:aws:elasticloadbalancing:*:${data.aws_caller_identity.current.account_id}:loadbalancer/*"]
+    }
   }
 }
 

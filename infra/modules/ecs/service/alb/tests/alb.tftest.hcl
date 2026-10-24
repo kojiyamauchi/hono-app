@@ -70,7 +70,10 @@ run "http_without_domain" {
       one(one(aws_s3_bucket_server_side_encryption_configuration.log_bucket_sse_configuration.rule).apply_server_side_encryption_by_default).sse_algorithm == "AES256" &&
       one(one(data.aws_iam_policy_document.log_bucket_policy_document.statement).principals).identifiers == toset(["logdelivery.elasticloadbalancing.amazonaws.com"]) &&
       one(data.aws_iam_policy_document.log_bucket_policy_document.statement).resources == toset(["${aws_s3_bucket.log_bucket.arn}/AWSLogs/123456789012/*"]) &&
-      one(data.aws_iam_policy_document.log_bucket_policy_document.statement).actions == toset(["s3:PutObject"])
+      one(data.aws_iam_policy_document.log_bucket_policy_document.statement).actions == toset(["s3:PutObject"]) &&
+      one(one(data.aws_iam_policy_document.log_bucket_policy_document.statement).condition).test == "ArnLike" &&
+      one(one(data.aws_iam_policy_document.log_bucket_policy_document.statement).condition).variable == "aws:SourceArn" &&
+      toset(one(one(data.aws_iam_policy_document.log_bucket_policy_document.statement).condition).values) == toset(["arn:aws:elasticloadbalancing:*:123456789012:loadbalancer/*"])
     )
     error_message = "ログバケットはACLと公開アクセスを無効にし、当該アカウントのログ配信だけを許可する必要があります。"
   }
