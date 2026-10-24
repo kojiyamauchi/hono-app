@@ -65,7 +65,7 @@ variable "container_definition" {
   [
     {
       "name": "nginx",
-      "image": "nginx:1.21",
+      "image": "public.ecr.aws/docker/library/nginx:1.30.6",
       "cpu": 1024,
       "memory": 2048,
       "essential": true,
