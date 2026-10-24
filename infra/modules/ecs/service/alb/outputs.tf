@@ -4,7 +4,7 @@ output "alb_fqdn" {
 }
 
 output "alb_zone_id" {
-  description = <<DESC
+  description = <<-DESC
   ALBのホステッドゾーンIDです。
   Route53でエイリアスレコードで作成する際に利用します。
   DESC
