@@ -1,18 +1,20 @@
 locals {
-  service_name = "hono-app"
-  region       = "ap-northeast-1"
+  service_name       = "hono-app"
+  region             = "ap-northeast-1"
+  web_container_name = "nginx"
+  web_container_port = 80
 
   container_definitions = jsonencode([
     {
-      name      = "nginx"
-      image     = "public.ecr.aws/nginx/nginx:1.21"
+      name      = local.web_container_name
+      image     = "public.ecr.aws/docker/library/nginx:1.30.6"
       cpu       = 1024
       memory    = 2048
       essential = true
       portMappings = [
         {
-          containerPort = 80
-          hostPort      = 80
+          containerPort = local.web_container_port
+          hostPort      = local.web_container_port
         }
       ]
       logConfiguration = {
