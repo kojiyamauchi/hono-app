@@ -42,7 +42,7 @@ run "http_without_domain" {
       length(aws_lb_listener.http_listener_forward) == 1 &&
       length(aws_lb_listener.http_listener_redirect) == 0 &&
       length(aws_lb_listener.https_listener) == 0 &&
-      length(aws_route53_record.name) == 0 &&
+      length(aws_route53_record.alb_alias) == 0 &&
       length(data.aws_route53_zone.zone) == 0 &&
       one(aws_lb_listener.http_listener_forward[0].default_action).target_group_arn == output.alb_target_group_arn &&
       aws_lb_listener.http_listener_forward[0].load_balancer_arn == aws_lb.alb.arn
@@ -97,9 +97,9 @@ run "https_with_dns" {
       one(one(aws_lb_listener.http_listener_redirect[0].default_action).redirect).protocol == "HTTPS" &&
       aws_lb_listener.https_listener[0].certificate_arn == var.alb_https_certificate_arn &&
       aws_lb_listener.https_listener[0].ssl_policy == "ELBSecurityPolicy-TLS13-1-2-2021-06" &&
-      one(aws_route53_record.name[0].alias).name == aws_lb.alb.dns_name &&
-      one(aws_route53_record.name[0].alias).zone_id == aws_lb.alb.zone_id &&
-      aws_route53_record.name[0].zone_id == "Z1234567890"
+      one(aws_route53_record.alb_alias[0].alias).name == aws_lb.alb.dns_name &&
+      one(aws_route53_record.alb_alias[0].alias).zone_id == aws_lb.alb.zone_id &&
+      aws_route53_record.alb_alias[0].zone_id == "Z1234567890"
     )
     error_message = "HTTPSを有効にした場合、HTTPをリダイレクトし、指定ゾーンのDNSをALBへ向ける必要があります。"
   }
