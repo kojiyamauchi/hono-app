@@ -155,6 +155,17 @@ variable "alb_target_group_port" {
   }
 }
 
+variable "alb_target_group_deregistration_delay" {
+  type        = number
+  description = "ターゲット登録解除時に処理中のリクエストの完了を待つ秒数"
+  default     = 300
+
+  validation {
+    condition     = var.alb_target_group_deregistration_delay >= 0 && var.alb_target_group_deregistration_delay <= 3600 && floor(var.alb_target_group_deregistration_delay) == var.alb_target_group_deregistration_delay
+    error_message = "ターゲット登録解除の待機時間は0から3600までの整数を指定してください。"
+  }
+}
+
 variable "alb_target_group_health_check_port" {
   type        = number
   description = "ヘルスチェックのポート番号。0なら転送先と同じポートを使う"

@@ -6,6 +6,8 @@ resource "aws_lb_target_group" "target_group" {
   vpc_id      = var.alb_vpc_id
   target_type = "ip"
 
+  deregistration_delay = var.alb_target_group_deregistration_delay
+
   health_check {
     enabled             = true
     port                = var.alb_target_group_health_check_port == 0 ? "traffic-port" : tostring(var.alb_target_group_health_check_port)

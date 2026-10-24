@@ -55,6 +55,7 @@ run "http_without_domain" {
       aws_lb_target_group.target_group.target_type == "ip" &&
       aws_lb_target_group.target_group.protocol == "HTTP" &&
       aws_lb_target_group.target_group.port == 80 &&
+      tonumber(aws_lb_target_group.target_group.deregistration_delay) == 300 &&
       one(aws_lb_target_group.target_group.health_check).port == "traffic-port" &&
       one(aws_lb_target_group.target_group.health_check).path == "/" &&
       one(aws_lb_target_group.target_group.health_check).healthy_threshold == 3 &&
@@ -111,6 +112,21 @@ run "production_protection" {
     condition     = aws_lb.alb.enable_deletion_protection && !aws_s3_bucket.log_bucket.force_destroy
     error_message = "prodではALBの削除を保護し、ログ入りバケットの強制削除を無効にする必要があります。"
   }
+}
+
+run "custom_deregistration_delay" {
+  command = plan
+  variables { alb_target_group_deregistration_delay = 30 }
+  assert {
+    condition     = tonumber(aws_lb_target_group.target_group.deregistration_delay) == 30
+    error_message = "ターゲット登録解除の待機時間を指定した秒数へ変更できる必要があります。"
+  }
+}
+
+run "excessive_deregistration_delay" {
+  command = plan
+  variables { alb_target_group_deregistration_delay = 3601 }
+  expect_failures = [var.alb_target_group_deregistration_delay]
 }
 
 run "one_subnet_is_rejected" {

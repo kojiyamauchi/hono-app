@@ -81,13 +81,14 @@ module "alb" {
   alb_security_group_ids = [
     module.alb_security_group.security_group_id
   ]
-  alb_enable_https_listener         = var.alb_https_certificate_arn != null
-  alb_enable_redirect_http_to_https = var.alb_https_certificate_arn != null
-  alb_https_certificate_arn         = var.alb_https_certificate_arn
-  alb_domain_name                   = var.alb_domain_name
-  alb_hosted_zone_name              = var.alb_hosted_zone_name
-  alb_target_group_port             = local.web_container_port
-  alb_vpc_id                        = module.vpc.vpc_id
+  alb_enable_https_listener             = var.alb_https_certificate_arn != null
+  alb_enable_redirect_http_to_https     = var.alb_https_certificate_arn != null
+  alb_https_certificate_arn             = var.alb_https_certificate_arn
+  alb_domain_name                       = var.alb_domain_name
+  alb_hosted_zone_name                  = var.alb_hosted_zone_name
+  alb_target_group_port                 = local.web_container_port
+  alb_target_group_deregistration_delay = terraform.workspace == "dev" ? 30 : 300
+  alb_vpc_id                            = module.vpc.vpc_id
 
   # internet-facing ALBの作成前に、Internet Gatewayと経路も用意する。
   depends_on = [module.vpc]
