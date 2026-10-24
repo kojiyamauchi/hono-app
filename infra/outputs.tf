@@ -22,3 +22,13 @@ output "github_ecr_push_role_arn" {
   value       = module.github_ecr_push.iam_role_arn
   description = "GitHub ActionsがECRへイメージを登録するIAMロールのARN"
 }
+
+output "alb_url" {
+  description = "動作確認用の公開URL"
+  value       = "${var.alb_https_certificate_arn != null ? "https" : "http"}://${coalesce(var.alb_domain_name, module.alb.alb_fqdn)}"
+}
+
+output "ecs_service_name" {
+  description = "タスクを維持するECSサービスの名前"
+  value       = module.ecs_service.service_name
+}

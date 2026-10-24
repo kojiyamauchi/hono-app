@@ -508,7 +508,38 @@ terraform -chdir=infra plan -var-file=env/dev.tfvars
 
 VPCモジュールで`for_each`のキーを作るときは、入力値から決まる値を使います。作成前のリソースを`for_each`へ渡すと、初回planでキーを確定できない場合があります。リソースIDは各resourceの本文で参照してください。
 
-ECSモジュールは、Fargateでコンテナを動かすためのECSクラスターを定義しています。クラスター名は`<service_name>-<env>-cluster`の形式で、Container Insightsを有効化し、capacity providerは`FARGATE`のみを登録してデフォルト戦略にも設定しています。Container Insightsはdevを含む全workspaceで有効になり、CloudWatchの利用量に応じた料金が発生し得ます。クラスターには`ServiceName`と`Env`のタグを必ず付与し、`cluster_additional_tags`で追加のタグを指定できます。`ServiceName`と`Env`は予約済みキーのため、`cluster_additional_tags`へ指定すると検証エラーになります。root moduleは、作成したクラスターの名前とARNを`ecs_cluster_name` / `ecs_cluster_arn`として出力します。現時点ではクラスターのみを定義しており、タスク定義・サービス・ロードバランサーは未定義です。
+ECSモジュールは、Fargateでコンテナを動かすためのECSクラスターを定義しています。クラスター名は`<service_name>-<env>-cluster`の形式で、Container Insightsを有効化し、capacity providerは`FARGATE`のみを登録してデフォルト戦略にも設定しています。Container Insightsはdevを含む全workspaceで有効になり、CloudWatchの利用量に応じた料金が発生し得ます。クラスターには`ServiceName`と`Env`のタグを必ず付与し、`cluster_additional_tags`で追加のタグを指定できます。`ServiceName`と`Env`は予約済みキーのため、`cluster_additional_tags`へ指定すると検証エラーになります。root moduleは、作成したクラスターの名前とARNを`ecs_cluster_name` / `ecs_cluster_arn`として出力します。タスク定義・タスク用IAMロール・ECSサービス・ALBも定義しており、現在は疎通確認用の`public.ecr.aws/docker/library/nginx:1.30.6`を1タスク起動します。Honoアプリのイメージへの切り替えと自動デプロイは含みません。
+
+公開経路は次のとおりです。Route53とACMは、ドメインと証明書を用意した後に任意で設定します。
+
+```mermaid
+flowchart LR
+  client[利用者] -->|HTTP 80| alb[publicサブネットのALB]
+  alb --> target[ターゲットグループ]
+  target -->|HTTP 80| task[privateサブネットのnginxタスク]
+  definition[タスク定義] -.-> service[ECSサービス]
+  service -. 起動数の維持と転送先登録 .-> task
+  task -->|イメージ取得・ログ送信| nat[NAT Gateway]
+  alb -. アクセスログ .-> s3[S3]
+```
+
+ALB用SGはHTTPの80番だけを公開し、ECS用SGはALB用SGからコンテナの80番への通信だけを受け付けます。タスクへpublic IPは付けず、外向き通信は同じAZのNAT Gatewayを経由します。SG間のルールは生成予定のSG IDを`for_each`のキーにせず、独立したresourceとして定義しています。rootではヘルスチェックもコンテナと同じポートを使います。別ポートを利用する構成へ変更する場合は、ALBのegressとECSのingressにも対象ポートの許可を追加してください。
+
+ECSサービスはタスク定義のリビジョン付きARNを参照し、起動数1、更新時の上限200%・正常稼働数の下限100%でローリング更新します。更新失敗時のロールバックと安定状態の待機を有効にしています。リスナー・NAT経路・IAMポリシー・通信ルールを作成してからサービスを起動します。ECS Execは無効で、このモジュールはCodeDeployや外部コントローラーには対応しません。ターゲット登録解除時の待機時間はdevで30秒、それ以外は300秒です。ALBモジュールの`alb_target_group_deregistration_delay`で調整できます。
+
+適用後は`terraform -chdir=infra output -raw alb_url`のURLをブラウザーで開き、nginxのページを確認します。ALBとECSサービスはこのrootで管理します。作成前にAWSアカウントとworkspaceを確認し、`terraform -chdir=infra plan -var-file=env/dev.tfvars`で変更内容を確認してください。
+
+HTTPSと独自ドメインを追加する場合は、同じリージョンの発行済みACM証明書と既存Route53のpublicホストゾーンを用意し、tfvarsへ次の値を設定します。証明書は指定した公開ドメインをカバーするものを使ってください。
+
+```hcl
+alb_https_certificate_arn = "arn:aws:acm:ap-northeast-1:123456789012:certificate/00000000-0000-0000-0000-000000000000"
+alb_domain_name           = "dev.example.com"
+alb_hosted_zone_name      = "example.com"
+```
+
+証明書ARNを指定すると443番を公開し、HTTPからHTTPSへリダイレクトします。DNSレコードはドメイン名とホストゾーン名の両方を指定した場合だけ作成します。両方指定または両方省略することを変数の入力検証で保証しています。これらを省略した初期構成では、証明書やホストゾーンを検索せずALBのDNS名によるHTTPで確認できます。
+
+ALBアクセスログは、名前に自動サフィックスを付けたS3バケットへ保存します。ACLを無効にし、公開アクセスを遮断し、SSE-S3で暗号化します。バケットポリシーはログ配信サービスから当該AWSアカウントの`AWSLogs/<アカウントID>/`への書き込みだけを許可し、ポリシーを設定してからALBのログを有効にします。ログは90日後に標準IAへの移行対象となり、550日後に削除します。prodではALBの削除保護を有効にし、ログ入りバケットの強制削除を無効にします。
 
 ECRモジュールは、`<service_name>-<env>-<role>`という名前のリポジトリを定義します。`role`には格納するイメージのサービス内での役割を指定し、イメージタグはデフォルトで上書き可能です。`ServiceName`と`Env`のタグを必ず付与し、`repository_additional_tags`で追加のタグを指定できます。これら2つのキーは追加タグでは使用できません。モジュールはリポジトリの名前・ARN・URLを出力します。root moduleは`role = "web"`で呼び出し、選択中のworkspaceに対応する`hono-app-<env>-web`リポジトリを作成します。
 
@@ -536,7 +567,7 @@ terraform -chdir=infra plan -var-file=env/dev.tfvars
 
 CDワークフローは`main`へのpushでECRへ`main-<短縮SHA>`タグを登録します。手動実行は**ワークフローの実行ブランチをmain**にし、`build_target`でビルドするブランチまたはタグを指定します。手動登録分には`manual-*`タグが付くため、30日経過後に削除されます。現時点で選べる環境はdevのみです。事前にGitHubのSettings → Secrets and variables → ActionsでRepository secret `IAM_ARN_TO_PUSH_IMAGE`へ`github_ecr_push_role_arn`の値を設定してください。ビルド先は`linux/amd64`で、GitHub Actionsのビルドキャッシュを利用します。短時間に連続pushした場合は同じ環境の実行を直列化し、待機中の古い実行が新しい実行に置き換わることがあります。ECSへの反映はこのワークフローには含まれません。
 
-VPC・ECS・ECR・IAM・CloudWatch Logsモジュールと環境別rootのTerraformテストは、`bun run tf:test:init`でテスト用のproviderを初期化してから`bun run tf:test`で実行します。`tf:test:vpc`はSG、`tf:test:ecs`はタスク定義とタスク用IAMロールのテストも含みます。テストはAWSをモックするためAWS認証情報は不要です。VPC・ECS・ECR・CloudWatch Logsの初期化はルートの`infra/.terraform/providers`をproviderの取得元に使うため、先に`bun run tf:init`または`bun run tf:init:no-backend`を実行しておく必要があります。`tf:test`はCIの`Terraform Checks`でも実行します。
+VPC・ECS・ECR・IAM・CloudWatch Logsモジュールと環境別rootのTerraformテストは、`bun run tf:test:init`でテスト用のproviderを初期化してから`bun run tf:test`で実行します。`tf:test:vpc`はSG、`tf:test:ecs`はタスク定義・タスク用IAMロール・ECSサービス・ALBのテストも含みます。テストはAWSをモックするためAWS認証情報は不要です。VPC・ECS・ECR・CloudWatch Logsの初期化はルートの`infra/.terraform/providers`をproviderの取得元に使うため、先に`bun run tf:init`または`bun run tf:init:no-backend`を実行しておく必要があります。`tf:test`はCIの`Terraform Checks`でも実行します。
 
 ローカルではAWS CLIのprofileで対象AWSアカウントを確認してから`tf:init`を実行し、`bun run tf:workspace:dev`で`dev` workspaceを選択してから`tf:plan` / `tf:apply`を実行してください。`bun run tf:init`はS3 backendへ接続するため、AWS認証情報が未設定の状態では失敗します。CIの静的検証では`TF_WORKSPACE=dev`と`bun run tf:init:no-backend`を使用し、remote backendへ接続しません。stg / prod環境を追加する場合は、対応するworkspaceを作成してstateを分離してください。
 
