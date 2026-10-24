@@ -2,10 +2,10 @@ version: 0.2
 language: en
 words:
   - autoincrement
+  - buildx
   - bun
   - Bun
   - bunx
-  - buildx
   - chdir
   - datasource
   - dotenv
@@ -13,11 +13,13 @@ words:
   - eips
   - esbenp
   - extname
+  - FIPS
   - HMAC
   - hono
   - Hono
   - hostnames
   - kojiyamauchi
+  - logdelivery
   - mappers
   - octocat
   - oneline
@@ -26,6 +28,7 @@ words:
   - Refreshable
   - supabase
   - Supabase
+  - targetgroup
   - tflint
   - tfstate
   - tfvars
