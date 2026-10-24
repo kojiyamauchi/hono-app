@@ -1,4 +1,4 @@
-# rootでECRの権限とコンテナのログ出力先への配線を確認する。
+# rootでECR権限・ログ出力・ALBとECSサービスの接続を確認する。
 mock_provider "aws" {
   mock_resource "aws_lb" {
     defaults = {
