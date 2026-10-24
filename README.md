@@ -523,7 +523,7 @@ flowchart LR
   alb -. アクセスログ .-> s3[S3]
 ```
 
-ALB用SGはHTTPの80番だけを公開し、ECS用SGはALB用SGからコンテナの80番への通信だけを受け付けます。タスクへpublic IPは付けず、外向き通信は同じAZのNAT Gatewayを経由します。SG間のルールは生成予定のSG IDを`for_each`のキーにせず、独立したresourceとして定義しています。
+ALB用SGはHTTPの80番だけを公開し、ECS用SGはALB用SGからコンテナの80番への通信だけを受け付けます。タスクへpublic IPは付けず、外向き通信は同じAZのNAT Gatewayを経由します。SG間のルールは生成予定のSG IDを`for_each`のキーにせず、独立したresourceとして定義しています。rootではヘルスチェックもコンテナと同じポートを使います。別ポートを利用する構成へ変更する場合は、ALBのegressとECSのingressにも対象ポートの許可を追加してください。
 
 ECSサービスはタスク定義のリビジョン付きARNを参照し、起動数1、更新時の上限200%・正常稼働数の下限100%でローリング更新します。更新失敗時のロールバックと安定状態の待機を有効にしています。リスナー・NAT経路・IAMポリシー・通信ルールを作成してからサービスを起動します。ECS Execは無効で、このモジュールはCodeDeployや外部コントローラーには対応しません。ターゲット登録解除時の待機時間はdevで30秒、それ以外は300秒です。ALBモジュールの`alb_target_group_deregistration_delay`で調整できます。
 

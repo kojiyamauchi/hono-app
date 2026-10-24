@@ -90,6 +90,9 @@ module "alb" {
   alb_target_group_deregistration_delay = terraform.workspace == "dev" ? 30 : 300
   alb_vpc_id                            = module.vpc.vpc_id
 
+  # rootのSGはコンテナポートだけを許可するため、ヘルスチェックも同じポートにする。
+  alb_target_group_health_check_port = 0
+
   # internet-facing ALBの作成前に、Internet Gatewayと経路も用意する。
   depends_on = [module.vpc]
 }
