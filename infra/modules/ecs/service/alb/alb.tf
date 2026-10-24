@@ -2,6 +2,7 @@ resource "aws_alb" "alb" {
   name                       = local.alb_name
   internal                   = false
   enable_deletion_protection = var.env == "prod"
+  drop_invalid_header_fields = true
 
   load_balancer_type = "application"
 

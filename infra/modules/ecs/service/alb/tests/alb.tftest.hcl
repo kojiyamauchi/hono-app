@@ -33,6 +33,11 @@ run "http_without_domain" {
   command = apply
 
   assert {
+    condition     = aws_alb.alb.drop_invalid_header_fields
+    error_message = "不正なヘッダー名はALBで除去する必要があります。"
+  }
+
+  assert {
     condition = (
       length(aws_alb_listener.http_listener_forward) == 1 &&
       length(aws_alb_listener.http_listener_redirect) == 0 &&
