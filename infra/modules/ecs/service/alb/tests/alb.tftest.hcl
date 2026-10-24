@@ -1,13 +1,13 @@
 # AWSリソースを作成せず、リスナー分岐とアクセスログの権限を確認する。
 mock_provider "aws" {
-  mock_resource "aws_alb" {
+  mock_resource "aws_lb" {
     defaults = {
       arn      = "arn:aws:elasticloadbalancing:ap-northeast-1:123456789012:loadbalancer/app/test/1234567890123456"
       dns_name = "test-alb.ap-northeast-1.elb.amazonaws.com"
       zone_id  = "Z1234567890"
     }
   }
-  mock_resource "aws_alb_target_group" {
+  mock_resource "aws_lb_target_group" {
     defaults = { arn = "arn:aws:elasticloadbalancing:ap-northeast-1:123456789012:targetgroup/test/1234567890123456" }
   }
   mock_data "aws_caller_identity" {
@@ -33,32 +33,32 @@ run "http_without_domain" {
   command = apply
 
   assert {
-    condition     = aws_alb.alb.drop_invalid_header_fields
+    condition     = aws_lb.alb.drop_invalid_header_fields
     error_message = "不正なヘッダー名はALBで除去する必要があります。"
   }
 
   assert {
     condition = (
-      length(aws_alb_listener.http_listener_forward) == 1 &&
-      length(aws_alb_listener.http_listener_redirect) == 0 &&
-      length(aws_alb_listener.https_listener) == 0 &&
+      length(aws_lb_listener.http_listener_forward) == 1 &&
+      length(aws_lb_listener.http_listener_redirect) == 0 &&
+      length(aws_lb_listener.https_listener) == 0 &&
       length(aws_route53_record.name) == 0 &&
       length(data.aws_route53_zone.zone) == 0 &&
-      one(aws_alb_listener.http_listener_forward[0].default_action).target_group_arn == output.alb_target_group_arn &&
-      aws_alb_listener.http_listener_forward[0].load_balancer_arn == aws_alb.alb.arn
+      one(aws_lb_listener.http_listener_forward[0].default_action).target_group_arn == output.alb_target_group_arn &&
+      aws_lb_listener.http_listener_forward[0].load_balancer_arn == aws_lb.alb.arn
     )
     error_message = "証明書やドメインなしで、ALBのHTTPリスナーからターゲットグループへ転送する必要があります。"
   }
 
   assert {
     condition = (
-      aws_alb_target_group.target_group.target_type == "ip" &&
-      aws_alb_target_group.target_group.protocol == "HTTP" &&
-      aws_alb_target_group.target_group.port == 80 &&
-      one(aws_alb_target_group.target_group.health_check).port == "traffic-port" &&
-      one(aws_alb_target_group.target_group.health_check).path == "/" &&
-      one(aws_alb_target_group.target_group.health_check).healthy_threshold == 3 &&
-      one(aws_alb_target_group.target_group.health_check).unhealthy_threshold == 3
+      aws_lb_target_group.target_group.target_type == "ip" &&
+      aws_lb_target_group.target_group.protocol == "HTTP" &&
+      aws_lb_target_group.target_group.port == 80 &&
+      one(aws_lb_target_group.target_group.health_check).port == "traffic-port" &&
+      one(aws_lb_target_group.target_group.health_check).path == "/" &&
+      one(aws_lb_target_group.target_group.health_check).healthy_threshold == 3 &&
+      one(aws_lb_target_group.target_group.health_check).unhealthy_threshold == 3
     )
     error_message = "FargateのIPアドレスの80番ポートへ転送し、同じポートで正常性を確認する必要があります。"
   }
@@ -74,8 +74,8 @@ run "http_without_domain" {
       one(one(data.aws_iam_policy_document.log_bucket_policy_document.statement).condition).test == "ArnLike" &&
       one(one(data.aws_iam_policy_document.log_bucket_policy_document.statement).condition).variable == "aws:SourceArn" &&
       toset(one(one(data.aws_iam_policy_document.log_bucket_policy_document.statement).condition).values) == toset(["arn:aws:elasticloadbalancing:*:123456789012:loadbalancer/*"]) &&
-      one(aws_alb.alb.access_logs).enabled &&
-      one(aws_alb.alb.access_logs).bucket == aws_s3_bucket.log_bucket.bucket
+      one(aws_lb.alb.access_logs).enabled &&
+      one(aws_lb.alb.access_logs).bucket == aws_s3_bucket.log_bucket.bucket
     )
     error_message = "ログバケットはACLと公開アクセスを無効にし、当該アカウントのログ配信だけを許可する必要があります。"
   }
@@ -92,12 +92,12 @@ run "https_with_dns" {
   }
   assert {
     condition = (
-      length(aws_alb_listener.http_listener_forward) == 0 &&
-      one(one(aws_alb_listener.http_listener_redirect[0].default_action).redirect).protocol == "HTTPS" &&
-      aws_alb_listener.https_listener[0].certificate_arn == var.alb_https_certificate_arn &&
-      aws_alb_listener.https_listener[0].ssl_policy == "ELBSecurityPolicy-TLS13-1-2-2021-06" &&
-      one(aws_route53_record.name[0].alias).name == aws_alb.alb.dns_name &&
-      one(aws_route53_record.name[0].alias).zone_id == aws_alb.alb.zone_id &&
+      length(aws_lb_listener.http_listener_forward) == 0 &&
+      one(one(aws_lb_listener.http_listener_redirect[0].default_action).redirect).protocol == "HTTPS" &&
+      aws_lb_listener.https_listener[0].certificate_arn == var.alb_https_certificate_arn &&
+      aws_lb_listener.https_listener[0].ssl_policy == "ELBSecurityPolicy-TLS13-1-2-2021-06" &&
+      one(aws_route53_record.name[0].alias).name == aws_lb.alb.dns_name &&
+      one(aws_route53_record.name[0].alias).zone_id == aws_lb.alb.zone_id &&
       aws_route53_record.name[0].zone_id == "Z1234567890"
     )
     error_message = "HTTPSを有効にした場合、HTTPをリダイレクトし、指定ゾーンのDNSをALBへ向ける必要があります。"
@@ -108,7 +108,7 @@ run "production_protection" {
   command = plan
   variables { env = "prod" }
   assert {
-    condition     = aws_alb.alb.enable_deletion_protection && !aws_s3_bucket.log_bucket.force_destroy
+    condition     = aws_lb.alb.enable_deletion_protection && !aws_s3_bucket.log_bucket.force_destroy
     error_message = "prodではALBの削除を保護し、ログ入りバケットの強制削除を無効にする必要があります。"
   }
 }

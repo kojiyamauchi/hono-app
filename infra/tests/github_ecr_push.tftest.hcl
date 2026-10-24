@@ -1,6 +1,6 @@
 # rootでECRの権限とコンテナのログ出力先への配線を確認する。
 mock_provider "aws" {
-  mock_resource "aws_alb" {
+  mock_resource "aws_lb" {
     defaults = {
       arn      = "arn:aws:elasticloadbalancing:ap-northeast-1:123456789012:loadbalancer/app/test/1234567890123456"
       dns_name = "test-alb.ap-northeast-1.elb.amazonaws.com"
@@ -19,7 +19,7 @@ mock_provider "aws" {
   mock_resource "aws_ecs_task_definition" {
     defaults = { arn = "arn:aws:ecs:ap-northeast-1:123456789012:task-definition/root-task:7" }
   }
-  mock_resource "aws_alb_target_group" {
+  mock_resource "aws_lb_target_group" {
     defaults = { arn = "arn:aws:elasticloadbalancing:ap-northeast-1:123456789012:targetgroup/root/1234567890123456" }
   }
 }

@@ -1,4 +1,4 @@
-resource "aws_alb_target_group" "target_group" {
+resource "aws_lb_target_group" "target_group" {
   name = local.alb_target_group_name
 
   port        = var.alb_target_group_port

@@ -1,6 +1,6 @@
 output "alb_fqdn" {
   description = "ALBに付与されたFQDNです"
-  value       = aws_alb.alb.dns_name
+  value       = aws_lb.alb.dns_name
 }
 
 output "alb_zone_id" {
@@ -8,10 +8,10 @@ output "alb_zone_id" {
   ALBのホステッドゾーンIDです。
   Route53でエイリアスレコードで作成する際に利用します。
   DESC
-  value       = aws_alb.alb.zone_id
+  value       = aws_lb.alb.zone_id
 }
 
 output "alb_target_group_arn" {
   description = "ECSサービスに関連付けるターゲットグループのARN"
-  value       = aws_alb_target_group.target_group.arn
+  value       = aws_lb_target_group.target_group.arn
 }

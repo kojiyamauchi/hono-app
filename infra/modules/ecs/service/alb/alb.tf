@@ -1,4 +1,4 @@
-resource "aws_alb" "alb" {
+resource "aws_lb" "alb" {
   name                       = local.alb_name
   internal                   = false
   enable_deletion_protection = var.env == "prod"
