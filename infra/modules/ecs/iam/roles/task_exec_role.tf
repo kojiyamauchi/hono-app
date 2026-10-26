@@ -41,6 +41,15 @@ data "aws_iam_policy_document" "task_exec_role_policy_document" {
     ]
     resources = [for arn in var.task_exec_role_log_group_arns : "${arn}:*"]
   }
+
+  dynamic "statement" {
+    for_each = length(var.task_exec_role_ssm_parameter_arns) > 0 ? [1] : []
+    content {
+      sid       = "ReadApplicationParameters"
+      actions   = ["ssm:GetParameters"]
+      resources = var.task_exec_role_ssm_parameter_arns
+    }
+  }
 }
 
 resource "aws_iam_role_policy" "task_exec_role_policy" {
