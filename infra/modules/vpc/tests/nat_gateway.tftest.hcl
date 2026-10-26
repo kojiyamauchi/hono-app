@@ -68,3 +68,44 @@ run "nat_gateway_uses_public_subnet_in_same_az" {
     error_message = "NAT Gatewayは各AZのpublic subnetへ配置する必要があります。"
   }
 }
+
+# 先頭のAZとは異なる配置先を明示し、入力順に依存せず集約することを確認する。
+run "single_nat_gateway_routes_all_private_subnets" {
+  command = apply
+
+  variables {
+    single_nat_gateway_availability_zone = "ap-northeast-1c"
+  }
+
+  assert {
+    condition = (
+      keys(aws_eip.eips) == ["ap-northeast-1c"] &&
+      keys(aws_nat_gateway.nat_gateways) == ["ap-northeast-1c"] &&
+      aws_nat_gateway.nat_gateways["ap-northeast-1c"].subnet_id == aws_subnet.public_subnets["10.0.1.0/24"].id &&
+      aws_nat_gateway.nat_gateways["ap-northeast-1c"].allocation_id == aws_eip.eips["ap-northeast-1c"].allocation_id
+    )
+    error_message = "集約時は指定したAZだけにEIPとNAT Gatewayを作成し、対応するpublicサブネットへ配置する必要があります。"
+  }
+
+  assert {
+    condition = (
+      length(aws_route.private_default_routes) == 3 &&
+      alltrue([
+        for availability_zone, route_table in aws_route_table.private_route_tables :
+        aws_route.private_default_routes[availability_zone].route_table_id == route_table.id &&
+        aws_route.private_default_routes[availability_zone].nat_gateway_id == aws_nat_gateway.nat_gateways["ap-northeast-1c"].id
+      ])
+    )
+    error_message = "集約時もprivateサブネットごとのroute tableを維持し、すべてのデフォルトルートを指定したNAT Gatewayへ向ける必要があります。"
+  }
+}
+
+run "single_nat_gateway_requires_public_subnet_in_selected_az" {
+  command = plan
+
+  variables {
+    single_nat_gateway_availability_zone = "ap-northeast-1b"
+  }
+
+  expect_failures = [var.single_nat_gateway_availability_zone]
+}

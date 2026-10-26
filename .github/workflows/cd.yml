@@ -53,6 +53,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Build and push image to Amazon ECR
+        id: build-image
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -61,3 +62,9 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           tags: ${{ steps.login-ecr.outputs.registry }}/hono-app-${{ inputs.environment || 'dev' }}-web:${{ steps.get-image-tag.outputs.image-tag }}
+      - name: Record image digest
+        env:
+          IMAGE_DIGEST: ${{ steps.build-image.outputs.digest }}
+          IMAGE_TAG: ${{ steps.get-image-tag.outputs.image-tag }}
+        run: |
+          printf '## ビルド済みイメージ\n\nタグ: `%s`\n\nTerraformの `app_image_digest`: `%s`\n\nECSへのデプロイは実行していません。\n' "$IMAGE_TAG" "$IMAGE_DIGEST" >> "$GITHUB_STEP_SUMMARY"

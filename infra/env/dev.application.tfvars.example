@@ -1,0 +1,37 @@
+# 公開直前にdev.application.local.tfvarsへコピーし、実際の公開設定とARNへ置き換える。
+# 機密値はここへ記載せず、SSM SecureStringへ別途登録する。
+# ECRへ登録したlinux/amd64イメージのダイジェストへ必ず置き換える。
+app_image_digest = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+
+app_environment = {
+  SUPABASE_URL                  = "https://project-ref.supabase.co"
+  ALLOWED_ORIGINS               = "https://frontend.example.com"
+  PASSWORD_RESET_FROM_EMAIL     = "noreply@example.com"
+  PASSWORD_RESET_URL_BASE       = "https://frontend.example.com/reset-password"
+  EMAIL_VERIFICATION_FROM_EMAIL = "noreply@example.com"
+  EMAIL_VERIFICATION_URL_BASE   = "https://frontend.example.com/verify-email"
+  COOKIE_SAMESITE               = "Lax"
+}
+
+# アカウントIDとパラメーターのARNは実際の環境に合わせる。
+app_secret_parameter_arns = {
+  DATABASE_URL                    = "arn:aws:ssm:ap-northeast-1:123456789012:parameter/hono-app/dev/DATABASE_URL"
+  SUPABASE_ANON_KEY               = "arn:aws:ssm:ap-northeast-1:123456789012:parameter/hono-app/dev/SUPABASE_ANON_KEY"
+  JWT_SECRET                      = "arn:aws:ssm:ap-northeast-1:123456789012:parameter/hono-app/dev/JWT_SECRET"
+  REFRESH_TOKEN_SECRET            = "arn:aws:ssm:ap-northeast-1:123456789012:parameter/hono-app/dev/REFRESH_TOKEN_SECRET"
+  PASSWORD_RESET_TOKEN_SECRET     = "arn:aws:ssm:ap-northeast-1:123456789012:parameter/hono-app/dev/PASSWORD_RESET_TOKEN_SECRET"
+  EMAIL_VERIFICATION_TOKEN_SECRET = "arn:aws:ssm:ap-northeast-1:123456789012:parameter/hono-app/dev/EMAIL_VERIFICATION_TOKEN_SECRET"
+  RESEND_API_KEY                  = "arn:aws:ssm:ap-northeast-1:123456789012:parameter/hono-app/dev/RESEND_API_KEY"
+}
+
+# ブラウザから認証を使う公開環境では、発行済み証明書とドメインも指定する。
+# alb_https_certificate_arn = "arn:aws:acm:ap-northeast-1:123456789012:certificate/実際の証明書ID"
+# alb_domain_name           = "api.example.com"
+# alb_hosted_zone_name      = "example.com"
+
+# trace送信は既定で無効。確認するときだけ有効にし、送信ヘッダーをSSMへ登録する。
+# otel_traces = {
+#   enabled               = true
+#   headers_parameter_arn = "arn:aws:ssm:ap-northeast-1:123456789012:parameter/hono-app/dev/OTEL_EXPORTER_OTLP_TRACES_HEADERS"
+#   sampling_ratio        = 0.1
+# }

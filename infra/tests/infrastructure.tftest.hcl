@@ -69,6 +69,21 @@ override_module {
 }
 
 variables {
+  app_image_digest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  app_environment = {
+    SUPABASE_URL                  = "https://example.supabase.co"
+    ALLOWED_ORIGINS               = "http://localhost:3000"
+    PASSWORD_RESET_FROM_EMAIL     = "noreply@example.com"
+    PASSWORD_RESET_URL_BASE       = "https://example.com/reset-password"
+    EMAIL_VERIFICATION_FROM_EMAIL = "noreply@example.com"
+    EMAIL_VERIFICATION_URL_BASE   = "https://example.com/verify-email"
+  }
+  app_secret_parameter_arns = {
+    for name in [
+      "DATABASE_URL", "SUPABASE_ANON_KEY", "JWT_SECRET", "REFRESH_TOKEN_SECRET",
+      "PASSWORD_RESET_TOKEN_SECRET", "EMAIL_VERIFICATION_TOKEN_SECRET", "RESEND_API_KEY",
+    ] : name => "arn:aws:ssm:ap-northeast-1:123456789012:parameter/hono-app/dev/${name}"
+  }
   subnets = {
     public = [
       { cidr_block = "10.0.0.0/24", availability_zone = "ap-northeast-1a" },
@@ -115,12 +130,129 @@ run "initial_http_plan" {
   command = plan
   assert {
     condition = (
-      aws_vpc_security_group_ingress_rule.ecs_from_alb.from_port == 80 &&
-      aws_vpc_security_group_egress_rule.alb_to_ecs.to_port == 80 &&
-      output.ecs_service_name == "hono-app-dev-service"
+      aws_vpc_security_group_ingress_rule.ecs_from_alb.from_port == 3000 &&
+      aws_vpc_security_group_egress_rule.alb_to_ecs.to_port == 3000 &&
+      output.ecs_service_name == "hono-app-${terraform.workspace}-service"
     )
     error_message = "リソースIDが未確定の初回planでも、ECSサービスとALBからの通信を計画できる必要があります。"
   }
+}
+
+run "hono_runtime_configuration" {
+  command = plan
+
+  assert {
+    condition = (
+      jsondecode(local.container_definitions)[0].name == "hono" &&
+      jsondecode(local.container_definitions)[0].image == "123456789012.dkr.ecr.ap-northeast-1.amazonaws.com/hono-app-dev-web@${var.app_image_digest}" &&
+      jsondecode(local.container_definitions)[0].portMappings[0].containerPort == 3000 &&
+      tomap({ for entry in jsondecode(local.container_definitions)[0].environment : entry.name => entry.value }) == tomap(local.app_environment) &&
+      tomap({ for entry in jsondecode(local.container_definitions)[0].secrets : entry.name => entry.valueFrom }) == var.app_secret_parameter_arns &&
+      !contains([for entry in jsondecode(local.container_definitions)[0].environment : entry.name], "DATABASE_URL") &&
+      local.app_environment.COOKIE_SECURE == (terraform.workspace == "dev" ? "false" : "true") &&
+      local.app_environment.ENABLE_API_DOCS == "false"
+    )
+    error_message = "HonoをECRの固定ダイジェスト・3000番ポートで起動し、公開設定とSSM参照を分離する必要があります。"
+  }
+}
+
+run "mutable_image_tag_is_rejected" {
+  command = plan
+  variables {
+    app_image_digest = "latest"
+  }
+  expect_failures = [var.app_image_digest]
+}
+
+run "trace_export_uses_parameter_store_headers" {
+  command = plan
+  variables {
+    otel_traces = {
+      enabled               = true
+      headers_parameter_arn = "arn:aws:ssm:ap-northeast-1:123456789012:parameter/hono-app/dev/OTEL_EXPORTER_OTLP_TRACES_HEADERS"
+      sampling_ratio        = 0.25
+    }
+  }
+  assert {
+    condition = (
+      local.app_environment.OTEL_TRACES_ENABLED == "true" &&
+      local.app_environment.OTEL_TRACES_SAMPLER_RATIO == "0.25" &&
+      local.app_environment.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT == "https://otlp.nr-data.net:4318/v1/traces" &&
+      local.app_secret_parameter_arns.OTEL_EXPORTER_OTLP_TRACES_HEADERS == var.otel_traces.headers_parameter_arn &&
+      length(jsondecode(local.container_definitions)[0].secrets) == 8 &&
+      !contains(keys(local.app_environment), "OTEL_EXPORTER_OTLP_TRACES_HEADERS")
+    )
+    error_message = "trace送信は明示的な有効化時だけ設定し、機密ヘッダーを公開設定へ入れずSSM参照として追加してください。"
+  }
+}
+
+run "disabled_tracing_does_not_request_header_permissions" {
+  command = plan
+  variables {
+    otel_traces = {
+      headers_parameter_arn = "arn:aws:ssm:ap-northeast-1:123456789012:parameter/hono-app/dev/OTEL_EXPORTER_OTLP_TRACES_HEADERS"
+    }
+  }
+  assert {
+    condition = (
+      local.app_environment.OTEL_TRACES_ENABLED == "false" &&
+      !contains(keys(local.app_secret_parameter_arns), "OTEL_EXPORTER_OTLP_TRACES_HEADERS")
+    )
+    error_message = "trace送信が無効な場合、ヘッダー用パラメーターへの取得権限を追加しないでください。"
+  }
+}
+
+run "trace_export_requires_headers_parameter" {
+  command = plan
+  variables {
+    otel_traces = { enabled = true }
+  }
+  expect_failures = [var.otel_traces]
+}
+
+run "trace_export_rejects_wildcard_parameter" {
+  command = plan
+  variables {
+    otel_traces = {
+      enabled               = true
+      headers_parameter_arn = "arn:aws:ssm:ap-northeast-1:123456789012:parameter/hono-app/dev/*"
+    }
+  }
+  expect_failures = [var.otel_traces]
+}
+
+run "placeholder_image_digest_is_rejected" {
+  command = plan
+  variables {
+    app_image_digest = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  }
+  expect_failures = [var.app_image_digest]
+}
+
+run "missing_application_secret_is_rejected" {
+  command = plan
+  variables {
+    app_secret_parameter_arns = {
+      JWT_SECRET = "arn:aws:ssm:ap-northeast-1:123456789012:parameter/hono-app/dev/JWT_SECRET"
+    }
+  }
+  expect_failures = [var.app_secret_parameter_arns]
+}
+
+run "wildcard_origin_is_rejected" {
+  command = plan
+  variables {
+    app_environment = merge(var.app_environment, { ALLOWED_ORIGINS = "*" })
+  }
+  expect_failures = [var.app_environment]
+}
+
+run "cross_site_cookie_requires_https" {
+  command = plan
+  variables {
+    app_environment = merge(var.app_environment, { COOKIE_SAMESITE = "None" })
+  }
+  expect_failures = [var.app_environment]
 }
 
 run "http_service_wiring" {
@@ -134,7 +266,7 @@ run "http_service_wiring" {
       aws_vpc_security_group_egress_rule.alb_to_ecs.referenced_security_group_id == module.ecs_security_group.security_group_id &&
       aws_vpc_security_group_egress_rule.alb_to_ecs.to_port == local.web_container_port &&
       output.alb_url == "http://${module.alb.alb_fqdn}" &&
-      output.ecs_service_name == "hono-app-dev-service"
+      output.ecs_service_name == "hono-app-${terraform.workspace}-service"
     )
     error_message = "公開URLはHTTPのALBを指し、ALBとECSのSG間でコンテナのポートだけを許可する必要があります。"
   }
@@ -159,4 +291,21 @@ run "https_requires_public_domain" {
     alb_https_certificate_arn = "arn:aws:acm:ap-northeast-1:123456789012:certificate/test"
   }
   expect_failures = [var.alb_https_certificate_arn]
+}
+
+# workspaceごとに実行し、devの省コスト設定がstg/prodへ波及しないことを確認する。
+run "workspace_cost_configuration" {
+  command = plan
+
+  assert {
+    condition = (
+      local.task_cpu_allocation == (terraform.workspace == "dev" ? 256 : 1024) &&
+      local.task_memory_allocation == (terraform.workspace == "dev" ? 512 : 2048) &&
+      jsondecode(local.container_definitions)[0].cpu == local.task_cpu_allocation &&
+      jsondecode(local.container_definitions)[0].memory == local.task_memory_allocation &&
+      local.enable_container_insights == (terraform.workspace != "dev") &&
+      local.log_retention_in_days == (terraform.workspace == "dev" ? 7 : 30)
+    )
+    error_message = "devだけを小さなタスク・Insights無効・7日ログ保持とし、stg/prodの従来設定とコンテナの割り当てを維持する必要があります。"
+  }
 }

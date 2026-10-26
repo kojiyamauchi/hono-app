@@ -5,7 +5,7 @@ locals {
 }
 
 # public subnetを配置するAZごとにroute tableを1つ作成する。
-# privateがAZごとのNAT Gatewayへ向く構成と対称に保つため、publicもAZ単位へ揃える。
+# NAT Gatewayを集約した場合も、各サブネットとroute tableの対応は維持する。
 resource "aws_route_table" "public_route_tables" {
   for_each = local.public_availability_zones
   vpc_id   = aws_vpc.vpc.id
@@ -46,14 +46,14 @@ resource "aws_route_table" "private_route_tables" {
   }
 }
 
-# デフォルトルートは自身のAZのNAT Gatewayへ向ける。他AZのNAT Gatewayへ向けると、
-# そのAZの障害が他AZへ波及し、クロスAZのデータ転送料も発生するため。
+# 通常は自身のAZへ向ける。集約時は全AZから指定したNAT Gatewayへ向けるため、
+# 配置先AZの障害が全privateサブネットの外向き通信へ波及し、クロスAZ転送料も発生する。
 resource "aws_route" "private_default_routes" {
   for_each       = local.private_availability_zones
   route_table_id = aws_route_table.private_route_tables[each.key].id
 
   destination_cidr_block = "0.0.0.0/0"
-  nat_gateway_id         = aws_nat_gateway.nat_gateways[each.key].id
+  nat_gateway_id         = aws_nat_gateway.nat_gateways[coalesce(var.single_nat_gateway_availability_zone, each.key)].id
 }
 
 # 各private subnetを、自身の配置先AZに対応するroute tableへ関連付ける。

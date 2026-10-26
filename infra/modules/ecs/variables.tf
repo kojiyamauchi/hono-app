@@ -28,3 +28,10 @@ variable "cluster_additional_tags" {
     error_message = "キーのServiceNameおよびEnvは予約済みです。使用することはできません。"
   }
 }
+
+variable "enable_container_insights" {
+  type        = bool
+  default     = true
+  nullable    = false
+  description = "Container Insightsによる追加メトリクス収集を有効にするか"
+}

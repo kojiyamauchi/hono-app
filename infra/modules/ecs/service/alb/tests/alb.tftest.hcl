@@ -38,6 +38,11 @@ run "http_without_domain" {
   }
 
   assert {
+    condition     = aws_lb.alb.xff_header_processing_mode == "append" && !aws_lb.alb.enable_xff_client_port
+    error_message = "アプリが信頼する末尾のIPをALBが追記し、IP検証を妨げるクライアントポートを付与しない設定を維持してください。"
+  }
+
+  assert {
     condition = (
       length(aws_lb_listener.http_listener_forward) == 1 &&
       length(aws_lb_listener.http_listener_redirect) == 0 &&

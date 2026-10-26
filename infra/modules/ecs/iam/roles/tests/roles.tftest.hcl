@@ -89,6 +89,35 @@ run "role_names_tags_and_policy_bindings" {
   }
 }
 
+run "application_parameters_are_scoped_to_execution_role" {
+  command = apply
+
+  variables {
+    task_exec_role_ssm_parameter_arns = ["arn:aws:ssm:ap-northeast-1:123456789012:parameter/hono-app/dev/DATABASE_URL"]
+  }
+
+  assert {
+    condition = (
+      length(data.aws_iam_policy_document.task_exec_role_policy_document.statement) == 4 &&
+      one([for statement in data.aws_iam_policy_document.task_exec_role_policy_document.statement : statement if statement.sid == "ReadApplicationParameters"]).actions == toset(["ssm:GetParameters"]) &&
+      one([for statement in data.aws_iam_policy_document.task_exec_role_policy_document.statement : statement if statement.sid == "ReadApplicationParameters"]).resources == toset(var.task_exec_role_ssm_parameter_arns) &&
+      aws_iam_role_policy.task_exec_role_policy.role == aws_iam_role.task_exec_role.id &&
+      length(aws_iam_role_policy.task_role_inline_policies) == 0
+    )
+    error_message = "機密値の取得権限は指定したSSMパラメーターとタスク実行ロールに限定し、アプリのタスクロールへ付与しないでください。"
+  }
+}
+
+run "wildcard_parameter_is_rejected" {
+  command = plan
+
+  variables {
+    task_exec_role_ssm_parameter_arns = ["arn:aws:ssm:ap-northeast-1:123456789012:parameter/hono-app/dev/*"]
+  }
+
+  expect_failures = [var.task_exec_role_ssm_parameter_arns]
+}
+
 run "ten_managed_policies_are_allowed" {
   command = plan
 

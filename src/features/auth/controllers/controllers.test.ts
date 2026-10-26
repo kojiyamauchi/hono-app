@@ -81,7 +81,21 @@ beforeEach(() => {
 })
 
 describe('authController', () => {
-  test('signupはx-forwarded-forの先頭IPをserviceの第2引数へ渡す', async () => {
+  test.each([
+    { label: 'IPv6', header: '203.0.113.10, 2001:db8::10', expectedIp: '2001:db8::10' },
+    { label: '前後の空白', header: '203.0.113.10,  198.51.100.20 ', expectedIp: '198.51.100.20' },
+    { label: '不正な末尾', header: '203.0.113.10, invalid', expectedIp: undefined },
+    { label: '空の末尾', header: '203.0.113.10, ', expectedIp: undefined },
+  ])('loginの転送ヘッダーを検証する（$label）', async ({ header, expectedIp }) => {
+    login.mockResolvedValue({ token: 'access-token', refreshToken: 'refresh-token', user: { id: 1, name: 'Taro', email: 'taro@example.com' } })
+
+    const response = await app.request('/login', { method: 'POST', headers: { 'x-forwarded-for': header, 'x-real-ip': '192.0.2.10' } })
+
+    expect(response.status).toBe(200)
+    expect(login).toHaveBeenCalledWith({ email: 'taro@example.com', password: 'password123' }, expectedIp)
+  })
+
+  test('signupはALBがx-forwarded-forの末尾へ追記したIPをserviceの第2引数へ渡す', async () => {
     signup.mockResolvedValue({
       token: 'access-token',
       refreshToken: 'next-refresh-token',
@@ -94,7 +108,7 @@ describe('authController', () => {
     })
 
     expect(response.status).toBe(201)
-    expect(signup).toHaveBeenCalledWith({ name: 'Taro', email: 'taro@example.com', password: 'password123' }, '203.0.113.10')
+    expect(signup).toHaveBeenCalledWith({ name: 'Taro', email: 'taro@example.com', password: 'password123' }, '198.51.100.20')
   })
 
   test('signupはIPヘッダが無い場合にundefinedをserviceの第2引数へ渡す', async () => {
@@ -110,7 +124,7 @@ describe('authController', () => {
     expect(signup).toHaveBeenCalledWith({ name: 'Taro', email: 'taro@example.com', password: 'password123' }, undefined)
   })
 
-  test('loginはx-forwarded-forの先頭IPをserviceの第2引数へ渡す', async () => {
+  test('loginはALBがx-forwarded-forの末尾へ追記したIPをserviceの第2引数へ渡す', async () => {
     login.mockResolvedValue({
       token: 'access-token',
       refreshToken: 'next-refresh-token',
@@ -123,7 +137,7 @@ describe('authController', () => {
     })
 
     expect(response.status).toBe(200)
-    expect(login).toHaveBeenCalledWith({ email: 'taro@example.com', password: 'password123' }, '203.0.113.10')
+    expect(login).toHaveBeenCalledWith({ email: 'taro@example.com', password: 'password123' }, '198.51.100.20')
   })
 
   test('loginはIPヘッダが無い場合にundefinedをserviceの第2引数へ渡す', async () => {
@@ -199,7 +213,7 @@ describe('authController', () => {
     expect(response.headers.get('set-cookie')).toContain('refreshToken=')
   })
 
-  test('password-reset/requestはx-forwarded-forの先頭IPをserviceへ渡す', async () => {
+  test('password-reset/requestはALBがx-forwarded-forの末尾へ追記したIPをserviceへ渡す', async () => {
     requestPasswordReset.mockResolvedValue(undefined)
 
     const response = await app.request('/password-reset/request', {
@@ -208,10 +222,10 @@ describe('authController', () => {
     })
 
     expect(response.status).toBe(202)
-    expect(requestPasswordReset).toHaveBeenCalledWith('taro@example.com', '203.0.113.10')
+    expect(requestPasswordReset).toHaveBeenCalledWith('taro@example.com', '198.51.100.20')
   })
 
-  test('password-reset/requestはx-forwarded-forが無い場合にx-real-ipをserviceへ渡す', async () => {
+  test('password-reset/requestはx-forwarded-forが無い場合にx-real-ipを信用しない', async () => {
     requestPasswordReset.mockResolvedValue(undefined)
 
     const response = await app.request('/password-reset/request', {
@@ -220,7 +234,7 @@ describe('authController', () => {
     })
 
     expect(response.status).toBe(202)
-    expect(requestPasswordReset).toHaveBeenCalledWith('taro@example.com', '198.51.100.20')
+    expect(requestPasswordReset).toHaveBeenCalledWith('taro@example.com', undefined)
   })
 
   test('password-reset/requestはIPヘッダが無い場合にundefinedをserviceへ渡す', async () => {

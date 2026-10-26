@@ -238,7 +238,7 @@ describe('auth signup/login routes（Cookie設定）', () => {
     }
   })
 
-  test('POST /auth/signupは同一IPからのレート制限超過時に429を返す', async () => {
+  test('POST /auth/signupは偽装した先頭IPを変えてもALBが追記した同一IPの制限を回避できない', async () => {
     findByEmail.mockResolvedValue(null)
     createUser.mockImplementation(async (input: { name: string; email: string; password: string }) => ({
       id: 1,
@@ -256,7 +256,7 @@ describe('auth signup/login routes（Cookie設定）', () => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-forwarded-for': '203.0.113.60',
+            'x-forwarded-for': `198.51.100.${i + 1}, 203.0.113.60`,
           },
           body: JSON.stringify({ name: 'Taro', email: `user-${i}@example.com`, password: 'password123' }),
         })
@@ -267,7 +267,7 @@ describe('auth signup/login routes（Cookie設定）', () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-forwarded-for': '203.0.113.60',
+          'x-forwarded-for': '198.51.100.99, 203.0.113.60',
         },
         body: JSON.stringify({ name: 'Taro', email: 'user-overflow@example.com', password: 'password123' }),
       })

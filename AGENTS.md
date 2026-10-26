@@ -152,6 +152,7 @@ bun run lint         # ESLintによる自動修正（max-warnings 0）
 bun run format       # Prettierによるフォーマット
 bun run spellcheck   # CSpellによるスペルチェック
 bun test --isolate   # テストファイルを分離したBun Testの実行
+bun run test:container # AWSへ接続せず本番イメージ・migration・DB操作をローカル検証
 ```
 
 ### データベース操作
@@ -159,6 +160,7 @@ bun test --isolate   # テストファイルを分離したBun Testの実行
 ```bash
 bun run prisma:generate      # Prismaクライアントの生成
 bun run prisma:migrate:dev   # マイグレーションの作成と適用
+bun run prisma:migrate:deploy # 既存migrationを配備先DBへ適用（接続先を確認して実行）
 bun run prisma:validate      # スキーマの検証
 bun run prisma:format        # スキーマファイルのフォーマット
 bun run prisma:studio        # Prisma Studioを開く

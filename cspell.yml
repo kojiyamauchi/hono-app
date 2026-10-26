@@ -7,6 +7,7 @@ words:
   - Bun
   - bunx
   - chdir
+  - cpus
   - datasource
   - dotenv
   - dtos
@@ -17,14 +18,17 @@ words:
   - hono
   - Hono
   - hostnames
+  - isready
   - kojiyamauchi
   - logdelivery
   - mappers
   - octocat
   - oneline
+  - pooler
   - postgresql
   - Prisma
   - Refreshable
+  - sslmode
   - supabase
   - Supabase
   - targetgroup

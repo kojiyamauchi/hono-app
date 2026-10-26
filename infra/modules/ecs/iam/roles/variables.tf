@@ -77,6 +77,21 @@ variable "task_role_managed_policy_arns" {
   }
 }
 
+variable "task_exec_role_ssm_parameter_arns" {
+  type        = list(string)
+  default     = []
+  nullable    = false
+  description = "環境変数へ注入する既存SSM SecureStringのARN。既定のaws/ssmキーを使用する"
+
+  validation {
+    condition = alltrue([
+      for arn in var.task_exec_role_ssm_parameter_arns :
+      can(regex("^arn:[^:]+:ssm:[^:]+:[0-9]{12}:parameter/.+$", arn)) && !strcontains(arn, "*")
+    ])
+    error_message = "ワイルドカードを含まないSSMパラメーターARNを指定してください。"
+  }
+}
+
 variable "task_role_inline_policies" {
   description = <<DESC
   タスクロールに付与するインラインポリシーです。キーにインラインポリシー名、値にインラインポリシーのボディ(JSON)を記述します。

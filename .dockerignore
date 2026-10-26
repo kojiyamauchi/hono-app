@@ -30,6 +30,7 @@ AGENTS.md
 CLAUDE.md
 supabase
 infra
+scripts
 
 # Docker関連（ビルドコンテキストへ含めない）
 Dockerfile

@@ -1,13 +1,18 @@
-# AZごとに一意なpublic subnetへNAT Gatewayを1つ配置する。
+# 通常は各AZへ配置し、集約する場合も入力値から決まるAZをstateのキーに保つ。
 locals {
   public_subnet_cidr_by_az = {
     for subnet in var.subnets.public :
     subnet.availability_zone => subnet.cidr_block
   }
+  nat_gateway_subnet_cidr_by_az = {
+    for availability_zone, cidr_block in local.public_subnet_cidr_by_az :
+    availability_zone => cidr_block
+    if var.single_nat_gateway_availability_zone == null || availability_zone == var.single_nat_gateway_availability_zone
+  }
 }
 
 resource "aws_eip" "eips" {
-  for_each = local.public_subnet_cidr_by_az
+  for_each = local.nat_gateway_subnet_cidr_by_az
   domain   = "vpc"
 
   tags = {
@@ -19,7 +24,7 @@ resource "aws_eip" "eips" {
 }
 
 resource "aws_nat_gateway" "nat_gateways" {
-  for_each      = local.public_subnet_cidr_by_az
+  for_each      = local.nat_gateway_subnet_cidr_by_az
   allocation_id = aws_eip.eips[each.key].allocation_id
   subnet_id     = aws_subnet.public_subnets[each.value].id
 
