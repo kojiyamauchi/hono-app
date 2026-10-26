@@ -30,7 +30,7 @@ FROM build AS migration
 
 USER bun
 
-CMD ["bun", "node_modules/prisma/build/index.js", "migrate", "deploy"]
+CMD ["bun", "run", "prisma:migrate:deploy"]
 
 # ---- 実行ステージ: 実行に必要な成果物のみを含めるスリムな最終イメージ ----
 FROM oven/bun:1.3.14 AS runtime
