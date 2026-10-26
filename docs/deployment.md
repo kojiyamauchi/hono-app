@@ -5,6 +5,7 @@
 ## 配線と管理範囲
 
 - TerraformはECSのタスク定義・サービスを管理し、Honoの3000番ポートへALBから転送します。ヘルスチェックは既存の `/health` を使います。
+- クライアントIPはALBが `X-Forwarded-For` の末尾へ追記した有効なIPだけを使います。ALBはappend・クライアントポート非付与に固定し、タスクのSGはALBからの接続だけを許可します。タスクを直接公開したり、ALBの前にCDN等を追加したりする場合は、この信頼境界を見直してください。[ALBの転送ヘッダー](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/x-forwarded-headers.html)
 - イメージはECRの `sha256:...` ダイジェストで指定します。新しいリリースもロールバックも、この値を変更してplan・applyします。ECSだけを手動更新してTerraformとの不一致を作らないでください。
 - 公開設定は `app_environment`、機密値は `app_secret_parameter_arns` のSSM参照で渡します。Terraformは機密値を読み取りません。
 - タスク実行ロールは指定されたSSMパラメーターへの `ssm:GetParameters` だけを追加で持ちます。SSMはStandardのSecureStringと既定の `alias/aws/ssm` キーを使用します。カスタマー管理KMSキーを使う場合の復号権限は含みません。

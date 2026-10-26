@@ -4,6 +4,10 @@ resource "aws_lb" "alb" {
   enable_deletion_protection = var.env == "prod"
   drop_invalid_header_fields = true
 
+  # アプリはALBが末尾へ追記したIPを使うため、ヘッダーの追記とポート非付与を固定する。
+  xff_header_processing_mode = "append"
+  enable_xff_client_port     = false
+
   load_balancer_type = "application"
 
   subnets = var.alb_subnet_ids
