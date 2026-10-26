@@ -54,7 +54,7 @@ postgresql://postgres.<project-ref>:<URLエンコード済みパスワード>@<�
 
 ### HTTPSとCookie
 
-HTTPのALB DNS名はcurlでの疎通確認に使用できます。ブラウザーで認証を使う公開環境には、東京リージョンの発行済みACM証明書・公開ドメイン・既存Route53 publicホストゾーンを設定してください。証明書指定時はHTTPからHTTPSへリダイレクトし、Secure Cookieを有効にします。
+HTTPのALB DNS名は `/health` など機密情報を含まない疎通確認専用です。パスワード・認証トークン・Cookieを含むリクエストをHTTPで送らないでください。devを含め、フロントエンドの接続先や認証APIとして使う環境では、東京リージョンの発行済みACM証明書・公開ドメイン・既存Route53 publicホストゾーンの設定を公開開始前の必須条件とします。証明書指定時はHTTPからHTTPSへリダイレクトし、Secure Cookieを有効にします。
 
 `ALLOWED_ORIGINS` は実際のフロントエンドのOriginを指定します。フロントエンドとAPIがcross-siteなら `COOKIE_SAMESITE = "None"` とHTTPSの両方が必要です。`stg/prod` では常にSecure Cookieを使います。
 
@@ -139,7 +139,7 @@ terraform -chdir=infra apply dev.tfplan
 terraform -chdir=infra output -raw alb_url
 ```
 
-ECSサービスが安定状態となり、ALBのターゲットがHealthyになることを確認します。表示されたURLの `/health` を確認し、検証専用アカウントで認証とDB操作を確認します。Supabase Authのメール確認とResendの実配達は、それぞれ実際の設定で確認してください。`/health` はプロセスのヘルスチェックであり、DB接続の成功までは保証しません。
+ECSサービスが安定状態となり、ALBのターゲットがHealthyになることを確認します。表示されたURLの `/health` を確認します。認証APIの確認はHTTPSで接続できることを確かめてから、検証専用アカウントで実施します。HTTPしか設定していない場合は認証・DB操作へ進まず、先に証明書とドメインを設定してください。Supabase Authのメール確認とResendの実配達は、それぞれ実際の設定で確認してください。`/health` はプロセスのヘルスチェックであり、DB接続の成功までは保証しません。
 
 シークレットを変更したときは同じARNでも既存タスクの環境変数は更新されません。SSM更新後はECSサービスの再起動を別途実施してください。
 
