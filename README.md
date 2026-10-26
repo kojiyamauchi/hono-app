@@ -466,9 +466,11 @@ bun run tf:init:no-backend
 bun run tf:lint:init
 ```
 
-Terraform stateは、`ap-northeast-1`のS3バケット`terraform-state-hono-app`へ保存し、S3 lockfileによるstate lockingを有効にしています。環境ごとのstateはTerraform workspaceで分離し、現時点では`dev` workspaceを使用します。`tf:plan` / `tf:apply`は選択中のworkspaceを対象とし、特定のtfvarsファイルを自動では読み込みません。`infra/env/*.tfvars`は将来の環境別入力値の仮置きであり、利用する場合は`-var-file=env/<workspace>.tfvars`を明示的に指定してください。
+Terraform stateは、`ap-northeast-1`のS3バケット`terraform-state-hono-app`へ保存し、S3 lockfileによるstate lockingを有効にしています。環境ごとのstateはTerraform workspaceで分離し、現時点では`dev` workspaceを使用します。`tf:plan` / `tf:apply`は選択中のworkspaceを対象とし、特定のtfvarsファイルを自動では読み込みません。`infra/env/dev.tfvars` はdevのネットワーク入力、`dev.application.local.tfvars` は公開前に入力するアプリ設定です。stg/prodのtfvarsは仮置きであり、利用時は各環境の入力値を用意して `-var-file` を明示してください。
 
 GitHub Actions用OIDCプロバイダーはAWSアカウントで共通のため、`infra/account`を独立したrootとして管理します。`default` workspaceの`hono-app/account/terraform.tfstate`に保存し、最初に一度だけ適用してください。その後、環境別rootの`infra`でECRとIAMロールを管理します。`infra`は既存OIDCプロバイダーをdata sourceで参照するため、プロバイダー未作成の状態ではplanできません。stg/prodを同じAWSアカウントへ追加するときも、プロバイダーを再作成せず同じARNを参照します。
+
+以下は環境を構築する際の操作例です。実際のapplyを保留して準備する場合は [デプロイ手順](docs/deployment.md) を参照してください。plan前には同手順のローカル設定ファイルを用意します。
 
 ```bash
 aws sts get-caller-identity
@@ -478,7 +480,7 @@ terraform -chdir=infra/account plan
 terraform -chdir=infra/account apply
 terraform -chdir=infra init
 terraform -chdir=infra workspace show          # devを確認
-terraform -chdir=infra plan -var-file=env/dev.tfvars
+terraform -chdir=infra plan -var-file=env/dev.tfvars -var-file=env/dev.application.local.tfvars
 ```
 
 サブネットは必須変数 `subnets` でCIDRと配置先AZを明示します。以下は最小構成となる2AZのtfvarsファイル入力例です。AZは対象アカウントで利用可能な名前に合わせてください。public/privateはそれぞれ2個以上かつ同数とし、同じ2つ以上のAZの組み合わせへ分散します。
@@ -498,17 +500,32 @@ subnets = {
 
 public/privateサブネットは、1つのAZにつきそれぞれ1つ指定します。既存サブネットがある場合は現在のCIDRとAZの組み合わせを引き継いでください。リソースのキーはCIDRのまま維持するため、リストの並べ替えや利用可能なAZの追加で配置先は変わりません。指定したAZが利用できない場合や、`excluded_availability_zones` を除いた利用可能AZが2つ未満の場合は処理を停止します。CIDRや指定AZを変更するとサブネットの再作成が発生します。dev環境では `infra/env/dev.tfvars` で `ap-northeast-1b` を除外しており、対象アカウントのAZ利用方針を変更する場合はこの値を更新します。
 
-dev環境のplanでは、必須のサブネット入力を含むtfvarsファイルを明示します。
+dev環境のplanでは、サブネット入力とアプリ設定のtfvarsファイルを両方指定します。`infra/env/dev.application.tfvars.example` を `dev.application.local.tfvars` へコピーし、実際の公開設定・SSMのARN・ECRイメージのダイジェストを入力してください。機密値はtfvarsへ書かずSSMへ別途登録します。コピーと入力、公開直前の操作の順序は [デプロイ手順](docs/deployment.md) にまとめています。
 
 ```bash
-terraform -chdir=infra plan -var-file=env/dev.tfvars
+terraform -chdir=infra plan -var-file=env/dev.tfvars -var-file=env/dev.application.local.tfvars
 ```
 
-現時点ではサブネット、Internet Gateway、AZごとのNAT GatewayとEIP、public/private subnetのルートテーブルまでを定義しています。ルートテーブルはpublic/privateそれぞれAZごとに1つ作成し、各サブネットを自身のAZに対応するルートテーブルへ関連付けます。publicのデフォルトルートはInternet Gatewayへ、privateのデフォルトルートは自身のAZのNAT Gatewayへ向けています。privateを自身のAZのNAT Gatewayへ向けることで、あるAZの障害を他のAZへ波及させず、クロスAZのデータ転送料も避けています。
+ネットワークはサブネット、Internet Gateway、NAT GatewayとEIP、public/private subnetのルートテーブルを定義しています。ルートテーブルはpublic/privateそれぞれAZごとに1つ作成し、各サブネットを自身のAZに対応するルートテーブルへ関連付けます。publicのデフォルトルートはInternet Gatewayへ向けます。通常はNAT GatewayをAZごとに配置し、privateのデフォルトルートを自身のAZへ向けることで、AZ障害の波及とクロスAZの転送料を避けます。
+
+devの `infra/env/dev.tfvars` は `ap-northeast-1a` / `ap-northeast-1c` の2AZ構成とし、`single_nat_gateway_availability_zone = "ap-northeast-1a"` でNAT GatewayとEIPを1つずつに集約します。すべてのprivateサブネットは、このNAT Gatewayを外向き通信に使います。集約先AZが停止すると全privateサブネットのインターネット接続が失われ、別AZからの通信にはクロスAZ転送料も発生します。配置先はpublicサブネットのAZから明示指定するため、入力リストの並べ替えで集約先は変わりません。`null` にするとAZごとの配置へ戻ります。環境別rootでは集約をdevだけに許可し、stg/prodに集約先を指定すると検証エラーになります。
 
 VPCモジュールで`for_each`のキーを作るときは、入力値から決まる値を使います。作成前のリソースを`for_each`へ渡すと、初回planでキーを確定できない場合があります。リソースIDは各resourceの本文で参照してください。
 
-ECSモジュールは、Fargateでコンテナを動かすためのECSクラスターを定義しています。クラスター名は`<service_name>-<env>-cluster`の形式で、Container Insightsを有効化し、capacity providerは`FARGATE`のみを登録してデフォルト戦略にも設定しています。Container Insightsはdevを含む全workspaceで有効になり、CloudWatchの利用量に応じた料金が発生し得ます。クラスターには`ServiceName`と`Env`のタグを必ず付与し、`cluster_additional_tags`で追加のタグを指定できます。`ServiceName`と`Env`は予約済みキーのため、`cluster_additional_tags`へ指定すると検証エラーになります。root moduleは、作成したクラスターの名前とARNを`ecs_cluster_name` / `ecs_cluster_arn`として出力します。タスク定義・タスク用IAMロール・ECSサービス・ALBも定義しており、現在は疎通確認用の`public.ecr.aws/docker/library/nginx:1.30.6`を1タスク起動します。Honoアプリのイメージへの切り替えと自動デプロイは含みません。
+ECSモジュールは、Fargateでコンテナを動かすためのECSクラスターを定義しています。クラスター名は`<service_name>-<env>-cluster`の形式で、capacity providerは`FARGATE`のみを登録してデフォルト戦略にも設定しています。Container Insightsはモジュールの `enable_container_insights` で切り替えられ、既定は有効です。環境別rootはdevだけ無効化し、stg/prodは有効のままにします。有効時はCloudWatchの利用量に応じた料金が発生し得ます。クラスターには`ServiceName`と`Env`のタグを必ず付与し、`cluster_additional_tags`で追加のタグを指定できます。`ServiceName`と`Env`は予約済みキーのため、`cluster_additional_tags`へ指定すると検証エラーになります。root moduleは、作成したクラスターの名前とARNを`ecs_cluster_name` / `ecs_cluster_arn`として出力します。タスク定義・タスク用IAMロール・ECSサービス・ALBも定義しており、HonoアプリのECRイメージをダイジェストで指定し、3000番ポートで1タスク起動する構成です。機密環境変数は既存SSMパラメーターから取得します。デプロイとクラウドDBへのmigrationは自動実行しません。公開準備と最終操作は [デプロイ手順](docs/deployment.md) を参照してください。
+
+環境別rootのリソース割り当てとアプリログの保持期間は次のとおりです。タスク全体とコンテナのCPU・メモリは同じ値を使います。
+
+| 設定                 | dev              | stg / prod     |
+| -------------------- | ---------------- | -------------- |
+| タスクのCPU          | 256（0.25 vCPU） | 1024（1 vCPU） |
+| タスクのメモリ       | 512 MiB          | 2048 MiB       |
+| Container Insights   | 無効             | 有効           |
+| アプリログの保持期間 | 7日              | 30日           |
+
+devは小さな検証用構成です。公開前に `bun run test:container` でコンテナの起動とDB操作を確認し、実際の負荷に応じて割り当てを見直してください。ALBのアクセスログは別設定で、従来どおりS3に550日保持します。
+
+2026年10月26日に確認した東京リージョンのオンデマンド単価で、月730時間・1タスク常時稼働・IPv4をNAT用1個とALB用2個と仮定すると、devの基本料金は約85.2 USD/月です（NAT 45.26、Fargate 11.25、ALB 17.74、IPv4 10.95 USD）。変更前の約220.40 USD/月から約61%削減します。税・割引・無料枠・クレジットは含めず、NATのデータ処理、クロスAZや外向きの転送、ALBのLCU、CloudWatch、S3などの従量料金は別途加算されます。単価は [VPC](https://aws.amazon.com/vpc/pricing/) / [Fargate](https://aws.amazon.com/fargate/pricing/) / [ALB](https://aws.amazon.com/elasticloadbalancing/pricing/) の料金ページで確認してください。
 
 公開経路は次のとおりです。Route53とACMは、ドメインと証明書を用意した後に任意で設定します。
 
@@ -516,18 +533,18 @@ ECSモジュールは、Fargateでコンテナを動かすためのECSクラス�
 flowchart LR
   client[利用者] -->|HTTP 80| alb[publicサブネットのALB]
   alb --> target[ターゲットグループ]
-  target -->|HTTP 80| task[privateサブネットのnginxタスク]
+  target -->|HTTP 3000| task[privateサブネットのHonoタスク]
   definition[タスク定義] -.-> service[ECSサービス]
   service -. 起動数の維持と転送先登録 .-> task
   task -->|イメージ取得・ログ送信| nat[NAT Gateway]
   alb -. アクセスログ .-> s3[S3]
 ```
 
-ALB用SGはHTTPの80番だけを公開し、ECS用SGはALB用SGからコンテナの80番への通信だけを受け付けます。タスクへpublic IPは付けず、外向き通信は同じAZのNAT Gatewayを経由します。SG間のルールは生成予定のSG IDを`for_each`のキーにせず、独立したresourceとして定義しています。rootではヘルスチェックもコンテナと同じポートを使います。別ポートを利用する構成へ変更する場合は、ALBのegressとECSのingressにも対象ポートの許可を追加してください。
+ALB用SGはHTTPの80番だけを公開し、ECS用SGはALB用SGからコンテナの3000番への通信だけを受け付けます。タスクへpublic IPは付けず、外向き通信はNAT Gatewayを経由します。devは指定AZの1台を共有し、通常構成では同じAZのNAT Gatewayを使います。SG間のルールは生成予定のSG IDを`for_each`のキーにせず、独立したresourceとして定義しています。rootではヘルスチェックもコンテナと同じポートの `/health` を使います。別ポートを利用する構成へ変更する場合は、ALBのegressとECSのingressにも対象ポートの許可を追加してください。
 
 ECSサービスはタスク定義のリビジョン付きARNを参照し、起動数1、更新時の上限200%・正常稼働数の下限100%でローリング更新します。更新失敗時のロールバックと安定状態の待機を有効にしています。リスナー・NAT経路・IAMポリシー・通信ルールを作成してからサービスを起動します。ECS Execは無効で、このモジュールはCodeDeployや外部コントローラーには対応しません。ターゲット登録解除時の待機時間はdevで30秒、それ以外は300秒です。ALBモジュールの`alb_target_group_deregistration_delay`で調整できます。
 
-適用後は`terraform -chdir=infra output -raw alb_url`のURLをブラウザーで開き、nginxのページを確認します。ALBとECSサービスはこのrootで管理します。作成前にAWSアカウントとworkspaceを確認し、`terraform -chdir=infra plan -var-file=env/dev.tfvars`で変更内容を確認してください。
+適用後は`terraform -chdir=infra output -raw alb_url`のURLへ `/health` を付け、Honoの応答を確認します。ALBとECSサービスはこのrootで管理します。作成前にAWSアカウントとworkspaceを確認し、`terraform -chdir=infra plan -var-file=env/dev.tfvars -var-file=env/dev.application.local.tfvars`で変更内容を確認してください。
 
 HTTPSと独自ドメインを追加する場合は、同じリージョンの発行済みACM証明書と既存Route53のpublicホストゾーンを用意し、tfvarsへ次の値を設定します。証明書は指定した公開ドメインをカバーするものを使ってください。
 
@@ -556,16 +573,16 @@ terraform -chdir=infra/account init
 terraform -chdir=infra/account import aws_iam_openid_connect_provider.github "arn:aws:iam::${AWS_ACCOUNT_ID}:oidc-provider/token.actions.githubusercontent.com"
 terraform -chdir=infra init
 terraform -chdir=infra workspace select dev
-terraform -chdir=infra import -var-file=env/dev.tfvars 'module.github_ecr_push.aws_iam_role.role' hono-app-dev-role
-terraform -chdir=infra import -var-file=env/dev.tfvars 'module.github_ecr_push.aws_iam_role_policy.inline_policies["hono-app-dev-ecr-web-push"]' 'hono-app-dev-role:hono-app-dev-ecr-web-push'
+terraform -chdir=infra import -var-file=env/dev.tfvars -var-file=env/dev.application.local.tfvars 'module.github_ecr_push.aws_iam_role.role' hono-app-dev-role
+terraform -chdir=infra import -var-file=env/dev.tfvars -var-file=env/dev.application.local.tfvars 'module.github_ecr_push.aws_iam_role_policy.inline_policies["hono-app-dev-ecr-web-push"]' 'hono-app-dev-role:hono-app-dev-ecr-web-push'
 terraform -chdir=infra/modules/iam/provider/oidc/github state rm aws_iam_openid_connect_provider.github aws_iam_role.role aws_iam_role_policy.ecr_web_push
 terraform -chdir=infra/account plan
-terraform -chdir=infra plan -var-file=env/dev.tfvars
+terraform -chdir=infra plan -var-file=env/dev.tfvars -var-file=env/dev.application.local.tfvars
 ```
 
 最後のplanでOIDCプロバイダーとロールの重複作成・削除がないことを確認してからapplyしてください。旧stateのdata sourceはAWSリソースの所有権を持たないため、移行対象に含めません。
 
-CDワークフローは`main`へのpushでECRへ`main-<短縮SHA>`タグを登録します。手動実行は**ワークフローの実行ブランチをmain**にし、`build_target`でビルドするブランチまたはタグを指定します。手動登録分には`manual-*`タグが付くため、30日経過後に削除されます。現時点で選べる環境はdevのみです。事前にGitHubのSettings → Secrets and variables → ActionsでRepository secret `IAM_ARN_TO_PUSH_IMAGE`へ`github_ecr_push_role_arn`の値を設定してください。ビルド先は`linux/amd64`で、GitHub Actionsのビルドキャッシュを利用します。短時間に連続pushした場合は同じ環境の実行を直列化し、待機中の古い実行が新しい実行に置き換わることがあります。ECSへの反映はこのワークフローには含まれません。
+CDワークフローは`main`へのpushでECRへ`main-<短縮SHA>`タグを登録します。手動実行は**ワークフローの実行ブランチをmain**にし、`build_target`でビルドするブランチまたはタグを指定します。手動登録分には`manual-*`タグが付くため、30日経過後に削除されます。現時点で選べる環境はdevのみです。事前にGitHubのSettings → Secrets and variables → ActionsでRepository secret `IAM_ARN_TO_PUSH_IMAGE`へ`github_ecr_push_role_arn`の値を設定してください。ビルド先は`linux/amd64`で、GitHub Actionsのビルドキャッシュを利用します。ビルド後のSummaryへイメージのダイジェストを記録します。短時間に連続pushした場合は同じ環境の実行を直列化し、待機中の古い実行が新しい実行に置き換わることがあります。ECSへの反映はこのワークフローには含まれません。
 
 VPC・ECS・ECR・IAM・CloudWatch Logsモジュールと環境別rootのTerraformテストは、`bun run tf:test:init`でテスト用のproviderを初期化してから`bun run tf:test`で実行します。`tf:test:vpc`はSG、`tf:test:ecs`はタスク定義・タスク用IAMロール・ECSサービス・ALBのテストも含みます。テストはAWSをモックするためAWS認証情報は不要です。VPC・ECS・ECR・CloudWatch Logsの初期化はルートの`infra/.terraform/providers`をproviderの取得元に使うため、先に`bun run tf:init`または`bun run tf:init:no-backend`を実行しておく必要があります。`tf:test`はCIの`Terraform Checks`でも実行します。
 
@@ -624,6 +641,7 @@ bun run tf:init:no-backend  # remote backendへ接続せずTerraform providerを
 bun run tf:account:init:no-backend # アカウント共通rootをbackendなしで初期化
 bun run tf:account:validate        # アカウント共通rootを検証
 bun run tf:workspace:dev    # dev workspaceを作成または選択
+bun run test:container      # AWSへ接続せず本番イメージ・migration・DB操作をローカル検証
 bun run tf:plan             # 選択中のworkspaceのTerraform変更計画を確認
 bun run tf:apply            # 選択中のworkspaceへTerraform変更を適用
 bun run tf:fmt              # Terraform構成を再帰的にフォーマット
