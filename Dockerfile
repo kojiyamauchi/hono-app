@@ -25,6 +25,13 @@ COPY . .
 # 生成にはDATABASE_URLが要求されるが接続はしないため、ダミー値をビルドステージ側で渡す。
 RUN DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres bun run prisma:generate
 
+# ---- migrationステージ: 公開前に別プロセスとして実行する。通常起動ではDBを変更しない ----
+FROM build AS migration
+
+USER bun
+
+CMD ["bun", "node_modules/prisma/build/index.js", "migrate", "deploy"]
+
 # ---- 実行ステージ: 実行に必要な成果物のみを含めるスリムな最終イメージ ----
 FROM oven/bun:1.3.14 AS runtime
 
