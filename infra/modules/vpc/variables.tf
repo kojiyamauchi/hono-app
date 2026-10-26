@@ -59,6 +59,20 @@ variable "excluded_availability_zones" {
   }
 }
 
+variable "single_nat_gateway_availability_zone" {
+  type        = string
+  default     = null
+  description = "NAT Gatewayを1台へ集約する場合の配置先AZ。nullなら従来どおり各AZへ配置する"
+
+  validation {
+    condition = var.single_nat_gateway_availability_zone == null ? true : contains(
+      [for subnet in var.subnets.public : subnet.availability_zone],
+      var.single_nat_gateway_availability_zone
+    )
+    error_message = "集約するNAT Gatewayの配置先は、publicサブネットを配置するAZから指定してください。"
+  }
+}
+
 variable "subnets" {
   description = "public/privateサブネットのCIDRと配置先AZ。それぞれ2個以上かつ同数で指定し、1つのAZにつき各1つを同じAZの組み合わせへ配置する"
   nullable    = false
