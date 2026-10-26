@@ -21,23 +21,27 @@ provider "aws" {
   region = local.region
 }
 
+data "aws_caller_identity" "current" {}
+
 module "vpc" {
   source = "./modules/vpc"
 
-  service_name                = local.service_name
-  env                         = terraform.workspace
-  vpc_cidr_block              = "10.0.0.0/16"
-  subnets                     = var.subnets
-  excluded_availability_zones = var.excluded_availability_zones
+  service_name                         = local.service_name
+  env                                  = terraform.workspace
+  vpc_cidr_block                       = "10.0.0.0/16"
+  subnets                              = var.subnets
+  excluded_availability_zones          = var.excluded_availability_zones
+  single_nat_gateway_availability_zone = var.single_nat_gateway_availability_zone
   vpc_additional_tags = {
     Usage = "hono web server"
   }
 }
 
 module "ecs_cluster" {
-  source       = "./modules/ecs"
-  service_name = local.service_name
-  env          = terraform.workspace
+  source                    = "./modules/ecs"
+  service_name              = local.service_name
+  env                       = terraform.workspace
+  enable_container_insights = local.enable_container_insights
 }
 
 module "ecr_web" {
@@ -48,17 +52,20 @@ module "ecr_web" {
 }
 
 module "log_group" {
-  source       = "./modules/cloudwatch/logs"
-  service_name = local.service_name
-  env          = terraform.workspace
+  source                = "./modules/cloudwatch/logs"
+  service_name          = local.service_name
+  env                   = terraform.workspace
+  log_retention_in_days = local.log_retention_in_days
 }
 
 module "task" {
-  source             = "./modules/ecs/task"
-  service_name       = local.service_name
-  env                = terraform.workspace
-  task_role_arn      = module.roles.task_role_arn
-  task_exec_role_arn = module.roles.task_exec_role_arn
+  source                 = "./modules/ecs/task"
+  service_name           = local.service_name
+  env                    = terraform.workspace
+  task_role_arn          = module.roles.task_role_arn
+  task_exec_role_arn     = module.roles.task_exec_role_arn
+  task_cpu_allocation    = local.task_cpu_allocation
+  task_memory_allocation = local.task_memory_allocation
   # ロググループへ出力するコンテナ定義を渡す。
   container_definition = local.container_definitions
 }
@@ -70,6 +77,7 @@ module "roles" {
 
   task_exec_role_ecr_repository_arns = [module.ecr_web.repository_arn]
   task_exec_role_log_group_arns      = [module.log_group.log_group_arn]
+  task_exec_role_ssm_parameter_arns  = values(var.app_secret_parameter_arns)
 }
 
 module "alb" {
@@ -92,6 +100,7 @@ module "alb" {
 
   # rootのSGはコンテナポートだけを許可するため、ヘルスチェックも同じポートにする。
   alb_target_group_health_check_port = 0
+  alb_target_group_health_check_path = "/health"
 
   # internet-facing ALBの作成前に、Internet Gatewayと経路も用意する。
   depends_on = [module.vpc]

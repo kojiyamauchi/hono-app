@@ -32,3 +32,13 @@ output "ecs_service_name" {
   description = "タスクを維持するECSサービスの名前"
   value       = module.ecs_service.service_name
 }
+
+output "ecr_repository_url" {
+  description = "Honoイメージを登録するECRリポジトリのURL"
+  value       = module.ecr_web.repository_url
+}
+
+output "application_image" {
+  description = "タスクが起動するダイジェスト付きHonoイメージ"
+  value       = local.application_image
+}
