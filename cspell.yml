@@ -24,12 +24,12 @@ words:
   - mappers
   - octocat
   - oneline
-  - postgresql
   - pooler
+  - postgresql
   - Prisma
   - Refreshable
-  - supabase
   - sslmode
+  - supabase
   - Supabase
   - targetgroup
   - tflint
