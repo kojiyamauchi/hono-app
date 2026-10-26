@@ -16,12 +16,12 @@ app_environment = {
 # アカウントIDとパラメーターのARNは実際の環境に合わせる。
 app_secret_parameter_arns = {
   DATABASE_URL                    = "arn:aws:ssm:ap-northeast-1:123456789012:parameter/hono-app/dev/DATABASE_URL"
-  SUPABASE_ANON_KEY                = "arn:aws:ssm:ap-northeast-1:123456789012:parameter/hono-app/dev/SUPABASE_ANON_KEY"
+  SUPABASE_ANON_KEY               = "arn:aws:ssm:ap-northeast-1:123456789012:parameter/hono-app/dev/SUPABASE_ANON_KEY"
   JWT_SECRET                      = "arn:aws:ssm:ap-northeast-1:123456789012:parameter/hono-app/dev/JWT_SECRET"
   REFRESH_TOKEN_SECRET            = "arn:aws:ssm:ap-northeast-1:123456789012:parameter/hono-app/dev/REFRESH_TOKEN_SECRET"
   PASSWORD_RESET_TOKEN_SECRET     = "arn:aws:ssm:ap-northeast-1:123456789012:parameter/hono-app/dev/PASSWORD_RESET_TOKEN_SECRET"
   EMAIL_VERIFICATION_TOKEN_SECRET = "arn:aws:ssm:ap-northeast-1:123456789012:parameter/hono-app/dev/EMAIL_VERIFICATION_TOKEN_SECRET"
-  RESEND_API_KEY                   = "arn:aws:ssm:ap-northeast-1:123456789012:parameter/hono-app/dev/RESEND_API_KEY"
+  RESEND_API_KEY                  = "arn:aws:ssm:ap-northeast-1:123456789012:parameter/hono-app/dev/RESEND_API_KEY"
 }
 
 # ブラウザから認証を使う公開環境では、発行済み証明書とドメインも指定する。
