@@ -13,12 +13,19 @@ locals {
   # イメージはダイジェストで固定し、同じ設定から同じ成果物を起動できるようにする。
   application_image = "${module.ecr_web.repository_url}@${var.app_image_digest}"
   app_environment = merge(var.app_environment, {
-    NODE_ENV            = "production"
-    PORT                = tostring(local.web_container_port)
-    ENABLE_API_DOCS     = "false"
-    COOKIE_SECURE       = tostring(var.alb_https_certificate_arn != null || terraform.workspace != "dev")
-    OTEL_TRACES_ENABLED = "false"
+    NODE_ENV                           = "production"
+    PORT                               = tostring(local.web_container_port)
+    ENABLE_API_DOCS                    = "false"
+    COOKIE_SECURE                      = tostring(var.alb_https_certificate_arn != null || terraform.workspace != "dev")
+    OTEL_TRACES_ENABLED                = tostring(var.otel_traces.enabled)
+    OTEL_SERVICE_NAME                  = "${local.service_name}-${terraform.workspace}"
+    OTEL_TRACES_SAMPLER_RATIO          = tostring(var.otel_traces.sampling_ratio)
+    OTEL_EXPORTER_OTLP_TRACES_ENDPOINT = var.otel_traces.endpoint
   })
+  app_secret_parameter_arns = merge(var.app_secret_parameter_arns,
+    var.otel_traces.enabled && var.otel_traces.headers_parameter_arn != null ? {
+      OTEL_EXPORTER_OTLP_TRACES_HEADERS = var.otel_traces.headers_parameter_arn
+  } : {})
 
   container_definitions = jsonencode([
     {
@@ -32,7 +39,7 @@ locals {
         value = value
       }]
       # 機密値はTerraformへ渡さず、起動時に実行ロールでSSMから取得する。
-      secrets = [for name, arn in var.app_secret_parameter_arns : {
+      secrets = [for name, arn in local.app_secret_parameter_arns : {
         name      = name
         valueFrom = arn
       }]

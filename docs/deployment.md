@@ -11,6 +11,8 @@
 - アプリの通常起動ではmigrationを実行しません。同じソースからビルドしたDockerの `migration` ターゲットを、サービス更新前に別プロセスで実行します。
 - GitHub ActionsのCDはビルド・ECR登録・ダイジェストの記録までです。ECS更新やTerraform applyは自動実行しません。
 
+OpenTelemetryの外部送信は全環境で既定無効です。stg/prodを含め、必要な環境のtfvarsで `otel_traces.enabled = true` と `headers_parameter_arn` を指定して有効化できます。ヘッダーは `api-key=...` 形式の実値をSSM SecureStringへ登録し、そのARNだけを渡します。送信先とサンプリング比率も `otel_traces.endpoint` / `sampling_ratio` で指定でき、既定はNew RelicのOTLP endpoint・0.1です。無効時はヘッダーの取得権限も追加しません。
+
 ## 公開前に入力する情報
 
 以下のコピーはローカルのファイル操作だけです。コピー先はGit管理から除外しています。

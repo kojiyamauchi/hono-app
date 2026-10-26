@@ -28,3 +28,10 @@ app_secret_parameter_arns = {
 # alb_https_certificate_arn = "arn:aws:acm:ap-northeast-1:123456789012:certificate/実際の証明書ID"
 # alb_domain_name           = "api.example.com"
 # alb_hosted_zone_name      = "example.com"
+
+# trace送信は既定で無効。確認するときだけ有効にし、送信ヘッダーをSSMへ登録する。
+# otel_traces = {
+#   enabled               = true
+#   headers_parameter_arn = "arn:aws:ssm:ap-northeast-1:123456789012:parameter/hono-app/dev/OTEL_EXPORTER_OTLP_TRACES_HEADERS"
+#   sampling_ratio        = 0.1
+# }

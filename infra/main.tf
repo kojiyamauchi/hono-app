@@ -77,7 +77,7 @@ module "roles" {
 
   task_exec_role_ecr_repository_arns = [module.ecr_web.repository_arn]
   task_exec_role_log_group_arns      = [module.log_group.log_group_arn]
-  task_exec_role_ssm_parameter_arns  = values(var.app_secret_parameter_arns)
+  task_exec_role_ssm_parameter_arns  = values(local.app_secret_parameter_arns)
 }
 
 module "alb" {

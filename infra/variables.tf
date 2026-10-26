@@ -92,6 +92,36 @@ variable "app_secret_parameter_arns" {
   }
 }
 
+variable "otel_traces" {
+  description = "OpenTelemetryの外部送信設定。既定は無効で、送信ヘッダーの実値はSSMから取得する"
+  nullable    = false
+  default     = {}
+  type = object({
+    enabled               = optional(bool, false)
+    headers_parameter_arn = optional(string)
+    endpoint              = optional(string, "https://otlp.nr-data.net:4318/v1/traces")
+    sampling_ratio        = optional(number, 0.1)
+  })
+
+  validation {
+    condition     = !var.otel_traces.enabled || var.otel_traces.headers_parameter_arn != null
+    error_message = "trace送信を有効にする場合は、送信ヘッダーを保存したSSMパラメーターARNも指定してください。"
+  }
+
+  validation {
+    condition = var.otel_traces.headers_parameter_arn == null ? true : can(regex(
+      "^arn:aws:ssm:ap-northeast-1:${data.aws_caller_identity.current.account_id}:parameter/hono-app/[A-Za-z0-9_./-]+$",
+      var.otel_traces.headers_parameter_arn
+    ))
+    error_message = "送信ヘッダーは現在のアカウント・東京リージョン・/hono-app/配下のSSMパラメーターARNで指定してください。"
+  }
+
+  validation {
+    condition     = can(regex("^https://[^/]+/.+$", var.otel_traces.endpoint)) && var.otel_traces.sampling_ratio >= 0 && var.otel_traces.sampling_ratio <= 1
+    error_message = "送信先はHTTPSのURL、サンプリング比率は0以上1以下で指定してください。"
+  }
+}
+
 variable "excluded_availability_zones" {
   type        = list(string)
   default     = []
