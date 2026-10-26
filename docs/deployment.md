@@ -81,7 +81,19 @@ aws sts get-caller-identity
 terraform -chdir=infra workspace show
 ```
 
-対象アカウントと `dev` workspaceを確認します。state用S3、アカウント共通OIDCプロバイダー、`hono-app-dev-web` ECRリポジトリは作成済みであることを前提とします。新しいアカウントへ構築する場合の初期化はREADMEのTerraform手順に従います。
+対象アカウントと `dev` workspaceを確認します。state用S3とアカウント共通OIDCプロバイダーは作成済みであることを前提とします。新しいアカウントへ構築する場合の初期化はREADMEのTerraform手順に従います。
+
+`hono-app-dev-web` ECRリポジトリが未作成の場合は、初回だけリポジトリを先行作成します。公開設定のtfvarsを用意し、次のtarget付きplanでECRリポジトリとライフサイクルポリシーだけが対象であることを確認してから適用します。この操作もAWSへのapplyなので、公開準備中は実行しません。
+
+```bash
+terraform -chdir=infra plan -var-file=env/dev.tfvars \
+  -var-file=env/dev.application.local.tfvars \
+  -var='app_image_digest=sha256:1111111111111111111111111111111111111111111111111111111111111111' \
+  -target=module.ecr_web -out=ecr-bootstrap.tfplan
+terraform -chdir=infra apply ecr-bootstrap.tfplan
+```
+
+仮ダイジェストはこのtarget付きplanにだけCLIから渡し、公開設定ファイルへ保存しません。ECSサービスはこの操作では作成しません。続く2節・3節でビルドとイメージ登録を行い、実際のダイジェストを設定してから4節の全体plan・applyへ進みます。すでにECRリポジトリがある場合、この先行作成は不要です。
 
 SSM Parameter Storeへ上記7項目を `/hono-app/dev/<環境変数名>` のStandard SecureStringとして登録し、`alias/aws/ssm` を選択します。値はAWS Consoleなどで入力し、シェル履歴やTerraform stateへ残さないでください。tfvarsには実際に登録したパラメーターのARNを設定します。[ECSのSSM参照](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/secrets-envvar-ssm-paramstore.html)
 
