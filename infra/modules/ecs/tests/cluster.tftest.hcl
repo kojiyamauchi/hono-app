@@ -62,6 +62,19 @@ run "fargate_capacity_provider" {
   }
 }
 
+run "disable_container_insights" {
+  command = plan
+
+  variables {
+    enable_container_insights = false
+  }
+
+  assert {
+    condition     = one(aws_ecs_cluster.cluster.setting).value == "disabled"
+    error_message = "Container Insightsを無効化する入力を指定した場合、追加メトリクス収集を停止する必要があります。"
+  }
+}
+
 run "custom_tags" {
   command = plan
 
