@@ -112,6 +112,16 @@ jobs:
       - name: Test Terraform Modules
         run: bun run tf:test
 
+      - name: Test Staging Root Configuration
+        run: bun run tf:test:root
+        env:
+          TF_WORKSPACE: stg
+
+      - name: Test Production Root Configuration
+        run: bun run tf:test:root
+        env:
+          TF_WORKSPACE: prod
+
   build:
     name: Build Test
     needs:
