@@ -164,6 +164,63 @@ run "mutable_image_tag_is_rejected" {
   expect_failures = [var.app_image_digest]
 }
 
+run "trace_export_uses_parameter_store_headers" {
+  command = plan
+  variables {
+    otel_traces = {
+      enabled               = true
+      headers_parameter_arn = "arn:aws:ssm:ap-northeast-1:123456789012:parameter/hono-app/dev/OTEL_EXPORTER_OTLP_TRACES_HEADERS"
+      sampling_ratio        = 0.25
+    }
+  }
+  assert {
+    condition = (
+      local.app_environment.OTEL_TRACES_ENABLED == "true" &&
+      local.app_environment.OTEL_TRACES_SAMPLER_RATIO == "0.25" &&
+      local.app_environment.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT == "https://otlp.nr-data.net:4318/v1/traces" &&
+      local.app_secret_parameter_arns.OTEL_EXPORTER_OTLP_TRACES_HEADERS == var.otel_traces.headers_parameter_arn &&
+      length(jsondecode(local.container_definitions)[0].secrets) == 8 &&
+      !contains(keys(local.app_environment), "OTEL_EXPORTER_OTLP_TRACES_HEADERS")
+    )
+    error_message = "trace送信は明示的な有効化時だけ設定し、機密ヘッダーを公開設定へ入れずSSM参照として追加してください。"
+  }
+}
+
+run "disabled_tracing_does_not_request_header_permissions" {
+  command = plan
+  variables {
+    otel_traces = {
+      headers_parameter_arn = "arn:aws:ssm:ap-northeast-1:123456789012:parameter/hono-app/dev/OTEL_EXPORTER_OTLP_TRACES_HEADERS"
+    }
+  }
+  assert {
+    condition = (
+      local.app_environment.OTEL_TRACES_ENABLED == "false" &&
+      !contains(keys(local.app_secret_parameter_arns), "OTEL_EXPORTER_OTLP_TRACES_HEADERS")
+    )
+    error_message = "trace送信が無効な場合、ヘッダー用パラメーターへの取得権限を追加しないでください。"
+  }
+}
+
+run "trace_export_requires_headers_parameter" {
+  command = plan
+  variables {
+    otel_traces = { enabled = true }
+  }
+  expect_failures = [var.otel_traces]
+}
+
+run "trace_export_rejects_wildcard_parameter" {
+  command = plan
+  variables {
+    otel_traces = {
+      enabled               = true
+      headers_parameter_arn = "arn:aws:ssm:ap-northeast-1:123456789012:parameter/hono-app/dev/*"
+    }
+  }
+  expect_failures = [var.otel_traces]
+}
+
 run "placeholder_image_digest_is_rejected" {
   command = plan
   variables {
