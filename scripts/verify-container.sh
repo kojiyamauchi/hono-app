@@ -41,9 +41,13 @@ docker build --platform linux/amd64 --target migration -t "$migration_image" .
 
 # 検証用の自己署名証明書は一時生成し、公開CAの同梱と証明書検証の維持を確認する。
 mkdir "$smoke_dir/tls"
-openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+if ! openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
   -subj '/CN=localhost' -addext 'subjectAltName=DNS:localhost' \
-  -keyout "$smoke_dir/tls/server.key" -out "$smoke_dir/tls/server.crt" >/dev/null 2>&1
+  -keyout "$smoke_dir/tls/server.key" -out "$smoke_dir/tls/server.crt" >/dev/null 2>"$smoke_dir/tls/openssl.log"; then
+  echo '検証用証明書の生成に失敗しました。-addextに対応したOpenSSLが必要です。' >&2
+  cat "$smoke_dir/tls/openssl.log" >&2
+  exit 1
+fi
 # コンテナ内の非rootユーザーが、使い捨ての検証用秘密鍵を読み取れるようにする。
 chmod 755 "$smoke_dir/tls"
 chmod 644 "$smoke_dir/tls/server.key"
