@@ -21,8 +21,9 @@ import { authService } from '../services'
 
 /**
  * レート制限に使うクライアントIPを取得する。
- * ALBからのみタスクへ接続できる1段のプロキシ構成を前提に、ALBが末尾へ追記したIPだけを使う。
- * クライアントが指定できる先頭値やx-real-ipは信頼しない。ALB側ではappendとポート非付与を固定する。
+ * 信頼できるエッジからのみ接続できる構成を前提に、末尾へ追記されたIPだけを使う。
+ * AWSではALBのappend・ポート非付与、GCPでは追加プロキシのないCloud Run標準URLを使用する。
+ * クライアントが指定できる先頭値やx-real-ipは信頼しない。公開経路変更時は信頼境界を再確認する。
  * IPを特定できない場合は、全クライアントを同じキーへ束ねないようundefinedを返す。
  */
 const getClientIp = (c: Context): string | undefined => {
