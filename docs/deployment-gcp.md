@@ -9,7 +9,7 @@ Bun / HonoをCloud Run、DBとSupabase Authをクラウド版Supabase Freeで動
 - 既存の課金設定済みGCPプロジェクトを入力します。プロジェクトとstate保存用GCSバケットはTerraform管理外の前提リソースです。
 - Terraformは必要なAPI、Artifact Registry、6つのSecret Managerの入れ物、アプリ用サービスアカウント、Cloud Run、呼び出し権限を管理します。
 - Supabaseプロジェクトは管理画面でFreeを選択します。APIとDBのリージョンは可能な限り近づけます。
-- APIは `run.app` のHTTPS URLを使い、IAM認証を必須にします。`invoker_members` へ指定した利用者だけが呼び出せます。不特定多数への公開権限は作成しません。
+- APIは `run.app` のHTTPS URLを使い、IAM認証を必須にします。サービス単位の `roles/run.invoker` を `iam_binding` で一括管理し、`invoker_members` を許可対象の正本にします。Console等で追加された `allUsers` などもplanの差分に現れ、applyで除去します。プロジェクト・組織から継承する権限はこのbindingの管理外なので、別途確認してください。
 - Basic認証・IAPは今回導入しません。Googleアカウントでブラウザから直接ログインするIAPが必要な場合は、OAuth設定と許可対象を決めて追加します。
 - シークレットの実値とversionの作成はTerraform管理外とし、stateへ保存しません。Supabaseのanonキーは公開設定で扱い、service roleキーは使用しません。
 - 通常起動ではmigrationを実行しません。既存Dockerfileの `migration` ターゲットをローカルで実行してからCloud Runを更新します。

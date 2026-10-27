@@ -15,7 +15,7 @@ run "bootstrap_without_service" {
   command = plan
 
   assert {
-    condition     = length(google_cloud_run_v2_service.app) == 0 && length(google_cloud_run_v2_service_iam_member.invoker) == 0
+    condition     = length(google_cloud_run_v2_service.app) == 0 && length(google_cloud_run_v2_service_iam_binding.invoker) == 0
     error_message = "初回は前提リソースだけを用意し、未準備のAPIを起動・公開してはいけません。"
   }
   assert {
@@ -39,7 +39,7 @@ run "private_low_usage_service" {
 
   variables {
     app_image_digest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-    invoker_members  = ["user:developer@example.com"]
+    invoker_members  = ["user:developer@example.com", "serviceAccount:client@test-project.iam.gserviceaccount.com"]
     app_environment = {
       SUPABASE_URL                  = "https://test.supabase.co"
       SUPABASE_ANON_KEY             = "public-anon-key"
@@ -73,9 +73,13 @@ run "private_low_usage_service" {
   assert {
     condition = (
       !google_cloud_run_v2_service.app[0].invoker_iam_disabled &&
-      google_cloud_run_v2_service_iam_member.invoker["user:developer@example.com"].role == "roles/run.invoker"
+      length(google_cloud_run_v2_service_iam_binding.invoker) == 1 &&
+      google_cloud_run_v2_service_iam_binding.invoker[0].role == "roles/run.invoker" &&
+      google_cloud_run_v2_service_iam_binding.invoker[0].members == toset([
+        "user:developer@example.com", "serviceAccount:client@test-project.iam.gserviceaccount.com",
+      ])
     )
-    error_message = "IAM認証を必須にし、指定した利用者だけに呼び出しを許可する必要があります。"
+    error_message = "IAM認証を必須にし、サービス単位の呼び出し権限を指定した利用者の集合へ一括管理する必要があります。"
   }
   assert {
     condition = alltrue([for name, value in {

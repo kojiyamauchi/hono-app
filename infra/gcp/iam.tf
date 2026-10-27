@@ -6,12 +6,13 @@ resource "google_service_account" "runtime" {
   depends_on = [google_project_service.required]
 }
 
-resource "google_cloud_run_v2_service_iam_member" "invoker" {
-  for_each = var.app_image_digest == null ? toset([]) : var.invoker_members
+// サービス単位の呼び出し権限を一括管理し、手動追加された公開権限もplanで検出する。
+resource "google_cloud_run_v2_service_iam_binding" "invoker" {
+  count = var.app_image_digest == null ? 0 : 1
 
   project  = var.project_id
   location = var.region
   name     = google_cloud_run_v2_service.app[0].name
   role     = "roles/run.invoker"
-  member   = each.value
+  members  = var.invoker_members
 }
