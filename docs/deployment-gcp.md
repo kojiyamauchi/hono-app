@@ -12,6 +12,7 @@ Bun / HonoをCloud Run、DBとSupabase Authをクラウド版Supabase Freeで動
 - APIは `run.app` のHTTPS URLを使い、IAM認証を必須にします。サービス単位の `roles/run.invoker` を `iam_binding` で一括管理し、`invoker_members` を許可対象の正本にします。Console等で追加された `allUsers` などもplanの差分に現れ、applyで除去します。プロジェクト・組織から継承する権限はこのbindingの管理外なので、別途確認してください。
 - Basic認証・IAPは今回導入しません。Googleアカウントでブラウザから直接ログインするIAPが必要な場合は、OAuth設定と許可対象を決めて追加します。
 - シークレットの実値とversionの作成はTerraform管理外とし、stateへ保存しません。Supabaseのanonキーは公開設定で扱い、service roleキーは使用しません。
+- AWSではanonキーもSSM SecureStringで扱いますが、GCPでは公開キーである性質に合わせて公開設定（tfvars・state）へ含め、Secret Managerの無料枠である有効6 versionをDB接続情報・4種類の鍵・Resend APIキーに割り当てます。
 - 通常起動ではmigrationを実行しません。既存Dockerfileの `migration` ターゲットをローカルで実行してからCloud Runを更新します。
 - AWS用CDは引き続きECRへの登録だけを行います。GCPへの自動push・自動デプロイは追加しません。
 
