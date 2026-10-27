@@ -42,6 +42,7 @@ words:
 flagWords:
   - null
 ignorePaths:
+  - certificates/**/*.crt
   - ./**/.terraform/**
   - ./**/*.tfstate*
   - ./**/node_modules/**
