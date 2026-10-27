@@ -2,6 +2,27 @@
 
 この手順はAWS ECS/Fargateとクラウド版Supabaseを使う構成を対象とします。準備中はAWSへのapply、イメージのpush、クラウドDBへのmigrationを実行しません。最後の「公開を決めた後の操作」だけが外部環境を変更します。
 
+## 既存構成からのディレクトリ移行
+
+AWS用rootを `infra/` から `infra/aws/` へ移動しました。S3バケット・stateキー・module名・リソース名は変更していません。アカウント共通rootも `infra/account/` から `infra/aws/account/` へ移動しました。GCPは `infra/gcp/` に独立して追加し、既存AWSのstateへ混在させません。
+
+Gitに含まれない `.local.tfvars`、ローカルstateとバックアップはcheckout更新だけでは移動されません。以前の `infra/env/` や `infra/modules/` 等に残っている場合は、バックアップ後に同じ相対位置の `infra/aws/` 配下へ移してください。古いファイルを削除する前に移動先の内容を確認します。`.gitignore` は新しい配置でも機密設定とstateを除外します。providerのロックファイルは移動先のものを使います。
+
+移行後は対象AWSアカウントを確認し、新しいディレクトリで初期化して既存workspaceを選択します。別のstateへ移す操作や、既存リソースのimportはこのディレクトリ移動だけでは不要です。
+
+```bash
+aws sts get-caller-identity
+terraform -chdir=infra/aws/account init
+terraform -chdir=infra/aws/account workspace show  # defaultを確認
+terraform -chdir=infra/aws/account plan
+terraform -chdir=infra/aws init
+terraform -chdir=infra/aws workspace select dev
+terraform -chdir=infra/aws workspace show
+terraform -chdir=infra/aws plan -var-file=env/dev.tfvars -var-file=env/dev.application.local.tfvars
+```
+
+純粋な移動ではリソースの追加・変更・削除が出ないことを確認します。既存設定との差分や実環境のdriftが出た場合は内容を確認し、移動を理由にapplyしないでください。移行前の `.terraform/` が旧moduleパスを保持している場合は、新配置で `init -reconfigure` して同じbackendへ接続し直します。全環境のworkspaceを確認し、別のbackendやworkspaceで作り直さないでください。
+
 ## 配線と管理範囲
 
 - TerraformはECSのタスク定義・サービスを管理し、Honoの3000番ポートへALBから転送します。ヘルスチェックは既存の `/health` を使います。
@@ -19,7 +40,7 @@ OpenTelemetryの外部送信は全環境で既定無効です。stg/prodを含�
 以下のコピーはローカルのファイル操作だけです。コピー先はGit管理から除外しています。
 
 ```bash
-cp infra/env/dev.application.tfvars.example infra/env/dev.application.local.tfvars
+cp infra/aws/env/dev.application.tfvars.example infra/aws/env/dev.application.local.tfvars
 cp .env.deployment.local.example .env.deployment.local
 chmod 600 .env.deployment.local
 ```
@@ -65,9 +86,9 @@ bun run typecheck
 bun run lint:check
 bun test --isolate
 bun run tf:fmt:check
-bun run tf:lint
-bun run tf:validate
-TF_WORKSPACE=dev bun run tf:test
+bun run tf:aws:lint
+bun run tf:aws:validate
+TF_WORKSPACE=dev bun run tf:aws:test
 bun run test:container
 ```
 
@@ -81,7 +102,7 @@ TerraformのモックテストはAWSリソースを作りません。コンテ�
 
 ```bash
 aws sts get-caller-identity
-terraform -chdir=infra workspace show
+terraform -chdir=infra/aws workspace show
 ```
 
 対象アカウントと `dev` workspaceを確認します。state用S3とアカウント共通OIDCプロバイダーは作成済みであることを前提とします。新しいアカウントへ構築する場合の初期化はREADMEのTerraform手順に従います。
@@ -89,11 +110,11 @@ terraform -chdir=infra workspace show
 `hono-app-dev-web` ECRリポジトリが未作成の場合は、初回だけリポジトリを先行作成します。公開設定のtfvarsを用意し、次のtarget付きplanでECRリポジトリとライフサイクルポリシーだけが対象であることを確認してから適用します。この操作もAWSへのapplyなので、公開準備中は実行しません。
 
 ```bash
-terraform -chdir=infra plan -var-file=env/dev.tfvars \
+terraform -chdir=infra/aws plan -var-file=env/dev.tfvars \
   -var-file=env/dev.application.local.tfvars \
   -var='app_image_digest=sha256:1111111111111111111111111111111111111111111111111111111111111111' \
   -target=module.ecr_web -out=ecr-bootstrap.tfplan
-terraform -chdir=infra apply ecr-bootstrap.tfplan
+terraform -chdir=infra/aws apply ecr-bootstrap.tfplan
 ```
 
 仮ダイジェストはこのtarget付きplanにだけCLIから渡し、公開設定ファイルへ保存しません。ECSサービスはこの操作では作成しません。続く2節・3節でビルドとイメージ登録を行い、実際のダイジェストを設定してから4節の全体plan・applyへ進みます。すでにECRリポジトリがある場合、この先行作成は不要です。
@@ -133,10 +154,10 @@ aws ecr describe-images --region ap-northeast-1 --repository-name hono-app-dev-w
 ### 4. 最終planを確認してapplyする
 
 ```bash
-terraform -chdir=infra plan -var-file=env/dev.tfvars \
+terraform -chdir=infra/aws plan -var-file=env/dev.tfvars \
   -var-file=env/dev.application.local.tfvars -out=dev.tfplan
-terraform -chdir=infra apply dev.tfplan
-terraform -chdir=infra output -raw alb_url
+terraform -chdir=infra/aws apply dev.tfplan
+terraform -chdir=infra/aws output -raw alb_url
 ```
 
 ECSサービスが安定状態となり、ALBのターゲットがHealthyになることを確認します。表示されたURLの `/health` を確認します。認証APIの確認はHTTPSで接続できることを確かめてから、検証専用アカウントで実施します。HTTPしか設定していない場合は認証・DB操作へ進まず、先に証明書とドメインを設定してください。Supabase Authのメール確認とResendの実配達は、それぞれ実際の設定で確認してください。`/health` はプロセスのヘルスチェックであり、DB接続の成功までは保証しません。
