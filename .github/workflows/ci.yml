@@ -131,6 +131,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Execution Environment for Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v4
         with:
@@ -143,23 +148,23 @@ jobs:
           cache: true
 
       # Google認証やbackend接続を使わず、providerのモックで構成を検証する。
+      # 整形検査はAWSジョブのtf:fmt:checkでinfra全体を対象に実行する。
       - name: Initialize Terraform Without Backend
-        run: terraform -chdir=infra/gcp init -backend=false
-
-      - name: Check Terraform Formatting
-        run: terraform -chdir=infra/gcp fmt -check -recursive -diff
+        run: bun run tf:gcp:init:no-backend
 
       - name: Initialize TFLint
-        run: tflint --chdir=infra/gcp --init
+        run: bun run tf:gcp:lint:init
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
       - name: Run TFLint
-        run: tflint --chdir=infra/gcp
+        run: bun run tf:gcp:lint
 
       - name: Validate Terraform
-        run: terraform -chdir=infra/gcp validate
+        run: bun run tf:gcp:validate
 
       - name: Test Terraform
-        run: terraform -chdir=infra/gcp test
+        run: bun run tf:gcp:test
 
   build:
     name: Build Test
