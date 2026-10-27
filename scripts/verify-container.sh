@@ -38,6 +38,22 @@ trap 'exit 143' TERM
 docker info >/dev/null
 docker build --platform linux/amd64 --target runtime -t "$runtime_image" .
 docker build --platform linux/amd64 --target migration -t "$migration_image" .
+
+# 検証用の自己署名証明書は一時生成し、公開CAの同梱と証明書検証の維持を確認する。
+mkdir "$smoke_dir/tls"
+openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+  -subj '/CN=localhost' -addext 'subjectAltName=DNS:localhost' \
+  -keyout "$smoke_dir/tls/server.key" -out "$smoke_dir/tls/server.crt" >/dev/null 2>&1
+# コンテナ内の非rootユーザーが、使い捨ての検証用秘密鍵を読み取れるようにする。
+chmod 755 "$smoke_dir/tls"
+chmod 644 "$smoke_dir/tls/server.key"
+for image in "$runtime_image" "$migration_image"; do
+  docker run --rm --platform linux/amd64 \
+    --mount "type=bind,source=$smoke_dir/tls,target=/tmp/container-tls,readonly" \
+    --mount "type=bind,source=$PWD/scripts/verify-container-tls.mjs,target=/app/verify-container-tls.mjs,readonly" \
+    "$image" bun /app/verify-container-tls.mjs /tmp/container-tls
+done
+
 docker network create "$smoke_id" >/dev/null
 docker run -d --name "${smoke_id}-db" --network "$smoke_id" \
   -e POSTGRES_PASSWORD=smoke-password postgres:17-alpine >/dev/null
