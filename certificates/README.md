@@ -14,7 +14,8 @@ Dockerfileはruntimeとmigrationへこのファイルを同梱し、`NODE_EXTRA_
 
 ```bash
 openssl x509 -in certificates/supabase-root-2021.crt -noout -subject -issuer -dates -fingerprint -sha256
+bun test certificates/supabase-ca.test.js
 bun run test:container
 ```
 
-更新時は `scripts/verify-container-tls.mjs` の期待するフィンガープリントも更新します。この検証は有効期限の90日前から失敗し、更新を促します。実際のSupabaseへのruntime接続とmigrationの履歴取得も、証明書と接続先ホスト名の検証を有効にした状態で確認してください。
+更新時は `scripts/verify-certificate.mjs` の期待するフィンガープリントも更新します。識別情報と有効期限の検証は `bun test` を通じてCIのUnit Testでも実行し、有効期限の90日前から失敗して更新を促します。コンテナ検証も同じ関数を使い、同梱されたファイルを検証します。実際のSupabaseへのruntime接続とmigrationの履歴取得も、証明書と接続先ホスト名の検証を有効にした状態で確認してください。

@@ -51,6 +51,7 @@ for image in "$runtime_image" "$migration_image"; do
   docker run --rm --platform linux/amd64 \
     --mount "type=bind,source=$smoke_dir/tls,target=/tmp/container-tls,readonly" \
     --mount "type=bind,source=$PWD/scripts/verify-container-tls.mjs,target=/app/verify-container-tls.mjs,readonly" \
+    --mount "type=bind,source=$PWD/scripts/verify-certificate.mjs,target=/app/verify-certificate.mjs,readonly" \
     "$image" bun /app/verify-container-tls.mjs /tmp/container-tls
 done
 

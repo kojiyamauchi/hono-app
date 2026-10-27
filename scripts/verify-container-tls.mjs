@@ -1,17 +1,15 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { X509Certificate } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { connect, createServer } from 'node:tls'
 
+import { verifySupabaseCa } from './verify-certificate.mjs'
+
 const caPath = process.env.NODE_EXTRA_CA_CERTS
 assert.ok(caPath, '追加CAの読み込み先が設定されていません')
 assert.notEqual(process.env.NODE_TLS_REJECT_UNAUTHORIZED, '0', '証明書検証が無効です')
-const root = new X509Certificate(readFileSync(caPath))
-assert.equal(root.ca, true)
-assert.equal(root.fingerprint256, '80:70:25:AD:50:D4:ED:21:9D:2C:9C:7D:29:9C:00:4F:82:4E:B0:0C:F7:F6:5A:FE:F6:07:D0:7B:72:E6:CA:FA')
-assert.ok(Date.parse(root.validTo) - Date.now() > 90 * 24 * 60 * 60 * 1000, 'CA証明書の更新が必要です')
+verifySupabaseCa(caPath)
 
 const fixtureDirectory = process.argv[2]
 assert.ok(fixtureDirectory, '検証用証明書のディレクトリが必要です')
