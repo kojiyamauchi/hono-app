@@ -1,6 +1,7 @@
 version: 0.2
 language: en
 words:
+  - addext
   - artifactregistry
   - autoincrement
   - buildx
@@ -21,9 +22,12 @@ words:
   - Hono
   - hostnames
   - isready
+  - keyout
   - kojiyamauchi
   - logdelivery
   - mappers
+  - newkey
+  - noout
   - octocat
   - oneline
   - pooler
@@ -42,6 +46,7 @@ words:
 flagWords:
   - null
 ignorePaths:
+  - certificates/**/*.crt
   - ./**/.terraform/**
   - ./**/*.tfstate*
   - ./**/node_modules/**

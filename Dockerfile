@@ -14,6 +14,10 @@ FROM oven/bun:1.3.14 AS build
 
 WORKDIR /app
 
+# Supabaseの公開CAを標準の信頼ストアへ追加し、migrationでも証明書を検証する。
+COPY certificates/supabase-root-2021.crt /app/certificates/supabase-root-2021.crt
+ENV NODE_EXTRA_CA_CERTS=/app/certificates/supabase-root-2021.crt
+
 COPY package.json bun.lock ./
 RUN HUSKY=0 bun install --frozen-lockfile
 
@@ -38,6 +42,10 @@ FROM oven/bun:1.3.14 AS runtime
 WORKDIR /app
 
 ENV NODE_ENV=production
+
+# Bunの既定CAを維持したまま、Supabaseのサーバー証明書も検証できるようにする。
+COPY certificates/supabase-root-2021.crt /app/certificates/supabase-root-2021.crt
+ENV NODE_EXTRA_CA_CERTS=/app/certificates/supabase-root-2021.crt
 
 # 本番依存のみのnode_modules
 COPY --from=prod-deps /app/node_modules ./node_modules

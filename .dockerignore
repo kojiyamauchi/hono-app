@@ -4,6 +4,7 @@ src/generated
 
 # テストファイル（実行イメージへ含めない）
 **/*.test.ts
+**/*.test.js
 
 # 環境変数・シークレット
 .env

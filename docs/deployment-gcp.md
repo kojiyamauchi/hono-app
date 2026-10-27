@@ -47,7 +47,7 @@ bun test --isolate
 bun run test:container
 ```
 
-`test:container` はDocker Desktopで使い捨てPostgreSQLを作り、migrationと認証の動作を確認します。GCPやクラウド版Supabaseへは接続しません。既存DBはresetしません。
+`test:container` はDocker Desktop・Bun・OpenSSLを使用します。両イメージの公開CA同梱と未知のCA・異なるホスト名の拒否を確認し、使い捨てPostgreSQLでmigrationと認証の動作を検証します。GCPやクラウド版Supabaseへは接続しません。既存DBはresetしません。
 
 ## 公開を決めた後の操作
 
@@ -87,7 +87,9 @@ planにCloud Runサービスが含まれず、API・リポジトリ・6つのシ
 
 ### 2. Supabaseと機密値を準備する
 
-クラウド版SupabaseでFreeプロジェクトを作成します。Connect画面の **Session pooler / 5432番** の接続文字列を使用し、`sslmode=require` を付けます。ホストを推測せず画面の値を使い、パスワードをURLエンコードします。IPv6専用の直接接続を使う構成にはしません。[Supabaseの接続方式](https://supabase.com/docs/guides/database/connecting-to-postgres)
+クラウド版SupabaseでFreeプロジェクトを作成します。Connect画面の **Session pooler / 5432番** の接続文字列を使用し、`sslmode=verify-full` を付けます。ホストを推測せず画面の値を使い、パスワードをURLエンコードします。IPv6専用の直接接続を使う構成にはしません。[Supabaseの接続方式](https://supabase.com/docs/guides/database/connecting-to-postgres)
+
+runtimeとmigrationにはSupabaseの公開CAを同梱し、`NODE_EXTRA_CA_CERTS` でBunの既定CAへ追加しています。`verify-full` で接続先の証明書とホスト名を検証します。追加の証明書マウントやSecret ManagerへのCA登録は不要です。公開CAの取得元・有効期限・更新手順は[証明書の管理手順](../certificates/README.md)を参照してください。
 
 Data APIは無効にし、Prismaが作る認証・ユーザーテーブルを公開しません。Supabase AuthのSite URL・Redirect URLsは実際のフロントエンドへ設定します。DBの接続元IP制限を使用している場合は、今回のCloud Run構成には固定送信元IPがないことを考慮してください。固定IPが必要ならNATなどの費用を含めて別途設計します。
 
