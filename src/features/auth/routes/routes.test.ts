@@ -238,7 +238,7 @@ describe('auth signup/login routes（Cookie設定）', () => {
     }
   })
 
-  test('POST /auth/signupは偽装した先頭IPを変えてもALBが追記した同一IPの制限を回避できない', async () => {
+  test('POST /auth/signupは偽装した先頭IPを変えても信頼するエッジが追記した同一IPの制限を回避できない', async () => {
     findByEmail.mockResolvedValue(null)
     createUser.mockImplementation(async (input: { name: string; email: string; password: string }) => ({
       id: 1,
