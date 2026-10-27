@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { spawn } from 'node:child_process'
 import { X509Certificate } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -40,7 +41,22 @@ try {
   await connectToFixture({ ca: cert })
   await assert.rejects(connectToFixture(), { code: 'DEPTH_ZERO_SELF_SIGNED_CERT' })
   await assert.rejects(connectToFixture({ ca: cert, servername: 'wrong.invalid' }), { code: 'ERR_TLS_CERT_ALTNAME_INVALID' })
-  console.info('TLS検証成功: Supabase公開CAの同梱、未知のCAと異なるホスト名の拒否')
+  // 起動時の追加CA読み込みを、caを明示しない子プロセスの接続で検証する。
+  const probe = `import { connect } from 'node:tls'
+const socket = connect({ host: '127.0.0.1', port: ${address.port}, servername: 'localhost' })
+socket.once('secureConnect', () => { socket.end(); process.exit(0) })
+socket.once('error', (error) => { console.error(error.code ?? error.message); process.exit(1) })
+socket.setTimeout(5000, () => socket.destroy(new Error('TLS接続がタイムアウトしました')))`
+  const status = await new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, ['-e', probe], {
+      env: { ...process.env, NODE_EXTRA_CA_CERTS: join(fixtureDirectory, 'server.crt') },
+      stdio: ['ignore', 'inherit', 'inherit'],
+    })
+    child.once('error', reject)
+    child.once('exit', resolve)
+  })
+  assert.equal(status, 0, '追加CAが既定の信頼ストアへ反映されていません')
+  console.info('TLS検証成功: 追加CAの信頼ストア反映、Supabase公開CAの同梱、未知のCAと異なるホスト名の拒否')
 } finally {
   await new Promise((resolve) => server.close(resolve))
 }
