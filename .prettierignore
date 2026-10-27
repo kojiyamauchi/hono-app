@@ -1,7 +1,7 @@
 node_modules
 dist
 src/generated
-infra/.terraform
+infra/**/.terraform
 infra/**/*.tf
 infra/**/*.tfvars
 infra/**/*.hcl
