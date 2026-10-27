@@ -66,10 +66,12 @@ chmod 600 .env.deployment.local
 このVPCはIPv4構成です。SupabaseのConnect画面から **Session pooler、5432番** の接続文字列をコピーし、SSLを必須にします。poolerホストは推測せず、画面に表示された値を使ってください。
 
 ```text
-postgresql://postgres.<project-ref>:<URLエンコード済みパスワード>@<実際のpoolerホスト>:5432/postgres?sslmode=require
+postgresql://postgres.<project-ref>:<URLエンコード済みパスワード>@<実際のpoolerホスト>:5432/postgres?sslmode=verify-full
 ```
 
 通常の直接接続はIPv6のみの場合があり、transaction poolerの6543番はsession単位の動作が異なります。本手順ではアプリとmigrationの両方をSession poolerへ接続します。[Supabaseの接続方式](https://supabase.com/docs/guides/database/connecting-to-postgres)
+
+共用DockerfileはruntimeとmigrationへSupabaseの公開CAを同梱し、`NODE_EXTRA_CA_CERTS` でBunの既定CAへ追加します。`verify-full` で接続先の証明書とホスト名を検証し、証明書の追加マウントは不要です。取得元・有効期限・更新手順は[証明書の管理手順](../certificates/README.md)を参照してください。
 
 このアプリはPrismaでDBへアクセスし、Supabase SDKはAuthだけに使います。Supabase側のData APIは無効にして、Prismaが作成する認証・ユーザーテーブルをData APIへ公開しない構成にします。Supabase AuthのSite URL・Redirect URLsには実際のフロントエンドを設定してください。[SupabaseとPrismaの設定](https://supabase.com/docs/guides/database/prisma)
 
@@ -92,7 +94,7 @@ TF_WORKSPACE=dev bun run tf:aws:test
 bun run test:container
 ```
 
-TerraformのモックテストはAWSリソースを作りません。コンテナ検証はDocker DesktopとBunを使用し、linux/amd64でビルドした非rootの本番イメージを0.25 vCPU・512 MBで起動します。使い捨てPostgreSQLへmigrationを2回適用し、登録・ログイン・本人取得・Cookieの更新、APIドキュメントの非公開を確認します。外部メールは送らず、検証後に自分で作成したコンテナ・匿名ボリューム・ネットワーク・イメージタグを削除します。既存のSupabaseやDBは操作しません。
+TerraformのモックテストはAWSリソースを作りません。コンテナ検証はDocker Desktop・Bun・OpenSSLを使用し、両イメージの公開CA同梱と未知のCA・異なるホスト名の拒否を確認します。linux/amd64でビルドした非rootの本番イメージを0.25 vCPU・512 MBで起動します。使い捨てPostgreSQLへmigrationを2回適用し、登録・ログイン・本人取得・Cookieの更新、APIドキュメントの非公開を確認します。外部メールは送らず、検証後に自分で作成したコンテナ・匿名ボリューム・ネットワーク・イメージタグを削除します。既存のSupabaseやDBは操作しません。
 
 ## 公開を決めた後の操作
 
