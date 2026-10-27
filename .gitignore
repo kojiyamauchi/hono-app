@@ -3,13 +3,14 @@ node_modules/
 dist/
 .env
 .env.*.local
-infra/env/*.local.tfvars
+infra/**/env/*.local.tfvars
+infra/**/env/*.local.hcl
 .history/
 src/generated/
 
 # Terraformのローカル生成物
 **/.terraform/
-infra/modules/**/.terraform.lock.hcl
+infra/**/modules/**/.terraform.lock.hcl
 *.tfstate
 *.tfstate.*
 *.tfplan

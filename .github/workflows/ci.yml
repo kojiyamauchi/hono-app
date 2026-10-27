@@ -84,10 +84,10 @@ jobs:
           cache: true
 
       - name: Initialize Terraform Without Backend
-        run: bun run tf:init:no-backend
+        run: bun run tf:aws:init:no-backend
 
       - name: Initialize TFLint
-        run: bun run tf:lint:init
+        run: bun run tf:aws:lint:init
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
@@ -95,32 +95,71 @@ jobs:
         run: bun run tf:fmt:check
 
       - name: Run TFLint
-        run: bun run tf:lint
+        run: bun run tf:aws:lint
 
       - name: Validate Terraform
-        run: bun run tf:validate
+        run: bun run tf:aws:validate
 
       - name: Initialize Account Terraform Without Backend
-        run: bun run tf:account:init:no-backend
+        run: bun run tf:aws:account:init:no-backend
 
       - name: Validate Account Terraform
-        run: bun run tf:account:validate
+        run: bun run tf:aws:account:validate
 
       - name: Initialize Terraform Module Tests
-        run: bun run tf:test:init
+        run: bun run tf:aws:test:init
 
       - name: Test Terraform Modules
-        run: bun run tf:test
+        run: bun run tf:aws:test
 
       - name: Test Staging Root Configuration
-        run: bun run tf:test:root
+        run: bun run tf:aws:test:root
         env:
           TF_WORKSPACE: stg
 
       - name: Test Production Root Configuration
-        run: bun run tf:test:root
+        run: bun run tf:aws:test:root
         env:
           TF_WORKSPACE: prod
+
+  terraform-gcp:
+    name: Terraform GCP Checks
+    runs-on: ubuntu-latest
+    env:
+      TF_WORKSPACE: dev
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v6
+        with:
+          tflint_version: ${{ env.TFLINT_VERSION }}
+          cache: true
+
+      # Google認証やbackend接続を使わず、providerのモックで構成を検証する。
+      - name: Initialize Terraform Without Backend
+        run: terraform -chdir=infra/gcp init -backend=false
+
+      - name: Check Terraform Formatting
+        run: terraform -chdir=infra/gcp fmt -check -recursive -diff
+
+      - name: Initialize TFLint
+        run: tflint --chdir=infra/gcp --init
+
+      - name: Run TFLint
+        run: tflint --chdir=infra/gcp
+
+      - name: Validate Terraform
+        run: terraform -chdir=infra/gcp validate
+
+      - name: Test Terraform
+        run: terraform -chdir=infra/gcp test
 
   build:
     name: Build Test
