@@ -19,3 +19,13 @@ bun run test:container
 ```
 
 更新時は `scripts/verify-certificate.mjs` の期待するフィンガープリントも更新します。識別情報と有効期限の検証は `bun test` を通じてCIのUnit Testでも実行し、有効期限の90日前から失敗して更新を促します。コンテナ検証も同じ関数を使い、同梱されたファイルを検証します。実際のSupabaseへのruntime接続とmigrationの履歴取得も、証明書と接続先ホスト名の検証を有効にした状態で確認してください。
+
+## CAローテーション時の復旧
+
+Supabaseが有効期限より前にCAを切り替えた場合も、公式配布元から新しいCAを取得し、発行者・フィンガープリント・有効期間を確認します。移行期間に必要なら旧CAも含めたPEM形式のCA束を用意し、`sslmode=verify-full` を維持して接続を検証します。
+
+イメージの再ビルドを待たずにCloud Runを復旧する場合は、確認済みのCA束をSecret Managerへ登録し、数値versionに固定して `/run/ca/supabase-ca-bundle.pem` へ読み取り専用のシークレットボリュームとしてマウントします。実行用サービスアカウントにはそのシークレットの読み取り権限を付け、非rootの `bun` ユーザーがファイルを読めるようにします。`NODE_EXTRA_CA_CERTS` をこのパスへ上書きし、同じイメージの新revisionを起動します。CAはプロセス起動時に読み込むため、ファイルの差し替えだけで既存プロセスへ反映されることは前提にしません。[Cloud Runのシークレット設定](https://docs.cloud.google.com/run/docs/configuring/services/secrets)
+
+現行Terraformには緊急用CAボリュームの配線がないため、利用時はボリューム・CA用の権限・環境変数をTerraformへ追加し、planを確認してapplyします。Consoleから直接更新せず、イメージのダイジェストと既存6種の秘密値の参照は維持します。CA束を追加versionとして保存する場合は、通常構成とは別に[Secret Managerの料金](https://cloud.google.com/secret-manager/pricing)も確認してください。
+
+migrationを実行する場合も、同じCA束をコンテナへ読み取り専用でマウントし、`NODE_EXTRA_CA_CERTS` を同じパスへ上書きして、まず `prisma migrate status` を確認します。復旧後はリポジトリの証明書と検証の期待値を更新し、CI・コンテナ検証・実DB接続を確認したイメージへ更新します。同梱CAでの接続確認後に、緊急用マウントと環境変数の上書きをTerraformから除去します。証明書やホスト名の検証を無効にする方法では復旧しません。
