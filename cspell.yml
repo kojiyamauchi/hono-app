@@ -1,12 +1,14 @@
 version: 0.2
 language: en
 words:
+  - artifactregistry
   - autoincrement
   - buildx
   - bun
   - Bun
   - bunx
   - chdir
+  - cloudresourcemanager
   - cpus
   - datasource
   - dotenv
@@ -28,6 +30,8 @@ words:
   - postgresql
   - Prisma
   - Refreshable
+  - secretmanager
+  - serviceusage
   - sslmode
   - supabase
   - Supabase

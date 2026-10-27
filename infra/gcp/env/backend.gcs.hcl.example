@@ -1,0 +1,3 @@
+# 事前作成したGCSバケット。実際の値はbackend.local.hclへ設定する。
+bucket = "your-unique-terraform-state-bucket"
+prefix = "hono-app/gcp"
