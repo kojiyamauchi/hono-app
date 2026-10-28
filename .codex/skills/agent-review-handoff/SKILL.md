@@ -57,12 +57,17 @@ GitHub connectorが使える場合はconnectorで取得し、必要に応じて 
 ```bash
 gh pr view <PR番号> --json number,url,headRefName,headRefOid,isDraft,state
 gh pr checks <PR番号>
+
+# 依頼前のレビュー・レビューコメントの最大IDを記録する（ステップ4の照合に使用する）
+gh api repos/kojiyamauchi/hono-app/pulls/<PR番号>/reviews --jq '[.[].id] | max // 0'
+gh api repos/kojiyamauchi/hono-app/pulls/<PR番号>/comments --jq '[.[].id] | max // 0'
 ```
 
 - 対象PRがopen状態であることを確認する。
 - 最新HEADのSHAを確認する（レビュー対象を明示するため依頼プロンプトへ含める）。
 - 対象Issueがある場合はIssue番号を確認する。
 - PR本文の `## 実DB検証` セクションが記載済みであることを確認する。
+- 依頼前のレビュー・レビューコメントの最大IDを記録する（記録しないと、ステップ4で過去のレビューを今回の投稿と誤認する）。
 
 ### 2. 依頼プロンプトの作成
 
@@ -111,14 +116,24 @@ cd /Users/kojiyamauchi/Desktop/personal/hono-app && \
 
 標準出力の報告だけでは、レビューが実際にGitHubへ投稿されたかは確認できない。投稿を必ず確認する。
 
+最新のレビューを1件見るだけでは不十分である。過去のレビューが残っているPRでは、今回の実行が投稿前に失敗していても「レビューが存在する」状態は満たされてしまう。ステップ1で記録したIDを使い、今回追加されたものだけを抽出して照合する。
+
 ```bash
-gh pr view <PR番号> --json reviews --jq '.reviews[-1] | {author: .author.login, state: .state, submittedAt: .submittedAt}'
-gh pr view <PR番号> --comments
+REVIEW_SINCE=<ステップ1で記録したレビューの最大ID>
+COMMENT_SINCE=<ステップ1で記録したレビューコメントの最大ID>
+HEAD_SHA=<依頼したレビュー対象HEAD>
+
+gh api repos/kojiyamauchi/hono-app/pulls/<PR番号>/reviews \
+  --jq ".[] | select(.id > $REVIEW_SINCE) | {id, user: .user.login, state, commit_id, bodyLength: (.body | length)}"
+gh api repos/kojiyamauchi/hono-app/pulls/<PR番号>/comments \
+  --jq ".[] | select(.id > $COMMENT_SINCE) | {id, path, line, commit_id, url: .html_url}"
 ```
 
-- レビューがPR reviewとして投稿されていることを確認する。
-- 投稿されていない場合は、標準出力のエラーを確認し、許可したツール・ネットワーク設定を見直して再実行する。
-- 投稿されたレビューのURLを記録する（レビュー対応コミットの `comment:` に使用する）。
+- 今回追加されたレビューが1件以上あることを確認する。
+- 追加されたレビュー・レビューコメントの `commit_id` が、依頼した `HEAD_SHA` と一致することを確認する。
+- `bodyLength` が0のレビューは、inline commentの投稿に付随して作られる本文なしのレビューであり、総評の投稿成功を意味しない。総評を含むレビュー本体が投稿されたかは、本文があるレビューの有無で判定する。
+- 投稿されていない場合、または本文なしのレビューしか増えていない場合は、標準出力のエラーを確認し、許可したツール・ネットワーク・承認ポリシーの設定を見直して再実行する。
+- 投稿されたレビュー・レビューコメントのURLを記録する（レビュー対応コミットの `comment:` に使用する）。
 
 ### 5. レビュー対応への引き継ぎ
 
