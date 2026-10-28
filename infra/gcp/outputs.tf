@@ -5,7 +5,7 @@ output "repository_url" {
 
 output "service_url" {
   value       = try(google_cloud_run_v2_service.app[0].uri, null)
-  description = "IAM認証が必要なCloud RunのHTTPS URL。前提リソースだけの作成時はnull"
+  description = "IAPで保護されたCloud RunのHTTPS URL。前提リソースだけの作成時はnull"
 }
 
 output "secret_ids" {

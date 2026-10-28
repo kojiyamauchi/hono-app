@@ -7,6 +7,7 @@ resource "google_cloud_run_v2_service" "app" {
   deletion_protection  = true
   ingress              = "INGRESS_TRAFFIC_ALL"
   invoker_iam_disabled = false
+  iap_enabled          = true
 
   # 最小0でアクセスがない間は停止し、最大1で通常のスケールを抑える。
   scaling {
@@ -82,10 +83,18 @@ resource "google_cloud_run_v2_service" "app" {
       error_message = "API起動前に公開設定と6種類すべてのシークレットバージョンを指定してください。"
     }
     precondition {
+      condition     = !var.enable_api_docs || terraform.workspace == "dev"
+      error_message = "ScalarとOpenAPIドキュメントの公開はdev workspaceに限定してください。"
+    }
+    precondition {
+      condition     = try(var.app_environment.AUTH_EMAIL_MODE, "link") != "scalar" || var.enable_api_docs
+      error_message = "Scalarによる手動メール確認を選ぶ場合はAPIドキュメントを有効にしてください。"
+    }
+    precondition {
       condition     = contains(["dev", "stg", "prod"], terraform.workspace) && length(var.invoker_members) > 0
       error_message = "dev/stg/prod workspaceを選択し、呼び出しを許可するIAM principalを指定してください。"
     }
   }
 
-  depends_on = [google_secret_manager_secret_iam_member.runtime]
+  depends_on = [google_secret_manager_secret_iam_member.runtime, google_project_service_identity.iap]
 }
