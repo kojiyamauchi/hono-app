@@ -184,7 +184,9 @@ curl --silent --output /dev/null --write-out '%{http_code}\n' "$gcp_service_url/
 
 プログラム用のトークンはIAP向けに取得し、許可するOAuthクライアントとaudienceも事前に確認します。値はログやコマンド履歴へ残さず、curlで使う場合は保護した設定ファイルからヘッダーを読み込みます。
 
-アプリ自身のJWTは `Authorization` に渡します。IAPセッションはブラウザのCookieで管理し、アプリのJWTや `/auth` 配下のrefresh Cookieとは分けます。サービスURLをaudienceにしたGoogle IDトークンだけでIAPを通過できるとは扱いません。[IAPのプログラム認証](https://docs.cloud.google.com/iap/docs/authentication-howto)
+アプリ自身のJWTは `Authorization`、ブラウザのIAP認証はセッションCookieを使う想定です。初回配備直後、同じOriginのScalarから独自認証でログインして `/auth/me` を呼び、CookieとBearerトークンが併用できることを最初に実測します。Supabase Authは確認メール完了後の既存3API検証で `/supabase-auth/me` も同様に確認します。各JWTを付けたリクエストの成功を確認するまでは、その併用を検証済みと扱いません。
+
+401・403の場合は、`X-Goog-IAP-Generated-Response` の有無とアプリ側の応答を確認して、拒否した層を切り分けます。IAPで拒否される場合は後続の動作検証を中断し、認証方式の調整をレビューします。プログラム用の確認では、Google用トークンを `Proxy-Authorization` に渡してアプリの `Authorization` と分離できます。IAPへ許可するOAuthクライアント・audienceを確認し、サービスURL向けのGoogle IDトークンだけで通過できるとは扱いません。[IAPのプログラム認証](https://docs.cloud.google.com/iap/docs/authentication-howto)、[IAP応答の識別](https://docs.cloud.google.com/iap/docs/query-parameters-and-headers-howto)
 
 `/health` はプロセスの稼働確認であり、DB接続は保証しません。検証専用アカウントで登録・ログイン・本人取得・refreshを確認し、検証データを削除します。メールの配達とSupabase Authはそれぞれ別途確認します。
 
