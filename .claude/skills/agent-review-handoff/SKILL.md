@@ -40,7 +40,7 @@ PATH上の `codex` は同梱版より古い場合があり、`model_not_found`�
 
 レビュー結果をGitHubへ投稿させるため、起動時にネットワークと `gh` の実行を許可する。
 
-- Codexを起動する場合は、サンドボックスでネットワークアクセスを許可する。`--sandbox read-only` では投稿できない。
+- Codexを起動する場合は、`--sandbox workspace-write` に加えて `-c sandbox_workspace_write.network_access=true` でネットワークアクセスを明示的に許可する。`workspace-write` は既定でコマンドのネットワークアクセスを無効にするため、このオプションを省くと `gh pr checks` / `gh pr review` が実行できない。`--sandbox read-only` でも投稿できない。
 - ローカル設定ファイル（`.claude/settings.local.json` など）はgit管理外であり、環境によって内容が異なる。許可はローカル設定に依存せず、起動時のオプションで明示する。
 
 ### 3. 依頼前のCI確認
@@ -105,6 +105,7 @@ AGENTS.md の規約も確認してください。
 cd /Users/kojiyamauchi/Desktop/personal/hono-app && \
   /Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex exec \
   --sandbox workspace-write \
+  -c sandbox_workspace_write.network_access=true \
   "<ステップ2のテンプレートに値を埋めたもの>"
 ```
 
