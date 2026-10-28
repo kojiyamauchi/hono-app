@@ -60,8 +60,9 @@ gh pr view <PR番号> --json number,url,headRefName,headRefOid,isDraft,state
 gh pr checks <PR番号>
 
 # 依頼前のレビュー・レビューコメントの最大IDを記録する（ステップ4の照合に使用する）
-gh api repos/kojiyamauchi/hono-app/pulls/<PR番号>/reviews --jq '[.[].id] | max // 0'
-gh api repos/kojiyamauchi/hono-app/pulls/<PR番号>/comments --jq '[.[].id] | max // 0'
+# 一覧APIは既定で30件しか返さないため、per_pageはクエリ文字列へ置き --paginate で全ページを取得する
+gh api "repos/kojiyamauchi/hono-app/pulls/<PR番号>/reviews?per_page=100" --paginate --jq '.[].id' | sort -n | tail -1
+gh api "repos/kojiyamauchi/hono-app/pulls/<PR番号>/comments?per_page=100" --paginate --jq '.[].id' | sort -n | tail -1
 ```
 
 - 対象PRがopen状態であることを確認する。
@@ -69,6 +70,8 @@ gh api repos/kojiyamauchi/hono-app/pulls/<PR番号>/comments --jq '[.[].id] | ma
 - 対象Issueがある場合はIssue番号を確認する。
 - PR本文の `## 実DB検証` セクションが記載済みであることを確認する。
 - 依頼前のレビュー・レビューコメントの最大IDを記録する（記録しないと、ステップ4で過去のレビューを今回の投稿と誤認する）。
+- 最大IDは全ページを対象に求める。一覧APIは既定で古い順の最初の30件しか返さないため、先頭ページだけでは31件目以降の投稿を取得できず、正常に投稿されたものを失敗と誤判定する。
+- `per_page` は `-F` で渡さないこと。`gh api` は `-F` をリクエストボディと解釈してGETをPOSTへ変えるため、レビューの下書き（`PENDING` のレビュー）を誤って作成してしまう。下書きは1 PRにつき1つしか持てず、残すと以降のレビュー作成が失敗する。
 
 ### 2. 依頼プロンプトの作成
 
@@ -121,16 +124,18 @@ cd /Users/kojiyamauchi/Desktop/personal/hono-app && \
 最新のレビューを1件見るだけでは不十分である。過去のレビューが残っているPRでは、今回の実行が投稿前に失敗していても「レビューが存在する」状態は満たされてしまう。ステップ1で記録したIDを使い、今回追加されたものだけを抽出して照合する。
 
 ```bash
-REVIEW_SINCE=<ステップ1で記録したレビューの最大ID>
-COMMENT_SINCE=<ステップ1で記録したレビューコメントの最大ID>
-HEAD_SHA=<依頼したレビュー対象HEAD>
+export REVIEW_SINCE=<ステップ1で記録したレビューの最大ID>
+export COMMENT_SINCE=<ステップ1で記録したレビューコメントの最大ID>
+export HEAD_SHA=<依頼したレビュー対象HEAD>
 
-gh api repos/kojiyamauchi/hono-app/pulls/<PR番号>/reviews \
-  --jq ".[] | select(.id > $REVIEW_SINCE) | {id, user: .user.login, state, commit_id, bodyLength: (.body | length)}"
-gh api repos/kojiyamauchi/hono-app/pulls/<PR番号>/comments \
-  --jq ".[] | select(.id > $COMMENT_SINCE) | {id, path, line, commit_id, url: .html_url}"
+gh api "repos/kojiyamauchi/hono-app/pulls/<PR番号>/reviews?per_page=100" --paginate \
+  --jq '.[] | select(.id > (env.REVIEW_SINCE | tonumber)) | select(.state != "PENDING") | {id, user: .user.login, state, commit_id, bodyLength: (.body | length), url: .html_url}'
+gh api "repos/kojiyamauchi/hono-app/pulls/<PR番号>/comments?per_page=100" --paginate \
+  --jq '.[] | select(.id > (env.COMMENT_SINCE | tonumber)) | {id, path, line, commit_id, url: .html_url}'
 ```
 
+- 抽出はステップ1と同様に全ページを対象にする。先頭ページだけでは31件目以降の投稿を取得できない。
+- `state` が `PENDING` のレビューは未投稿の下書きであり、投稿済みとして数えない。
 - 今回追加されたレビューが1件以上あることを確認する。
 - 追加されたレビュー・レビューコメントの `commit_id` が、依頼した `HEAD_SHA` と一致することを確認する。
 - `bodyLength` が0のレビューは、inline commentの投稿に付随して作られる本文なしのレビューであり、総評の投稿成功を意味しない。総評を含むレビュー本体が投稿されたかは、本文があるレビューの有無で判定する。
