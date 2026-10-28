@@ -7,6 +7,42 @@ mock_provider "google" {
   }
 }
 
+mock_provider "google-beta" {
+  mock_resource "google_project_service_identity" {
+    override_during = plan
+    defaults = {
+      email = "service-123456789012@gcp-sa-iap.iam.gserviceaccount.com"
+    }
+  }
+}
+
+run "reject_scalar_without_docs" {
+  command = plan
+  variables {
+    app_image_digest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    invoker_members  = ["user:developer@example.com"]
+    app_environment = {
+      SUPABASE_URL                  = "https://test.supabase.co"
+      SUPABASE_PUBLISHABLE_KEY      = "sb_publishable_test_key"
+      ALLOWED_ORIGINS               = "https://example.com"
+      PASSWORD_RESET_FROM_EMAIL     = "noreply@example.com"
+      PASSWORD_RESET_URL_BASE       = "https://example.com/open-api/scalar"
+      EMAIL_VERIFICATION_FROM_EMAIL = "noreply@example.com"
+      EMAIL_VERIFICATION_URL_BASE   = "https://example.com/open-api/scalar"
+      AUTH_EMAIL_MODE               = "scalar"
+    }
+    secret_versions = {
+      DATABASE_URL                    = "1"
+      JWT_SECRET                      = "1"
+      REFRESH_TOKEN_SECRET            = "1"
+      PASSWORD_RESET_TOKEN_SECRET     = "1"
+      EMAIL_VERIFICATION_TOKEN_SECRET = "1"
+      RESEND_API_KEY                  = "1"
+    }
+  }
+  expect_failures = [google_cloud_run_v2_service.app]
+}
+
 variables {
   project_id = "test-project"
 }
@@ -15,7 +51,7 @@ run "bootstrap_without_service" {
   command = plan
 
   assert {
-    condition     = length(google_cloud_run_v2_service.app) == 0 && length(google_cloud_run_v2_service_iam_binding.invoker) == 0
+    condition     = length(google_cloud_run_v2_service.app) == 0 && length(google_cloud_run_v2_service_iam_binding.invoker) == 0 && length(google_iap_web_cloud_run_service_iam_binding.users) == 0
     error_message = "初回は前提リソースだけを用意し、未準備のAPIを起動・公開してはいけません。"
   }
   assert {
@@ -39,16 +75,18 @@ run "private_low_usage_service" {
 
   variables {
     app_image_digest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    enable_api_docs  = true
     invoker_members  = ["user:developer@example.com", "serviceAccount:client@test-project.iam.gserviceaccount.com"]
     app_environment = {
       SUPABASE_URL                  = "https://test.supabase.co"
-      SUPABASE_ANON_KEY             = "public-anon-key"
+      SUPABASE_PUBLISHABLE_KEY      = "sb_publishable_test_key"
       ALLOWED_ORIGINS               = "http://localhost:3000"
       PASSWORD_RESET_FROM_EMAIL     = "noreply@example.com"
       PASSWORD_RESET_URL_BASE       = "https://example.com/reset-password"
       EMAIL_VERIFICATION_FROM_EMAIL = "noreply@example.com"
       EMAIL_VERIFICATION_URL_BASE   = "https://example.com/verify-email"
       COOKIE_SAMESITE               = "None"
+      AUTH_EMAIL_MODE               = "scalar"
     }
     secret_versions = {
       DATABASE_URL                    = "1"
@@ -73,24 +111,29 @@ run "private_low_usage_service" {
   assert {
     condition = (
       !google_cloud_run_v2_service.app[0].invoker_iam_disabled &&
+      google_cloud_run_v2_service.app[0].iap_enabled &&
       length(google_cloud_run_v2_service_iam_binding.invoker) == 1 &&
       google_cloud_run_v2_service_iam_binding.invoker[0].role == "roles/run.invoker" &&
       google_cloud_run_v2_service_iam_binding.invoker[0].members == toset([
+        "serviceAccount:service-123456789012@gcp-sa-iap.iam.gserviceaccount.com",
+      ]) &&
+      google_iap_web_cloud_run_service_iam_binding.users[0].role == "roles/iap.httpsResourceAccessor" &&
+      google_iap_web_cloud_run_service_iam_binding.users[0].members == toset([
         "user:developer@example.com", "serviceAccount:client@test-project.iam.gserviceaccount.com",
       ])
     )
-    error_message = "IAM認証を必須にし、サービス単位の呼び出し権限を指定した利用者の集合へ一括管理する必要があります。"
+    error_message = "Cloud RunはIAPだけに呼び出しを許可し、利用者の権限をサービス単位のIAPへ限定する必要があります。"
   }
   assert {
     condition = alltrue([for name, value in {
       COOKIE_SECURE       = "true"
-      ENABLE_API_DOCS     = "false"
+      ENABLE_API_DOCS     = "true"
       OTEL_TRACES_ENABLED = "false"
       OTEL_SDK_DISABLED   = "true"
       } : anytrue([for env in google_cloud_run_v2_service.app[0].template[0].containers[0].env :
         env.name == name && env.value == value
     ])])
-    error_message = "Secure Cookieを有効化し、APIドキュメントと外部trace送信を無効にする必要があります。"
+    error_message = "Secure CookieとdevのScalarを有効化し、外部trace送信を無効にする必要があります。"
   }
   assert {
     condition = length([for env in google_cloud_run_v2_service.app[0].template[0].containers[0].env : env
