@@ -172,6 +172,8 @@ CookieはSecureを強制します。cross-siteのフロントエンドでCookie�
 
 サービス作成前にURLが必要な場合は、短いサービス名で利用できる `https://<サービス名>-<プロジェクト番号>.<リージョン>.run.app` の形式を使います。apply後に実際の出力URLとも照合します。[標準URLの仕様](https://docs.cloud.google.com/run/docs/triggering/https-request#service_url)
 
+今回のScalarは、メールとSupabaseの転送先に設定した上記の形式のURLで開きます。Terraformの `service_url` は別形式の有効な標準URLを返す場合があるため、その出力URLをScalarの案内へそのまま置き換えません。別のOriginでも利用する場合は、先に `ALLOWED_ORIGINS` へそのOriginを明示的に追加して配備し、ブラウザでPOSTの成功を確認します。
+
 ```bash
 terraform -chdir=infra/gcp workspace show
 bun run tf:gcp:plan -var-file=env/dev.local.tfvars -out=release.tfplan
@@ -180,7 +182,7 @@ gcp_service_url="$(terraform -chdir=infra/gcp output -raw service_url)"
 curl --silent --output /dev/null --write-out '%{http_code}\n' "$gcp_service_url/health"
 ```
 
-最後の認証なしの呼び出しは、Google認証へのリダイレクトまたはアクセス拒否となり、アプリのhealth本文を返さないことを確認します。ブラウザではサービスURLの `/open-api/scalar` を開き、許可済みGoogleアカウントでログインして確認します。プログラムからの検証にはIAPのプログラム用認証を使用します。
+最後の認証なしの呼び出しは、Google認証へのリダイレクトまたはアクセス拒否となり、アプリのhealth本文を返さないことを確認します。ブラウザではメールと同じURLの `/open-api/scalar` を開き、許可済みGoogleアカウントでログインして確認します。プログラムからの検証にはIAPのプログラム用認証を使用します。
 
 プログラム用のトークンはIAP向けに取得し、許可するOAuthクライアントとaudienceも事前に確認します。値はログやコマンド履歴へ残さず、curlで使う場合は保護した設定ファイルからヘッダーを読み込みます。
 
