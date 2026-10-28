@@ -43,6 +43,7 @@ words:
   - tflint
   - tfstate
   - tfvars
+  - tonumber
 flagWords:
   - null
 ignorePaths:
