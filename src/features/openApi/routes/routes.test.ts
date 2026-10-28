@@ -41,6 +41,9 @@ describe('registerOpenApiRoutes', () => {
 
       expect(response.status).toBe(200)
       expect(response.headers.get('content-type')).toContain('text/html')
+      const html = await response.text()
+      expect(html).toMatch(/"proxyUrl"\s*:\s*""/)
+      expect(html).toMatch(/"persistAuth"\s*:\s*false/)
     })
   })
 

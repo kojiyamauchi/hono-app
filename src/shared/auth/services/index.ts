@@ -8,6 +8,8 @@ import { sendResendEmail } from '@/libs/resend'
 import { resolveExternalApiErrorType, resolveExternalApiStatusCode, traceExternalApiCall } from '@/libs/telemetry/external'
 import { AppError } from '@/utils/errors'
 
+import { createScalarAuthEmail } from './scalarEmail'
+
 /**
  * 環境変数からJWT署名用のシークレットを取得する。未設定なら500エラー。
  */
@@ -234,6 +236,7 @@ export const passwordResetNotifier: PasswordResetNotifier = {
     const urlBase = getPasswordResetUrlBase()
     const resetUrl = `${urlBase}?token=${params.token}`
     const ttlHours = PASSWORD_RESET_TOKEN_TTL_MS / (60 * 60 * 1000)
+    const scalarEmail = createScalarAuthEmail({ url: urlBase, token: params.token, endpoint: '/auth/password-reset/confirm', ttlHours, passwordReset: true })
 
     const { error } = await traceExternalApiCall(
       {
@@ -252,26 +255,30 @@ export const passwordResetNotifier: PasswordResetNotifier = {
           from,
           to: params.email,
           subject: 'パスワード再設定のご案内',
-          text: [
-            'パスワードの再設定が申請されました。',
-            '',
-            '以下のURLからパスワードを再設定してください。',
-            resetUrl,
-            '',
-            `このURLの有効期限は${ttlHours}時間です。`,
-            '',
-            'このメールに心当たりがない場合は、操作は不要です。このメールを無視してください。',
-            'パスワードやリセット用URLを他者へ共有・返信しないでください。',
-          ].join('\n'),
-          html: [
-            '<p>パスワードの再設定が申請されました。</p>',
-            '<p>以下のURLからパスワードを再設定してください。</p>',
-            `<p><a href="${resetUrl}">${resetUrl}</a></p>`,
-            `<p>このURLの有効期限は${ttlHours}時間です。</p>`,
-            '<hr>',
-            '<p>このメールに心当たりがない場合は、操作は不要です。このメールを無視してください。</p>',
-            '<p>パスワードやリセット用URLを他者へ共有・返信しないでください。</p>',
-          ].join('\n'),
+          text:
+            scalarEmail?.text ??
+            [
+              'パスワードの再設定が申請されました。',
+              '',
+              '以下のURLからパスワードを再設定してください。',
+              resetUrl,
+              '',
+              `このURLの有効期限は${ttlHours}時間です。`,
+              '',
+              'このメールに心当たりがない場合は、操作は不要です。このメールを無視してください。',
+              'パスワードやリセット用URLを他者へ共有・返信しないでください。',
+            ].join('\n'),
+          html:
+            scalarEmail?.html ??
+            [
+              '<p>パスワードの再設定が申請されました。</p>',
+              '<p>以下のURLからパスワードを再設定してください。</p>',
+              `<p><a href="${resetUrl}">${resetUrl}</a></p>`,
+              `<p>このURLの有効期限は${ttlHours}時間です。</p>`,
+              '<hr>',
+              '<p>このメールに心当たりがない場合は、操作は不要です。このメールを無視してください。</p>',
+              '<p>パスワードやリセット用URLを他者へ共有・返信しないでください。</p>',
+            ].join('\n'),
         }),
     )
 

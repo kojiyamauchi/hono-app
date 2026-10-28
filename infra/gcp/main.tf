@@ -6,6 +6,10 @@ terraform {
       source  = "hashicorp/google"
       version = "~> 7.0"
     }
+    google-beta = {
+      source  = "hashicorp/google-beta"
+      version = "~> 7.0"
+    }
   }
 
   # バケットは事前作成し、env/backend.local.hclで指定する。AWSのstateとは共有しない。
@@ -13,6 +17,11 @@ terraform {
 }
 
 provider "google" {
+  project = var.project_id
+  region  = var.region
+}
+
+provider "google-beta" {
   project = var.project_id
   region  = var.region
 }
@@ -25,7 +34,7 @@ locals {
   ])
   app_environment = merge(var.app_environment == null ? {} : var.app_environment, {
     NODE_ENV            = "production"
-    ENABLE_API_DOCS     = "false"
+    ENABLE_API_DOCS     = tostring(var.enable_api_docs)
     COOKIE_SECURE       = "true"
     OTEL_TRACES_ENABLED = "false"
     OTEL_SDK_DISABLED   = "true"
@@ -35,7 +44,7 @@ locals {
 resource "google_project_service" "required" {
   for_each = toset([
     "run.googleapis.com", "artifactregistry.googleapis.com",
-    "secretmanager.googleapis.com", "iam.googleapis.com",
+    "secretmanager.googleapis.com", "iam.googleapis.com", "iap.googleapis.com",
   ])
 
   project            = var.project_id

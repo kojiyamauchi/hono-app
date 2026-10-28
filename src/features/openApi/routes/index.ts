@@ -33,5 +33,5 @@ export const registerOpenApiRoutes = (app: OpenAPIHono): void => {
   })
 
   // Scalar UIを /open-api/scalar で提供し、内部で /open-api/doc を読み込む。
-  app.get('/open-api/scalar', Scalar({ url: '/open-api/doc' }))
+  app.get('/open-api/scalar', Scalar({ url: '/open-api/doc', proxyUrl: '', persistAuth: false }))
 }

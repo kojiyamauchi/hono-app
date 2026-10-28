@@ -23,6 +23,7 @@ describe('passwordResetNotifier.send', () => {
     // 環境変数を元の状態に戻す
     process.env.PASSWORD_RESET_FROM_EMAIL = 'noreply@example.com'
     process.env.PASSWORD_RESET_URL_BASE = 'https://example.com/reset-password'
+    delete process.env.AUTH_EMAIL_MODE
   })
 
   test('正常系: メール送信が成功する（from/to/リセットURLを含む）', async () => {
@@ -51,6 +52,17 @@ describe('passwordResetNotifier.send', () => {
 
     const callArg = sendResendEmail.mock.calls[0][0] as { text: string }
     expect(callArg.text).toContain('1時間')
+  })
+
+  test('scalarモードでは固定リンクとトークンを分けて送信する', async () => {
+    process.env.AUTH_EMAIL_MODE = 'scalar'
+    sendResendEmail.mockResolvedValue({ data: { id: 'email-id' }, error: null })
+    await passwordResetNotifier.send({ email: 'user@example.com', token: 'manual-token' })
+    const value = sendResendEmail.mock.calls[0][0] as { text: string; html: string }
+    expect(value.text).toContain('manual-token')
+    expect(value.text).toContain('/auth/password-reset/confirm')
+    expect(value.html).toContain('href="https://example.com/reset-password"')
+    expect(value.html).not.toContain('?token=')
   })
 
   test('APIエラー: Resend SDK が { error: {...} } を返す場合は throw する', async () => {

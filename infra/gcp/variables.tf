@@ -31,32 +31,42 @@ variable "app_image_digest" {
 }
 
 variable "app_environment" {
-  description = "公開アプリ設定。Supabaseのanonキーは公開キーであり、service roleキーを渡さないこと"
+  description = "公開アプリ設定。SupabaseはPublishable keyを使用し、管理権限を持つキーを渡さないこと"
   default     = null
   type = object({
     SUPABASE_URL                  = string
-    SUPABASE_ANON_KEY             = string
+    SUPABASE_PUBLISHABLE_KEY      = string
     ALLOWED_ORIGINS               = string
     PASSWORD_RESET_FROM_EMAIL     = string
     PASSWORD_RESET_URL_BASE       = string
     EMAIL_VERIFICATION_FROM_EMAIL = string
     EMAIL_VERIFICATION_URL_BASE   = string
     COOKIE_SAMESITE               = optional(string, "Lax")
+    AUTH_EMAIL_MODE               = optional(string, "link")
   })
 
   validation {
     condition = var.app_environment == null ? true : (
       alltrue([for value in values(var.app_environment) : length(trimspace(value)) > 0]) &&
       can(regex("^https://[^/]+/?$", var.app_environment.SUPABASE_URL)) &&
+      can(regex("^sb_publishable_[A-Za-z0-9_-]+$", var.app_environment.SUPABASE_PUBLISHABLE_KEY)) &&
       can(regex("^https://", var.app_environment.PASSWORD_RESET_URL_BASE)) &&
       can(regex("^https://", var.app_environment.EMAIL_VERIFICATION_URL_BASE)) &&
       contains(["Lax", "Strict", "None"], var.app_environment.COOKIE_SAMESITE) &&
+      contains(["link", "scalar"], var.app_environment.AUTH_EMAIL_MODE) &&
       alltrue([for origin in split(",", var.app_environment.ALLOWED_ORIGINS) :
         can(regex("^https?://[^/]+$", trimspace(origin))) && !strcontains(origin, "*")
       ])
     )
-    error_message = "公開設定は空にせず、SupabaseとメールのURLはHTTPS、Originはパスやワイルドカードなし、SameSiteはLax・Strict・Noneで指定してください。"
+    error_message = "公開設定は空にせず、SupabaseはPublishable key、URLはHTTPS、Originはパスやワイルドカードなし、SameSiteはLax・Strict・None、メール形式はlink・scalarで指定してください。"
   }
+}
+
+variable "enable_api_docs" {
+  type        = bool
+  nullable    = false
+  default     = false
+  description = "dev環境でIAPの内側にScalarとOpenAPIドキュメントを公開する"
 }
 
 variable "secret_versions" {
@@ -78,7 +88,7 @@ variable "invoker_members" {
   type        = set(string)
   nullable    = false
   default     = []
-  description = "API呼び出しを許可するIAM principal。既定は非公開で、許可したユーザー・グループ・サービスアカウントのみ利用できる"
+  description = "IAP経由でのアクセスを許可するprincipal。Cloud Run直接呼び出し権限はIAPのサービスエージェントだけに付ける"
 
   validation {
     condition     = alltrue([for member in var.invoker_members : can(regex("^(user|group|serviceAccount):[^[:space:]]+@[^[:space:]]+$", member))])

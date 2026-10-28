@@ -5,15 +5,17 @@ region     = "asia-northeast1"
 # イメージ登録、シークレット登録、migration成功後に以下を追記する。
 # app_image_digest = "sha256:登録済みイメージの64桁ダイジェスト"
 # invoker_members = ["user:you@example.com"]
+# enable_api_docs = true # dev環境でIAPの内側にScalarを公開する。
 # app_environment = {
 #   SUPABASE_URL                  = "https://your-project.supabase.co"
-#   SUPABASE_ANON_KEY             = "Supabaseのanon公開キー。service roleキーは使用禁止"
-#   ALLOWED_ORIGINS               = "http://localhost:3000"
+#   SUPABASE_PUBLISHABLE_KEY      = "sb_publishable_対象プロジェクトの公開キー"
+#   ALLOWED_ORIGINS               = "https://対象サービスの標準URL.run.app"
 #   PASSWORD_RESET_FROM_EMAIL     = "noreply@your-domain.com"
-#   PASSWORD_RESET_URL_BASE       = "https://your-frontend.com/reset-password"
+#   PASSWORD_RESET_URL_BASE       = "https://対象サービスの標準URL.run.app/open-api/scalar"
 #   EMAIL_VERIFICATION_FROM_EMAIL = "noreply@your-domain.com"
-#   EMAIL_VERIFICATION_URL_BASE   = "https://your-frontend.com/verify-email"
+#   EMAIL_VERIFICATION_URL_BASE   = "https://対象サービスの標準URL.run.app/open-api/scalar"
 #   COOKIE_SAMESITE               = "Lax"
+#   AUTH_EMAIL_MODE               = "scalar"
 # }
 # secret_versions = {
 #   DATABASE_URL                    = "1"

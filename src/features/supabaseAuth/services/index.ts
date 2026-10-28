@@ -21,7 +21,7 @@ type AuthResult = {
 export const supabaseAuthService = {
   /**
    * サインアップ。Supabase Auth にユーザーを登録する。
-   * メール確認が無効なため、登録と同時にセッション（トークン）が発行される。
+   * メール確認が有効な場合は、確認完了までセッション（トークン）は発行されない。
    */
   signup: async (input: SignupSchemaType): Promise<AuthResult> => {
     const { data, error } = await traceExternalApiCall(

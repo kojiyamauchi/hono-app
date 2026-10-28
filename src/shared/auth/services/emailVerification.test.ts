@@ -68,6 +68,7 @@ describe('emailVerificationNotifier.send', () => {
   afterEach(() => {
     process.env.EMAIL_VERIFICATION_FROM_EMAIL = 'verify@example.com'
     process.env.EMAIL_VERIFICATION_URL_BASE = 'https://example.com/verify-email'
+    delete process.env.AUTH_EMAIL_MODE
   })
 
   test('送信元・宛先・検証URL・24時間の案内を含むメールを送信する', async () => {
@@ -87,6 +88,17 @@ describe('emailVerificationNotifier.send', () => {
     sendResendEmail.mockResolvedValue({ data: null, error: { name: 'validation_error', message: 'Invalid email' } })
 
     await expect(emailVerificationNotifier.send({ email: 'user@example.com', token: 'plain-token' })).rejects.toThrow('メール送信に失敗しました')
+  })
+
+  test('scalarモードでは固定リンクと入力用トークンを送信する', async () => {
+    process.env.AUTH_EMAIL_MODE = 'scalar'
+    sendResendEmail.mockResolvedValue({ data: { id: 'email-id' }, error: null })
+    await emailVerificationNotifier.send({ email: 'user@example.com', token: 'manual-token' })
+    const value = sendResendEmail.mock.calls[0][0] as { text: string; html: string }
+    expect(value.text).toContain('manual-token')
+    expect(value.text).toContain('/auth/email-verification/confirm')
+    expect(value.html).toContain('href="https://example.com/verify-email"')
+    expect(value.html).not.toContain('?token=')
   })
 
   test('必要な環境変数が未設定ならthrowする', async () => {

@@ -692,6 +692,10 @@ ALLOWED_ORIGINS="http://localhost:3000"
 
 `ENABLE_API_DOCS` はOpenAPI JSON(`/open-api/doc`)とScalar UI(`/open-api/scalar`)の公開フラグです。`true` のときだけ登録し、staging / prod では原則 `false` とします。
 
+クラウドのSupabaseには `SUPABASE_PUBLISHABLE_KEY=sb_publishable_...` を使用します。指定した場合は既存の `SUPABASE_ANON_KEY` より優先します。管理権限を持つSecret key・service roleキーは使用しません。
+
+`AUTH_EMAIL_MODE=scalar` では、独自認証の確認・パスワード再設定メールに固定のScalar URLと入力用トークンを分けて記載します。両方の `*_URL_BASE` へScalarのHTTPS URLを設定し、Scalarで確認APIを実行してください。既定の `link` 形式では従来どおりフロントエンド向けURLへトークンを付けます。GCPのIAPを使うdev環境の設定は[配備手順](docs/deployment-gcp.md)を参照してください。
+
 staging / production では環境ごとに別のSupabase projectを作成し、`DATABASE_URL` や各secretをdeployment platformまたはCI secretsで管理してください。
 
 Cookie、パスワードリセット、メールアドレス検証、OpenTelemetry / New Relic送信に関する環境変数も `.env.example` に定義しています。OpenTelemetryの詳細は [docs/observability.md](docs/observability.md) を参照してください。
@@ -705,7 +709,7 @@ Cookie、パスワードリセット、メールアドレス検証、OpenTelemet
 | `PASSWORD_RESET_TOKEN_SECRET` | パスワードリセットトークンのHMAC-SHA256署名鍵。設定がないとパスワードリセットエンドポイントが500を返す。 |
 | `RESEND_API_KEY`              | Resend の API キー。[resend.com](https://resend.com) でアカウントを作成し発行する。                      |
 | `PASSWORD_RESET_FROM_EMAIL`   | パスワードリセットメールの送信元アドレス。Resend で検証済みのドメインを使用する。                        |
-| `PASSWORD_RESET_URL_BASE`     | フロントエンドのパスワード再設定ページの URL。`?token=...` が付与されてメール本文のリセット URL になる。 |
+| `PASSWORD_RESET_URL_BASE`     | link形式では再設定ページURLへ `?token=...` を付与する。scalar形式では固定のScalar URLを指定する。        |
 
 ```txt
 PASSWORD_RESET_TOKEN_SECRET="your-password-reset-token-secret"
@@ -723,11 +727,11 @@ PASSWORD_RESET_URL_BASE="https://your-frontend.com/reset-password"
 
 メールアドレス検証機能を本番利用する場合、共通の `RESEND_API_KEY` に加えて以下の環境変数を設定してください。
 
-| 環境変数                          | 説明                                                                                |
-| --------------------------------- | ----------------------------------------------------------------------------------- |
-| `EMAIL_VERIFICATION_TOKEN_SECRET` | 検証トークンのHMAC-SHA256署名鍵。パスワードリセット用とは異なる値を設定する。       |
-| `EMAIL_VERIFICATION_FROM_EMAIL`   | 検証メールの送信元アドレス。Resend で検証済みのドメインを使用する。                 |
-| `EMAIL_VERIFICATION_URL_BASE`     | フロントエンドの検証ページURL。`?token=...` が付与されてメール本文の検証URLになる。 |
+| 環境変数                          | 説明                                                                                            |
+| --------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `EMAIL_VERIFICATION_TOKEN_SECRET` | 検証トークンのHMAC-SHA256署名鍵。パスワードリセット用とは異なる値を設定する。                   |
+| `EMAIL_VERIFICATION_FROM_EMAIL`   | 検証メールの送信元アドレス。Resend で検証済みのドメインを使用する。                             |
+| `EMAIL_VERIFICATION_URL_BASE`     | link形式では検証ページURLへ `?token=...` を付与する。scalar形式では固定のScalar URLを指定する。 |
 
 ```txt
 EMAIL_VERIFICATION_TOKEN_SECRET="your-email-verification-token-secret"
