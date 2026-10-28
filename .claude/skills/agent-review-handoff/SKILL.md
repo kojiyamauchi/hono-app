@@ -42,6 +42,7 @@ PATH上の `codex` は同梱版より古い場合があり、`model_not_found`�
 
 - Codexを起動する場合は、`--sandbox workspace-write` に加えて `-c sandbox_workspace_write.network_access=true` でネットワークアクセスを明示的に許可する。`workspace-write` は既定でコマンドのネットワークアクセスを無効にするため、このオプションを省くと `gh pr checks` / `gh pr review` が実行できない。`--sandbox read-only` でも投稿できない。
 - ローカル設定ファイル（`.claude/settings.local.json` など）はgit管理外であり、環境によって内容が異なる。許可はローカル設定に依存せず、起動時のオプションで明示する。
+- `codex exec` の承認ポリシーは `never` であり、承認を要求する操作は実行されずに落ちる。CodexのGitHubプラグイン経由の投稿は承認を要求する場合があるため、投稿には `gh` を使うよう依頼プロンプトで明示する。プラグイン経由でレビュー本体の投稿が承認待ちとなり、inline commentだけが投稿された事例がある。
 
 ### 3. 依頼前のCI確認
 
@@ -102,6 +103,7 @@ PR #<PR番号> をレビューしてください。
 .codex/skills/pr-review/SKILL.md をSkillとして読み、その手順に従ってレビューを実施してください。
 AGENTS.md の規約も確認してください。
 レビュー結果はGitHub上へPR reviewとして投稿してください。
+投稿には gh コマンドを使ってください。
 ```
 
 ### 3. レビュー担当エージェントの起動
