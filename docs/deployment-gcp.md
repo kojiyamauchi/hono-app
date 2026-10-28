@@ -7,12 +7,14 @@ Bun / HonoをCloud Run、DBとSupabase Authをクラウド版Supabase Freeで動
 ## 管理範囲とアクセス制限
 
 - 既存の課金設定済みGCPプロジェクトを入力します。プロジェクトとstate保存用GCSバケットはTerraform管理外の前提リソースです。
-- Terraformは必要なAPI、Artifact Registry、6つのSecret Managerの入れ物、アプリ用サービスアカウント、Cloud Run、呼び出し権限を管理します。
+- Terraformは必要なAPI、Artifact Registry、6つのSecret Managerの入れ物、アプリ用サービスアカウント、IAPサービスエージェント、Cloud Run、呼び出し権限を管理します。
 - Supabaseプロジェクトは管理画面でFreeを選択します。APIとDBのリージョンは可能な限り近づけます。
-- APIは `run.app` のHTTPS URLを使い、IAM認証を必須にします。サービス単位の `roles/run.invoker` を `iam_binding` で一括管理し、`invoker_members` を許可対象の正本にします。Console等で追加された `allUsers` などもplanの差分に現れ、applyで除去します。プロジェクト・組織から継承する権限はこのbindingの管理外なので、別途確認してください。
-- Basic認証・IAPは今回導入しません。Googleアカウントでブラウザから直接ログインするIAPが必要な場合は、OAuth設定と許可対象を決めて追加します。
-- シークレットの実値とversionの作成はTerraform管理外とし、stateへ保存しません。Supabaseのanonキーは公開設定で扱い、service roleキーは使用しません。
-- AWSではanonキーもSSM SecureStringで扱いますが、GCPでは公開キーである性質に合わせて公開設定（tfvars・state）へ含め、Secret Managerの無料枠である有効6 versionをDB接続情報・4種類の鍵・Resend APIキーに割り当てます。
+- APIは `run.app` のHTTPS URLを使い、Cloud Runへ直接IAPを設定します。ブラウザでURLを開くと必要に応じてGoogle認証へ進み、許可したアカウントだけがScalar・APIへアクセスできます。Basic認証は追加しません。
+- `roles/run.invoker` はIAPサービスエージェントだけへ付けます。利用者はサービス単位の `roles/iap.httpsResourceAccessor` で管理し、`invoker_members` をIAPの許可対象の正本にします。両方をbindingで一括管理し、手動で追加された権限もplanへ反映します。プロジェクト・組織から継承する権限は別途確認します。
+- 個人Gmail・組織外ユーザーの利用には、初回だけカスタムOAuthクライアントの準備が必要です。OAuthクライアントの作成・同意画面の設定はTerraform管理外とし、クライアントシークレットをtfvars・state・PRへ書きません。[Cloud Run直接IAPの設定](https://docs.cloud.google.com/run/docs/securing/identity-aware-proxy-cloud-run)
+- シークレットの実値とversionの作成はTerraform管理外とし、stateへ保存しません。Supabaseは `SUPABASE_PUBLISHABLE_KEY` にPublishable keyを設定します。管理権限を持つSecret key・service roleキーは使いません。既存ローカル・AWS用の `SUPABASE_ANON_KEY` は互換設定として利用できます。
+- GCPではPublishable keyを公開設定（tfvars・state）で扱い、Secret Managerの無料枠である有効6 versionをDB接続情報・4種類の鍵・Resend APIキーに割り当てます。
+- dev環境では `enable_api_docs = true` により、IAPの内側にOpenAPIとScalarを公開します。staging / prodでは公開しません。ScalarのAPI呼び出しは同じOriginへ送り、外部のAPIプロキシは使いません。
 - 通常起動ではmigrationを実行しません。既存Dockerfileの `migration` ターゲットをローカルで実行してからCloud Runを更新します。
 - AWS用CDは引き続きECRへの登録だけを行います。GCPへの自動push・自動デプロイは追加しません。
 
@@ -29,6 +31,8 @@ Cloud Runは最小0・最大1インスタンス、1 vCPU / 512 MiB、リクエ�
 - 公開前にGCPのBilling画面で少額の予算とメール通知を設定し、公開後は費用レポートを確認します。予算通知は自動停止や課金の上限ではありません。
 
 メールの無料枠、送信ドメイン、フロントエンドのホスティング、有料監視は別途確認します。
+
+既存の予算通知がある場合は重複作成せず、期間・対象プロジェクト・金額・実績か予測か・通知先を確認して記録します。今回のdevでは月100円、実績50%・90%・100%、Gmail宛ての既存通知を使用します。クレジット適用後の費用を対象とする予算は、無料トライアル中のリソース使用量そのものを通知する設定とは異なります。
 
 ## 外部環境を変更しない確認
 
@@ -91,7 +95,7 @@ planにCloud Runサービスが含まれず、API・リポジトリ・6つのシ
 
 runtimeとmigrationにはSupabaseの公開CAを同梱し、`NODE_EXTRA_CA_CERTS` でBunの既定CAへ追加しています。`verify-full` で接続先の証明書とホスト名を検証します。追加の証明書マウントやSecret ManagerへのCA登録は不要です。公開CAの取得元・有効期限・更新手順は[証明書の管理手順](../certificates/README.md)を参照してください。
 
-Data APIは無効にし、Prismaが作る認証・ユーザーテーブルを公開しません。Supabase AuthのSite URL・Redirect URLsは実際のフロントエンドへ設定します。DBの接続元IP制限を使用している場合は、今回のCloud Run構成には固定送信元IPがないことを考慮してください。固定IPが必要ならNATなどの費用を含めて別途設計します。
+Data APIは無効にし、Prismaが作る認証・ユーザーテーブルを公開しません。Supabase AuthのSite URL・Redirect URLsは実際に利用する画面へ設定します。今回のdevでは後述のScalarを使います。DBの接続元IP制限を使用している場合は、今回のCloud Run構成には固定送信元IPがないことを考慮してください。固定IPが必要ならNATなどの費用を含めて別途設計します。
 
 登録先IDを次のコマンドで確認し、GCP ConsoleのSecret Managerから各実値を登録します。実値をtfvarsやコマンド引数へ記載しません。
 
@@ -110,19 +114,34 @@ terraform -chdir=infra/gcp output -json secret_ids
 
 メール機能を確認する場合はResendで送信ドメインを検証し、無料枠内の送信上限を確認します。Supabase Authの実メール配信はSupabase側のメール設定も必要です。
 
+既存ドメインを使う場合は、送信専用サブドメインをResendへ登録し、表示されたDNSレコードだけを追加します。既存サイト・メールのレコードと重複しないことを確認し、受信メールの設定は変更しません。今回のdevは `notify.kojiyamauchi.com` / `noreply@notify.kojiyamauchi.com` を使用します。DNS値はResendが実際に表示する値を使い、過去の手順から推測しません。
+
+Supabase Authでは確認メールを有効にし、ResendのカスタムSMTPを設定します。SMTPのホスト・ポート・認証情報は[Resend公式手順](https://resend.com/docs/send-with-supabase-smtp)を確認します。SMTPパスワードに使うAPIキーはSupabaseの設定へ直接入力し、ログやPRに残しません。独自認証のResend API送信とは別に、Supabase側の設定・配達を検証します。
+
+Supabase AuthのSite URL・Redirect URLsには今回のScalarのHTTPS URLを設定します。確認メールの標準リンクはSupabase側で検証してからScalarへ戻します。Hono側の既存3APIは登録・ログイン・本人取得であり、独自認証の確認APIへSupabaseのトークンを渡しません。Supabase Authには今回パスワード再設定・refresh等の新規APIを追加しません。
+
+#### IAPの初回OAuth設定
+
+Google Auth Platformで外部向けの同意画面とウェブアプリケーション用OAuthクライアントを作成します。テスト中のアプリでは、利用するGmailをテストユーザーへ追加します。クライアントの承認済みリダイレクトURIには `https://iap.googleapis.com/v1/oauth/clientIds/<CLIENT_ID>:handleRedirect` を登録します。これはIAPのコールバックであり、ScalarのURLではありません。
+
+IAP APIの有効化後、公式手順の `access_settings.oauth_settings.client_id` / `client_secret` を含むYAMLをGit管理外へ作成し、権限を600にします。`gcloud --configuration=hono-app-dev iap settings set <保護したYAMLのパス> --project=<対象プロジェクト>` でプロジェクトへ設定し、使用後に一時ファイルを削除します。秘密値を含み得る設定全体の出力はログへ残しません。OAuthクライアントの用意だけではIAPの設定は完了せず、この設定とTerraformによるIAP有効化・利用者権限の適用まで必要です。[カスタムOAuthの公式手順](https://docs.cloud.google.com/run/docs/securing/identity-aware-proxy-cloud-run#configure-custom-oauth)
+
 ### 3. 同じソースからビルドし、migrationを実行する
 
 リリースするコミットへ揃えたcleanなcheckoutで実行します。migration用環境ファイルは既存の `.env.deployment.local.example` をコピーし、実際の `DATABASE_URL` だけを引用符なしで記載します。
+
+`git status --porcelain` が空であることを確認し、`git rev-parse HEAD` の完全なSHAを記録します。両イメージは同じcheckoutからビルドし、過去のローカルタグを再利用しません。
 
 ```bash
 cp .env.deployment.local.example .env.deployment.local
 chmod 600 .env.deployment.local
 docker build --platform linux/amd64 --target runtime -t hono-app:gcp-release .
 docker build --platform linux/amd64 --target migration -t hono-app:gcp-migration .
+docker run --rm --platform linux/amd64 --env-file .env.deployment.local hono-app:gcp-migration bunx --no-install prisma migrate status
 docker run --rm --platform linux/amd64 --env-file .env.deployment.local hono-app:gcp-migration
 ```
 
-接続先が今回のSupabaseであることを確認し、`prisma migrate deploy` の成功後に次へ進みます。通常起動用イメージにはPrisma CLIやmigrationファイルがないため、runtimeイメージのコマンド上書きでmigrationを実行しません。
+接続先が今回のSupabaseであることを確認します。未適用のmigrationがある場合に `prisma migrate deploy` を実行します。同じmigration群の適用成功・チェックサム確認を記録済みで、今回のstatusもup to dateなら、再適用やresetは不要です。通常起動用イメージにはPrisma CLIやmigrationファイルがないため、runtimeイメージのコマンド上書きでmigrationを実行しません。接続情報の一時ファイルは使用後に削除します。
 
 ### 4. runtimeイメージを登録する
 
@@ -139,11 +158,19 @@ gcloud artifacts docker images describe "$gcp_image_uri" --project="$gcp_project
 
 リージョンを変更した場合はDocker認証先も合わせます。イメージのダイジェストを記録し、Artifact Registryの保存容量も確認します。
 
+gcloud設定を複数使う環境では、認証・登録確認・トークン取得を含む各gcloudコマンドへ `--configuration=<対象の設定名>` を明示します。今回のdevでは `--configuration=hono-app-dev` を使用します。
+
 ### 5. API設定を入力して配備する
 
 `dev.local.tfvars` のコメント付きサンプルを使い、`app_image_digest`、`invoker_members`、公開設定、6つすべての `secret_versions` を追記します。シークレットは登録した数値versionに固定し、`latest` は使いません。
 
-CookieはSecureを強制します。cross-siteのフロントエンドでCookieを使う場合は `COOKIE_SAMESITE = "None"` が必要ですが、ブラウザ側のthird-party Cookie制限も受けます。IAM認証付きAPIを別Originのブラウザから使う構成は、CORSのpreflightとGoogle認証の扱いも設計が必要です。初回はCLIで確認します。
+CookieはSecureを強制します。cross-siteのフロントエンドでCookieを使う場合は `COOKIE_SAMESITE = "None"` が必要ですが、ブラウザ側のthird-party Cookie制限も受けます。IAM認証付きAPIを別Originのブラウザから使う構成は、CORSのpreflightとGoogle認証の扱いも設計が必要です。
+
+今回のdevは同じOriginのScalarを使い、`COOKIE_SAMESITE = "Lax"`、`AUTH_EMAIL_MODE = "scalar"`、`enable_api_docs = true` にします。`ALLOWED_ORIGINS` はScalarを開くサービスのOriginとします。CORSとは別にOrigin検証もあるため、同じOriginからのPOSTでも許可設定が必要です。
+
+独自認証の `PASSWORD_RESET_URL_BASE` / `EMAIL_VERIFICATION_URL_BASE` はScalarの固定URLとします。scalar形式のメールはURLへトークンを付けず、本文にトークンと対象APIを案内します。メール確認は `POST /auth/email-verification/confirm` の `token`、パスワード再設定は `POST /auth/password-reset/confirm` の `token` / `password` をScalarへ入力して実行します。link形式を使う既存のメール動作は維持します。
+
+サービス作成前にURLが必要な場合は、短いサービス名で利用できる `https://<サービス名>-<プロジェクト番号>.<リージョン>.run.app` の形式を使います。apply後に実際の出力URLとも照合します。[標準URLの仕様](https://docs.cloud.google.com/run/docs/triggering/https-request#service_url)
 
 ```bash
 terraform -chdir=infra/gcp workspace show
@@ -153,17 +180,17 @@ gcp_service_url="$(terraform -chdir=infra/gcp output -raw service_url)"
 curl --silent --output /dev/null --write-out '%{http_code}\n' "$gcp_service_url/health"
 ```
 
-最後の認証なしの呼び出しは拒否されることを確認します。許可されたGoogleアカウントでの確認は次のように行います。
+最後の認証なしの呼び出しは、Google認証へのリダイレクトまたはアクセス拒否となり、アプリのhealth本文を返さないことを確認します。ブラウザではサービスURLの `/open-api/scalar` を開き、許可済みGoogleアカウントでログインして確認します。プログラムからの検証にはIAPのプログラム用認証を使用します。
 
-```bash
-curl --fail --silent --show-error \
-  -H "X-Serverless-Authorization: Bearer $(gcloud auth print-identity-token)" \
-  "$gcp_service_url/health"
-```
+プログラム用のトークンはIAP向けに取得し、許可するOAuthクライアントとaudienceも事前に確認します。値はログやコマンド履歴へ残さず、curlで使う場合は保護した設定ファイルからヘッダーを読み込みます。
 
-アプリ自身のJWTを使う場合は `Authorization: Bearer <アプリのJWT>` を別途付けます。Cloud Run用のGoogle IDトークンは `X-Serverless-Authorization` に渡し、アプリ認証と衝突させません。[Cloud Runのサービス認証](https://docs.cloud.google.com/run/docs/authenticating/service-to-service)
+アプリ自身のJWTは `Authorization` に渡します。IAPセッションはブラウザのCookieで管理し、アプリのJWTや `/auth` 配下のrefresh Cookieとは分けます。サービスURLをaudienceにしたGoogle IDトークンだけでIAPを通過できるとは扱いません。[IAPのプログラム認証](https://docs.cloud.google.com/iap/docs/authentication-howto)
 
 `/health` はプロセスの稼働確認であり、DB接続は保証しません。検証専用アカウントで登録・ログイン・本人取得・refreshを確認し、検証データを削除します。メールの配達とSupabase Authはそれぞれ別途確認します。
+
+ブラウザのScalarでも登録・ログイン・本人取得・refresh・メール内トークンによる確認を行います。Resendの送信受付だけで配達成功とは扱わず、配達イベントまたは本人の受信を確認します。Supabase Authは既存の登録・ログイン・本人取得と確認メールを検証し、作成した検証ユーザーを削除します。
+
+必要な変更と配備前の確認を1つのPRへまとめ、Claudeとユーザーのレビュー後にマージします。実配備はマージ済みソースからビルドし、最終リリースplanを確認してapplyします。配備後の結果・稼働revision・実イメージのダイジェスト・再plan・検証データ削除・容量と費用も同じPRへ記録します。CDは別PRで扱います。
 
 Cloud Run標準URLへ直接接続する構成だけを対象とし、IP単位のレート制限は `X-Forwarded-For` の末尾を使います。公開前に、偽の先頭IPを変えても制限を回避できないことを確認します。追加のロードバランサー・CDN・プロキシを導入する場合は、この信頼境界を見直してください。
 
