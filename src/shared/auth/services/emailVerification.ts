@@ -5,6 +5,8 @@ import { resolveExternalApiErrorType, resolveExternalApiStatusCode, traceExterna
 import { emailVerificationTokenRepository } from '@/shared/auth/repositories'
 import { AppError } from '@/utils/errors'
 
+import { createScalarAuthEmail } from './scalarEmail'
+
 /** メールアドレス検証トークンの有効期間（24時間）。 */
 export const EMAIL_VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000
 
@@ -86,6 +88,12 @@ export const emailVerificationNotifier: EmailVerificationNotifier = {
     const from = getEmailVerificationFromEmail()
     const verificationUrl = `${getEmailVerificationUrlBase()}?token=${params.token}`
     const ttlHours = EMAIL_VERIFICATION_TOKEN_TTL_MS / (60 * 60 * 1000)
+    const scalarEmail = createScalarAuthEmail({
+      url: getEmailVerificationUrlBase(),
+      token: params.token,
+      endpoint: '/auth/email-verification/confirm',
+      ttlHours,
+    })
 
     const { error } = await traceExternalApiCall(
       {
@@ -104,24 +112,28 @@ export const emailVerificationNotifier: EmailVerificationNotifier = {
           from,
           to: params.email,
           subject: 'メールアドレス確認のご案内',
-          text: [
-            'メールアドレスの確認をお願いします。',
-            '',
-            '以下のURLからメールアドレスを確認してください。',
-            verificationUrl,
-            '',
-            `このURLの有効期限は${ttlHours}時間です。`,
-            '',
-            'このメールに心当たりがない場合は、操作は不要です。',
-          ].join('\n'),
-          html: [
-            '<p>メールアドレスの確認をお願いします。</p>',
-            '<p>以下のURLからメールアドレスを確認してください。</p>',
-            `<p><a href="${verificationUrl}">${verificationUrl}</a></p>`,
-            `<p>このURLの有効期限は${ttlHours}時間です。</p>`,
-            '<hr>',
-            '<p>このメールに心当たりがない場合は、操作は不要です。</p>',
-          ].join('\n'),
+          text:
+            scalarEmail?.text ??
+            [
+              'メールアドレスの確認をお願いします。',
+              '',
+              '以下のURLからメールアドレスを確認してください。',
+              verificationUrl,
+              '',
+              `このURLの有効期限は${ttlHours}時間です。`,
+              '',
+              'このメールに心当たりがない場合は、操作は不要です。',
+            ].join('\n'),
+          html:
+            scalarEmail?.html ??
+            [
+              '<p>メールアドレスの確認をお願いします。</p>',
+              '<p>以下のURLからメールアドレスを確認してください。</p>',
+              `<p><a href="${verificationUrl}">${verificationUrl}</a></p>`,
+              `<p>このURLの有効期限は${ttlHours}時間です。</p>`,
+              '<hr>',
+              '<p>このメールに心当たりがない場合は、操作は不要です。</p>',
+            ].join('\n'),
         }),
     )
 
