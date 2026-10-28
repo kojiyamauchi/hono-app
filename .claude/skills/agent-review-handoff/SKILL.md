@@ -64,8 +64,9 @@ gh pr checks <PR番号>
 
 # 依頼前のレビュー・レビューコメントの最大IDを記録する（ステップ4の照合に使用する）
 # 一覧APIは既定で30件しか返さないため、per_pageはクエリ文字列へ置き --paginate で全ページを取得する
-gh api "repos/kojiyamauchi/hono-app/pulls/<PR番号>/reviews?per_page=100" --paginate --jq '.[].id' | sort -n | tail -1
-gh api "repos/kojiyamauchi/hono-app/pulls/<PR番号>/comments?per_page=100" --paginate --jq '.[].id' | sort -n | tail -1
+# ページごとに max // 0 を求めてから全ページの最大値を取る（0件のPRでも 0 が得られる）
+gh api "repos/kojiyamauchi/hono-app/pulls/<PR番号>/reviews?per_page=100" --paginate --jq '[.[].id] | max // 0' | sort -n | tail -1
+gh api "repos/kojiyamauchi/hono-app/pulls/<PR番号>/comments?per_page=100" --paginate --jq '[.[].id] | max // 0' | sort -n | tail -1
 ```
 
 - 対象PRがopen状態であることを確認する
@@ -74,6 +75,7 @@ gh api "repos/kojiyamauchi/hono-app/pulls/<PR番号>/comments?per_page=100" --pa
 - PR本文の `## 実DB検証` セクションが記載済みであることを確認する
 - 依頼前のレビュー・レビューコメントの最大IDを記録する（記録しないと、ステップ4で過去のレビューを今回の投稿と誤認する）
 - 最大IDは全ページを対象に求める。一覧APIは既定で古い順の最初の30件しか返さないため、先頭ページだけでは31件目以降の投稿を取得できず、正常に投稿されたものを失敗と誤判定する
+- レビューやレビューコメントが0件のPRでは、最大IDを `0` として記録する。`.[].id` をそのまま並べる形だと0件時に出力が空になり、ステップ4の `tonumber` がエラー終了して投稿成功を確認できない
 - `per_page` は `-F` で渡さないこと。`gh api` は `-F` をリクエストボディと解釈してGETをPOSTへ変えるため、レビューの下書き（`PENDING` のレビュー）を誤って作成してしまう。下書きは1 PRにつき1つしか持てず、残すと以降のレビュー作成が失敗する
 
 ### 2. 依頼プロンプトの作成
