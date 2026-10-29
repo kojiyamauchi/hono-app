@@ -35,9 +35,11 @@ CIとCDの入口を分ける理由は、PRのChecksへ配備ジョブのskip項�
 
 自動適用を許可するのは、既存 `google_cloud_run_v2_service.app[0]` のコンテナimageを確定digestへ変更するupdateだけです。providerが再計算する出力属性は除外しますが、環境変数・Secret参照・サービスアカウント・CPU・メモリ・スケール・IAP・IAM検査・削除保護などの設定差分は拒否します。
 
-他のリソースの作成・更新・削除・置換、実環境のdrift、未確定の設定属性、不完全・遅延・未対応形式のplanも拒否します。配備後の再planはイメージ更新を含めて差分なしが必須です。
+他のリソースの作成・更新・削除・置換、後述の例外以外の実環境のdrift、未確定の設定属性、不完全・遅延・未対応形式のplanも拒否します。配備後の再planはイメージ更新を含めて設定差分なしが必須です。
 
-JSONのdriftには、etag・update_timeなどの計算属性だけの差分も含まれます。初期実装ではこれらも停止対象にし、初回適用で実測します。計算属性だけで誤停止した場合も、その場で検査を無効化せず、対象差分を確認してから、設定属性のdriftを引き続き拒否するテストとともに限定的な除外を別PRで追加します。
+初回試行では、イメージ登録によって対象Registryの `update_time` だけが変わることを実測しました。このため `resource_drift` のうち、`google_artifact_registry_repository.app` のmanagedなupdateで、変更前後の `update_time` が文字列、他の全属性が同一、未確定値がない場合だけ許容します。この例外は配備前と配備後の検査の両方へ適用します。
+
+Registryのcleanup設定・IAM・他の属性の変更や、`resource_changes` に現れるRegistryの更新は許容しません。etagや別リソースの更新日時も引き続き停止対象です。検査を無効化したり、計算属性を全リソースへ一律に除外したりせず、追加の例外が必要な場合は実測と回帰テストを別PRでレビューします。
 
 インフラ設定を変える場合は、PRでレビューした変更を別途確認して手動適用し、その後に通常CDを再実行します。承認待ちへ自動移行して残りの変更をapplyする機能は設けません。
 
@@ -55,13 +57,15 @@ WIFはGitHub issuerに対し、repository ID `1251281818`、owner ID `13247377`�
 
 IAP検証には検証用SAの `openid` / `userinfo.email` scope付きアクセストークンを使います。既存のユーザー用アクセストークンやCloud Run URL向けIDトークンでの成功を前提にしません。プログラム用OAuth client allowlistをCDが書き換えることもありません。[IAPのサービスアカウント認証](https://docs.cloud.google.com/iap/docs/authentication-howto#authenticate_with_a_service_account_access_token)
 
+固定provider 7.46.2でWIF poolをrefreshする際は、`iam.workloadIdentityPools.get` に加えて `iam.workloadIdentityPools.getAttestationRules` が必要です。後者は初回試行で403となったため、project単位の読み取りroleへ追加します。`setAttestationRules` は付与せず、attestation rules自体を変更する設定も追加しません。[Google公式の権限分類](https://docs.cloud.google.com/iam/docs/audit-logging)
+
 Cloud Runのoperationはサービス配下ではないため、`run.operations.get` はproject単位の読み取りroleへ付けます。初回適用ではoperation pollingの完了と、検証後のタグ削除まで実測します。
 
 初回にこの認証方式を実環境で検証し、成功するまでCDの有効化を完了扱いにしません。拒否された場合もIAPの解除や一般公開で回避せず、応答層と認証条件を確認します。
 
 ## 初回構築と有効化（実行前にユーザー確認）
 
-現在の `github_cd = null` が既定の構成ではCD用リソースは作成されません。`env/dev.cd.tfvars.json` は公開設定・数値Secret参照・GitHub識別情報だけを含むCD用の正本で、秘密値や固定のリリースdigestは含みません。
+`github_cd` の既定値は `null` で、この入力を省略した構成ではCD用リソースは作成されません。`env/dev.cd.tfvars.json` は公開設定・数値Secret参照・GitHub識別情報だけを含むCD用の正本で、秘密値や固定のリリースdigestは含みません。
 
 1. マージ済みmainと稼働中digestを確認し、ユーザーへ初回変更のplanを提示します。実環境では必ず `gcloud --configuration=hono-app-dev` を使います。
 2. `bun run tf:gcp:init` 後にworkspaceがdevであることを確認し、次のplanを作ります。`<現在のdigest>` はReady revisionを照会した実値で置き換え、過去のtfvarsの値を流用しません。
@@ -77,6 +81,18 @@ Cloud Runのoperationはサービス配下ではないため、`run.operations.g
 7. 最新mainへのpushで起動した `GCP dev CD` workflowを再実行します。全CIとCDが成功したこと、revision・digest・再plan・IAP・イメージ保持を記録します。実クラウドでの初回CD成功は、ローカル検証の成功とは分けて記録します。
 
 手動のインフラ変更・復旧時も `dev.cd.tfvars.json` を使い、現在のdigestまたは明示した復旧digestを引数で渡します。古い `dev.local.tfvars` のdigestを不用意にapplyして、アプリを巻き戻さないでください。
+
+## 初回試行後の修正と再開
+
+2026-10-30の初回試行では、CD用基盤とGitHub Environmentの構築、WIF認証、runtime登録まで成功し、TerraformのWIF pool読み取りで前述の権限不足が判明しました。イメージ登録後のRegistry更新日時も、従来のdrift検査では停止対象になることを確認しました。migration・Cloud Run更新には進んでおらず、初回CD全体はまだ未検証です。
+
+調査に使ったOwnerユーザーへの期限付きTokenCreator権限は削除済みで、通常運用の前提にはしません。調査終了時点では `GCP_DEV_CD_ENABLED=false` として停止しています。この修正のコードをマージするだけでは、クラウドの読み取りroleは更新されません。
+
+1. 修正をマージした最新mainで、現在のReady revisionのdigestを取得し、`dev.cd.tfvars.json` を使って全体planを作ります。上の初回構築用コマンドと同じ入力を使い、保存先は `cd-read-permission.tfplan` などで区別します。
+2. 想定する設定変更は `google_project_iam_custom_role.cd_read[0]` の更新1件で、permissionsへ `iam.workloadIdentityPools.getAttestationRules` を追加することだけです。サービス・Secret・WIF信頼条件や他の権限が変わらないことを確認し、ユーザーへplanを提示します。
+3. ユーザー確認後にその保存planを手動適用し、全体planの設定差分なしを再確認します。配備用SAによるplanは、次のActions実行でWIF経由の認証を使って確認します。承認済みIAM操作に伴うetagなどをstateへ同期する場合も、差分を個別確認してから行い、未確認のdriftを一括で取り込まないでください。
+4. ユーザー確認後にrepository variableを `GCP_DEV_CD_ENABLED=true` に戻し、最新mainの `GCP dev CD` workflowを再実行します。
+5. CI・migration・配備・IAP・再plan・保持タグ整理の成功と、SHA・revision・配備/復旧用digestを記録します。権限不足を解消しただけで初回CDの完了とは扱いません。
 
 ## 失敗と復旧
 
