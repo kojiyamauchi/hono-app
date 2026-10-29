@@ -1,7 +1,9 @@
 name: GCP dev CD
 
 on:
-  workflow_call:
+  push:
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -12,8 +14,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  ci:
+    name: CI
+    uses: ./.github/workflows/ci.yml
+
   deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.GCP_DEV_CD_ENABLED == 'true'
+    needs: ci
+    if: vars.GCP_DEV_CD_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     environment: gcp-dev
