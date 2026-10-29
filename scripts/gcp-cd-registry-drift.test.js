@@ -116,6 +116,14 @@ describe('Registry更新日時の限定的なdrift許容', () => {
     plan.resource_drift = [drift]
     expect(() => assertDeploymentPlan(plan, `${imagePath}@${newDigest}`)).toThrow()
   })
+  test('許容するRegistry driftと別のdriftが混在する場合は拒否する', () => {
+    const plan = imagePlan()
+    const other = registryDrift()
+    other.address = 'google_project_iam_member.cd_read[0]'
+    other.type = 'google_project_iam_member'
+    plan.resource_drift = [registryDrift(), other]
+    expect(() => assertDeploymentPlan(plan, `${imagePath}@${newDigest}`)).toThrow()
+  })
   test('resource_changesのRegistry更新を許可しない', () => {
     const plan = imagePlan()
     const drift = registryDrift()
