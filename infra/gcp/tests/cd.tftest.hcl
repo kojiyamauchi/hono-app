@@ -59,6 +59,7 @@ run "cd_scoped_to_main_and_dev" {
         "assertion.repository_id == '1234'", "assertion.repository_owner_id == '5678'",
         "assertion.ref == 'refs/heads/main'", "assertion.event_name == 'push'",
         "assertion.job_workflow_ref == 'owner/repository/.github/workflows/cd-gcp.yml@refs/heads/main'",
+        "assertion.environment == 'gcp-dev'",
       ] : strcontains(google_iam_workload_identity_pool_provider.github[0].attribute_condition, condition)])
     )
     error_message = "GitHubの数値ID・main・push・再利用workflowで信頼範囲を制限する必要があります。"

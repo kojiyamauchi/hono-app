@@ -58,6 +58,7 @@ resource "google_iam_workload_identity_pool_provider" "github" {
     "assertion.ref == 'refs/heads/main'",
     "assertion.event_name == 'push'",
     "assertion.job_workflow_ref == '${var.github_cd.repository}/.github/workflows/cd-gcp.yml@refs/heads/main'",
+    "assertion.environment == 'gcp-dev'",
   ])
   oidc {
     issuer_uri = "https://token.actions.githubusercontent.com"

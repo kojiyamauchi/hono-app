@@ -46,7 +46,7 @@ mainへのマージをdevへの配備判断とし、追加承認なしで配備�
 
 Cloud Runの作成・削除・IAM変更、WIF変更、Secret値の更新権限はCDへ渡しません。Cloud Runの更新権限はフィールド単位にimageだけへ限定できず、任意コードをruntime SAで動かせる権限でもあるため、mainのレビューとplan検査も信頼境界になります。SAの切り替えは完全な信頼分離ではなく、直接取得する権限とログ誤出力の範囲を減らすためのものです。
 
-WIFはGitHub issuerに対し、repository ID `1251281818`、owner ID `13247377`、`refs/heads/main`、pushイベント、再利用workflow `kojiyamauchi/hono-app/.github/workflows/cd-gcp.yml@refs/heads/main` をすべて検査します。長期鍵は保存しません。CI・ビルドの後、用途ごとに短命認証を取り直します。
+WIFはGitHub issuerに対し、repository ID `1251281818`、owner ID `13247377`、`refs/heads/main`、pushイベント、再利用workflow `kojiyamauchi/hono-app/.github/workflows/cd-gcp.yml@refs/heads/main`、Environment `gcp-dev` をすべて検査します。長期鍵は保存しません。CI・ビルドの後、用途ごとに短命認証を取り直します。
 
 IAP検証には検証用SAの `openid` / `userinfo.email` scope付きアクセストークンを使います。既存のユーザー用アクセストークンやCloud Run URL向けIDトークンでの成功を前提にしません。プログラム用OAuth client allowlistをCDが書き換えることもありません。[IAPのサービスアカウント認証](https://docs.cloud.google.com/iap/docs/authentication-howto#authenticate_with_a_service_account_access_token)
 
