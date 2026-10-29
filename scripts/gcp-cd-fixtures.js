@@ -12,11 +12,10 @@ export function imagePlan() {
     invoker_iam_disabled: false,
     deletion_protection: true,
     generation: '1',
-    template: [{ revision: 'old-revision', service_account: 'runtime@example.com', containers: [{ image: `${imagePath}@${oldDigest}`, env: [] }] }],
+    template: [{ revision: '', service_account: 'runtime@example.com', containers: [{ image: `${imagePath}@${oldDigest}`, env: [] }] }],
   }
   const after = structuredClone(before)
   after.template[0].containers[0].image = `${imagePath}@${newDigest}`
-  after.template[0].revision = null
   after.generation = null
   return {
     format_version: '1.2',
@@ -31,7 +30,7 @@ export function imagePlan() {
           actions: ['update'],
           before,
           after,
-          after_unknown: { generation: true, template: [{ revision: true, containers: [{ image: false }] }] },
+          after_unknown: { generation: true, template: [{ containers: [{ image: false }] }] },
         },
       },
     ],

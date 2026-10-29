@@ -40,6 +40,18 @@ describe('配備planの許可範囲', () => {
       },
     ],
     [
+      'revision名の指定',
+      (p) => {
+        p.resource_changes[0].change.after.template[0].revision = 'custom-revision'
+      },
+    ],
+    [
+      '未確定revision入力',
+      (p) => {
+        p.resource_changes[0].change.after_unknown.template[0].revision = true
+      },
+    ],
+    [
       '権限変更',
       (p) => {
         p.resource_changes.push({ address: 'google_project_iam_member.other', change: { actions: ['update'] } })
