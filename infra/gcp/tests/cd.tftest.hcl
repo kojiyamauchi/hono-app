@@ -87,6 +87,33 @@ run "cd_scoped_to_main_and_dev" {
   }
 }
 
+run "tag_delete_without_image_delete" {
+  command = plan
+  override_resource {
+    target          = google_project_iam_custom_role.cd_tag_delete[0]
+    override_during = plan
+    values = {
+      name = "projects/test-project/roles/honoDevCdTagDelete"
+    }
+  }
+  variables {
+    github_cd = {
+      repository    = "owner/repository"
+      repository_id = "1234"
+      owner_id      = "5678"
+      state_bucket  = "test-state-bucket"
+    }
+  }
+  assert {
+    condition = (
+      google_project_iam_custom_role.cd_tag_delete[0].permissions == toset(["artifactregistry.tags.delete"]) &&
+      google_artifact_registry_repository_iam_member.cd_tag_delete[0].repository == google_artifact_registry_repository.app.repository_id &&
+      google_artifact_registry_repository_iam_member.cd_tag_delete[0].role == google_project_iam_custom_role.cd_tag_delete[0].name
+    )
+    error_message = "タグ削除権限だけを対象Registryへ付け、イメージ削除権限まで広げてはいけません。"
+  }
+}
+
 run "reject_cd_before_first_deployment" {
   command = plan
   variables {

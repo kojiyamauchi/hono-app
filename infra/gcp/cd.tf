@@ -127,6 +127,25 @@ resource "google_storage_bucket_iam_member" "cd_state" {
   member = "serviceAccount:${google_service_account.cd["deploy"].email}"
 }
 
+# writerにはタグ削除がないため、イメージ削除まで広げず対象Registryへ追加する。
+resource "google_project_iam_custom_role" "cd_tag_delete" {
+  count       = local.cd_enabled ? 1 : 0
+  project     = var.project_id
+  role_id     = "honoDevCdTagDelete"
+  title       = "Hono dev CD tag delete"
+  description = "release保護タグと候補タグの削除だけ。イメージ自体の削除は許可しない"
+  permissions = ["artifactregistry.tags.delete"]
+}
+
+resource "google_artifact_registry_repository_iam_member" "cd_tag_delete" {
+  count      = local.cd_enabled ? 1 : 0
+  project    = var.project_id
+  location   = var.region
+  repository = google_artifact_registry_repository.app.repository_id
+  role       = google_project_iam_custom_role.cd_tag_delete[0].name
+  member     = "serviceAccount:${google_service_account.cd["deploy"].email}"
+}
+
 resource "google_secret_manager_secret_iam_member" "cd_database" {
   count     = local.cd_enabled ? 1 : 0
   project   = var.project_id

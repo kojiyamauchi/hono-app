@@ -38,11 +38,11 @@ mainへのマージをdevへの配備判断とし、追加承認なしで配備�
 
 ## 認証と権限
 
-| SA                          | 直接付与する権限                                                                                                                                     |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `hono-app-dev-cd-deploy`    | 対象Registryのwriter、対象Cloud Runのget/updateと状態確認、runtime SAのactAs、既存stateバケットのobjectAdmin、全体refreshに必要な設定・IAMの読み取り |
-| `hono-app-dev-cd-migration` | 対象DATABASE_URLシークレットの読み取りのみ                                                                                                           |
-| `hono-app-dev-cd-verify`    | 対象サービスのIAP accessorのみ                                                                                                                       |
+| SA                          | 直接付与する権限                                                                                                                                                                |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hono-app-dev-cd-deploy`    | 対象Registryのwriterとタグ削除のみのcustom role、対象Cloud Runのget/updateと状態確認、runtime SAのactAs、既存stateバケットのobjectAdmin、全体refreshに必要な設定・IAMの読み取り |
+| `hono-app-dev-cd-migration` | 対象DATABASE_URLシークレットの読み取りのみ                                                                                                                                      |
+| `hono-app-dev-cd-verify`    | 対象サービスのIAP accessorのみ                                                                                                                                                  |
 
 Cloud Runの作成・削除・IAM変更、WIF変更、Secret値の更新権限はCDへ渡しません。Cloud Runの更新権限はフィールド単位にimageだけへ限定できず、任意コードをruntime SAで動かせる権限でもあるため、mainのレビューとplan検査も信頼境界になります。SAの切り替えは完全な信頼分離ではなく、直接取得する権限とログ誤出力の範囲を減らすためのものです。
 
