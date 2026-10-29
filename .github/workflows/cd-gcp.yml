@@ -1,0 +1,198 @@
+name: GCP dev CD
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+# migrationから検証・保持タグ整理まで直列化し、実行中の配備は新しいpushで止めない。
+concurrency:
+  group: gcp-dev-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.GCP_DEV_CD_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment: gcp-dev
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      TF_WORKSPACE: dev
+      TF_IN_AUTOMATION: 'true'
+    steps:
+      - name: Checkout deployment SHA
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Skip outdated deployment
+        id: current
+        env:
+          DEPLOYMENT_SHA: ${{ github.sha }}
+        run: |
+          main_sha=$(git ls-remote https://github.com/kojiyamauchi/hono-app.git refs/heads/main | cut -f1)
+          if [ "$main_sha" = "$DEPLOYMENT_SHA" ]; then
+            echo 'deploy=true' >> "$GITHUB_OUTPUT"
+          else
+            echo '新しいmainがあるため、古い待機中の配備を省略しました。' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Prepare private runner directories
+        if: steps.current.outputs.deploy == 'true'
+        run: |
+          umask 077
+          mkdir -p "$RUNNER_TEMP/hono-gcp-dev-cd" "$RUNNER_TEMP/hono-gcp-dev-docker"
+          printf 'GCP_CD_DIR=%s/hono-gcp-dev-cd\nTF_DATA_DIR=%s/hono-gcp-dev-terraform\nCLOUDSDK_CONFIG=%s/hono-gcp-dev-gcloud\nDOCKER_CONFIG=%s/hono-gcp-dev-docker\n' \
+            "$RUNNER_TEMP" "$RUNNER_TEMP" "$RUNNER_TEMP" "$RUNNER_TEMP" >> "$GITHUB_ENV"
+
+      - name: Set up Bun
+        if: steps.current.outputs.deploy == 'true'
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Set up Docker Buildx
+        if: steps.current.outputs.deploy == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build runtime before cloud authentication
+        if: steps.current.outputs.deploy == 'true'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: runtime
+          platforms: linux/amd64
+          load: true
+          tags: hono-cd:runtime
+          labels: org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=gcp-runtime
+          cache-to: type=gha,scope=gcp-runtime,mode=max
+
+      - name: Build migration before cloud authentication
+        if: steps.current.outputs.deploy == 'true'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: migration
+          platforms: linux/amd64
+          load: true
+          tags: hono-cd:migration
+          labels: org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=gcp-migration
+          cache-to: type=gha,scope=gcp-migration,mode=max
+
+      - name: Verify built images with disposable database
+        if: steps.current.outputs.deploy == 'true'
+        run: bun run test:container
+        env:
+          VERIFY_RUNTIME_IMAGE: hono-cd:runtime
+          VERIFY_MIGRATION_IMAGE: hono-cd:migration
+
+      - name: Set up Terraform
+        if: steps.current.outputs.deploy == 'true'
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.15.8
+          terraform_wrapper: false
+
+      - name: Set up Google Cloud CLI
+        if: steps.current.outputs.deploy == 'true'
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Prepare local CLI configuration
+        if: steps.current.outputs.deploy == 'true'
+        run: |
+          umask 077
+          mkdir -p "$GCP_CD_DIR" "$DOCKER_CONFIG"
+          gcloud --configuration=hono-app-dev config configurations create hono-app-dev --no-activate --quiet
+
+      - name: Authenticate image publication and plan
+        if: steps.current.outputs.deploy == 'true'
+        id: publication-auth
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: hono-app-dev-512908-f3
+          workload_identity_provider: projects/669070496198/locations/global/workloadIdentityPools/hono-app-dev-github/providers/github
+          service_account: hono-app-dev-cd-deploy@hono-app-dev-512908-f3.iam.gserviceaccount.com
+          token_format: access_token
+
+      - name: Log in to Artifact Registry
+        if: steps.current.outputs.deploy == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: asia-northeast1-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.publication-auth.outputs.access_token }}
+
+      - name: Push runtime only
+        if: steps.current.outputs.deploy == 'true'
+        run: |
+          image="asia-northeast1-docker.pkg.dev/hono-app-dev-512908-f3/hono-app-dev/hono:candidate-${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          docker tag hono-cd:runtime "$image"
+          docker push "$image"
+
+      - name: Validate complete Terraform plan
+        if: steps.current.outputs.deploy == 'true'
+        run: bun scripts/gcp-cd.mjs plan
+
+      - name: Authenticate migration only
+        if: steps.current.outputs.deploy == 'true'
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: hono-app-dev-512908-f3
+          workload_identity_provider: projects/669070496198/locations/global/workloadIdentityPools/hono-app-dev-github/providers/github
+          service_account: hono-app-dev-cd-migration@hono-app-dev-512908-f3.iam.gserviceaccount.com
+
+      - name: Apply pending migrations and verify database
+        if: steps.current.outputs.deploy == 'true'
+        run: bun scripts/gcp-cd.mjs migrate
+
+      - name: Refresh deployment authentication
+        if: steps.current.outputs.deploy == 'true'
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: hono-app-dev-512908-f3
+          workload_identity_provider: projects/669070496198/locations/global/workloadIdentityPools/hono-app-dev-github/providers/github
+          service_account: hono-app-dev-cd-deploy@hono-app-dev-512908-f3.iam.gserviceaccount.com
+
+      - name: Apply saved plan and verify revision
+        if: steps.current.outputs.deploy == 'true'
+        run: bun scripts/gcp-cd.mjs apply
+
+      - name: Authenticate IAP verification only
+        if: steps.current.outputs.deploy == 'true'
+        id: iap-auth
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: hono-app-dev-512908-f3
+          workload_identity_provider: projects/669070496198/locations/global/workloadIdentityPools/hono-app-dev-github/providers/github
+          service_account: hono-app-dev-cd-verify@hono-app-dev-512908-f3.iam.gserviceaccount.com
+          token_format: access_token
+          access_token_scopes: openid,https://www.googleapis.com/auth/userinfo.email
+
+      - name: Verify IAP protection and authenticated health
+        if: steps.current.outputs.deploy == 'true'
+        run: bun scripts/gcp-cd.mjs verify
+        env:
+          IAP_ACCESS_TOKEN: ${{ steps.iap-auth.outputs.access_token }}
+
+      - name: Authenticate release retention
+        if: steps.current.outputs.deploy == 'true'
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: hono-app-dev-512908-f3
+          workload_identity_provider: projects/669070496198/locations/global/workloadIdentityPools/hono-app-dev-github/providers/github
+          service_account: hono-app-dev-cd-deploy@hono-app-dev-512908-f3.iam.gserviceaccount.com
+
+      - name: Retain current and previous release
+        if: steps.current.outputs.deploy == 'true'
+        run: bun scripts/gcp-cd.mjs cleanup
+
+      - name: Remove private temporary files
+        if: always()
+        run: rm -rf -- "$GCP_CD_DIR" "$TF_DATA_DIR" "$CLOUDSDK_CONFIG" "$DOCKER_CONFIG"

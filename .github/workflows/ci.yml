@@ -1,6 +1,9 @@
 name: Pull Request CI
 
 on:
+  push:
+    branches:
+      - main
   pull_request:
     branches:
       - develop
@@ -188,3 +191,12 @@ jobs:
 
       - name: Do Build
         run: bun run build
+
+  deploy-gcp-dev:
+    name: GCP dev CD
+    needs: [checks, terraform, terraform-gcp, build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.GCP_DEV_CD_ENABLED == 'true'
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/cd-gcp.yml
