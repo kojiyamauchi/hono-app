@@ -35,7 +35,9 @@ resource "google_iap_web_cloud_run_service_iam_binding" "users" {
   location               = var.region
   cloud_run_service_name = google_cloud_run_v2_service.app[0].name
   role                   = "roles/iap.httpsResourceAccessor"
-  members                = var.invoker_members
+  members = setunion(var.invoker_members, local.cd_enabled ? toset([
+    "serviceAccount:${google_service_account.cd["verify"].email}",
+  ]) : toset([]))
 
   depends_on = [google_cloud_run_v2_service_iam_binding.invoker]
 }

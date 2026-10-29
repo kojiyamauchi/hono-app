@@ -3,6 +3,14 @@ output "repository_url" {
   description = "runtimeイメージの登録先"
 }
 
+output "github_cd" {
+  value = local.cd_enabled ? {
+    provider         = google_iam_workload_identity_pool_provider.github[0].name
+    service_accounts = { for name, account in google_service_account.cd : name => account.email }
+  } : null
+  description = "承認済みの初回構築後に使うWIF名とCD用サービスアカウント。秘密値は含まない"
+}
+
 output "service_url" {
   value       = try(google_cloud_run_v2_service.app[0].uri, null)
   description = "IAPで保護されたCloud RunのHTTPS URL。前提リソースだけの作成時はnull"

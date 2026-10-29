@@ -9,6 +9,26 @@ variable "project_id" {
   }
 }
 
+variable "github_cd" {
+  description = "dev用CDの初回構築設定。秘密値は含めず、適用とGitHub側の有効化は個別確認後に行う"
+  default     = null
+  type = object({
+    repository    = string
+    repository_id = string
+    owner_id      = string
+    state_bucket  = string
+  })
+  validation {
+    condition = var.github_cd == null ? true : (
+      can(regex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", var.github_cd.repository)) &&
+      can(regex("^[1-9][0-9]*$", var.github_cd.repository_id)) &&
+      can(regex("^[1-9][0-9]*$", var.github_cd.owner_id)) &&
+      can(regex("^[a-z0-9][a-z0-9.-]+[a-z0-9]$", var.github_cd.state_bucket))
+    )
+    error_message = "GitHubのリポジトリ名・数値ID・所有者数値IDと、既存stateバケットを指定してください。"
+  }
+}
+
 variable "region" {
   type        = string
   nullable    = false
