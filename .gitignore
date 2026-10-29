@@ -3,6 +3,7 @@ node_modules/
 dist/
 .env
 .env.*.local
+gha-creds-*.json
 infra/**/env/*.local.tfvars
 infra/**/env/*.local.hcl
 .history/

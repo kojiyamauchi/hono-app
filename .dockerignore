@@ -10,6 +10,7 @@ src/generated
 .env
 .env.*
 !.env.example
+gha-creds-*.json
 
 # バージョン管理・履歴
 .git
