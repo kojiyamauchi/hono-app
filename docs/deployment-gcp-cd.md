@@ -57,7 +57,7 @@ WIFはGitHub issuerに対し、repository ID `1251281818`、owner ID `13247377`�
 
 IAP検証には検証用SAの `openid` / `userinfo.email` scope付きアクセストークンを使います。既存のユーザー用アクセストークンやCloud Run URL向けIDトークンでの成功を前提にしません。プログラム用OAuth client allowlistをCDが書き換えることもありません。[IAPのサービスアカウント認証](https://docs.cloud.google.com/iap/docs/authentication-howto#authenticate_with_a_service_account_access_token)
 
-固定provider 7.46.2でWIF poolをrefreshする際は、`iam.workloadIdentityPools.get` に加えて `iam.workloadIdentityPools.getAttestationRules` が必要です。後者は初回試行で403となったため、project単位の読み取りroleへ追加します。`setAttestationRules` は付与せず、attestation rules自体を変更する設定も追加しません。[Google公式の権限分類](https://docs.cloud.google.com/iam/docs/audit-logging)
+固定provider 7.46.2でWIF poolをrefreshする際は、`iam.workloadIdentityPools.get` に加えて `iam.workloadIdentityPools.getAttestationRules` が必要です。後者は初回試行で403となったため、project単位の読み取りroleへ追加します。`setAttestationRules` は付与せず、attestation rules自体を変更する設定も追加しません。[Google公式のIAM権限リファレンス](https://docs.cloud.google.com/iam/docs/roles-permissions/iam)
 
 Cloud Runのoperationはサービス配下ではないため、`run.operations.get` はproject単位の読み取りroleへ付けます。初回適用ではoperation pollingの完了と、検証後のタグ削除まで実測します。
 
