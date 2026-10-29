@@ -33,7 +33,7 @@ export function assertDeploymentPlan(plan, expectedImage, noChanges = false) {
   if (!/^1\./.test(plan.format_version ?? '') || plan.errored || plan.complete !== true || plan.deferred_changes?.length) {
     throw new DeploymentError('不完全または未対応のplanです。')
   }
-  if (plan.resource_drift?.some(({ change }) => !isDeepStrictEqual(change.actions, ['no-op']))) {
+  if (plan.resource_drift?.some((drift) => !isDeepStrictEqual(drift.change.actions, ['no-op']) && !isRegistryTimestampDrift(drift))) {
     throw new DeploymentError('実環境のdriftを検出しました。個別確認が必要です。')
   }
   const changes = plan.resource_changes
@@ -71,6 +71,26 @@ export function assertDeploymentPlan(plan, expectedImage, noChanges = false) {
     if (!noChanges && name === 'service_url' && change.after_unknown === true && isDeepStrictEqual(change.actions, ['update'])) continue
     throw new DeploymentError('想定外のoutput変更があります。')
   }
+}
+
+/** イメージ登録・タグ操作で変わる対象Registryの更新日時だけをdrift判定から除く。 */
+function isRegistryTimestampDrift({ address, mode, type, change }) {
+  if (
+    address !== 'google_artifact_registry_repository.app' ||
+    mode !== 'managed' ||
+    type !== 'google_artifact_registry_repository' ||
+    !isDeepStrictEqual(change?.actions, ['update']) ||
+    typeof change.before?.update_time !== 'string' ||
+    typeof change.after?.update_time !== 'string' ||
+    hasUnknown(change.after_unknown ?? {})
+  )
+    return false
+  const normalized = [change.before, change.after].map((value) => {
+    const result = structuredClone(value)
+    delete result.update_time
+    return result
+  })
+  return isDeepStrictEqual(...normalized)
 }
 
 /** unknownの空配列・falseと、実際の未確定値を区別する。 */
