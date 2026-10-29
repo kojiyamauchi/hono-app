@@ -38,17 +38,19 @@ mainへのマージをdevへの配備判断とし、追加承認なしで配備�
 
 ## 認証と権限
 
-| SA                          | 直接付与する権限                                                                                                                                                                |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `hono-app-dev-cd-deploy`    | 対象Registryのwriterとタグ削除のみのcustom role、対象Cloud Runのget/updateと状態確認、runtime SAのactAs、既存stateバケットのobjectAdmin、全体refreshに必要な設定・IAMの読み取り |
-| `hono-app-dev-cd-migration` | 対象DATABASE_URLシークレットの読み取りのみ                                                                                                                                      |
-| `hono-app-dev-cd-verify`    | 対象サービスのIAP accessorのみ                                                                                                                                                  |
+| SA                          | 直接付与する権限                                                                                                                                                                                                |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hono-app-dev-cd-deploy`    | 対象Registryのwriterとタグ削除のみのcustom role、対象Cloud Runのget/updateと状態確認、runtime SAのactAs、既存stateバケットのobjectAdmin、project単位のoperation読み取りと全体refreshに必要な設定・IAMの読み取り |
+| `hono-app-dev-cd-migration` | 対象DATABASE_URLシークレットの読み取りのみ                                                                                                                                                                      |
+| `hono-app-dev-cd-verify`    | 対象サービスのIAP accessorのみ                                                                                                                                                                                  |
 
 Cloud Runの作成・削除・IAM変更、WIF変更、Secret値の更新権限はCDへ渡しません。Cloud Runの更新権限はフィールド単位にimageだけへ限定できず、任意コードをruntime SAで動かせる権限でもあるため、mainのレビューとplan検査も信頼境界になります。SAの切り替えは完全な信頼分離ではなく、直接取得する権限とログ誤出力の範囲を減らすためのものです。
 
 WIFはGitHub issuerに対し、repository ID `1251281818`、owner ID `13247377`、`refs/heads/main`、pushイベント、再利用workflow `kojiyamauchi/hono-app/.github/workflows/cd-gcp.yml@refs/heads/main` をすべて検査します。長期鍵は保存しません。CI・ビルドの後、用途ごとに短命認証を取り直します。
 
 IAP検証には検証用SAの `openid` / `userinfo.email` scope付きアクセストークンを使います。既存のユーザー用アクセストークンやCloud Run URL向けIDトークンでの成功を前提にしません。プログラム用OAuth client allowlistをCDが書き換えることもありません。[IAPのサービスアカウント認証](https://docs.cloud.google.com/iap/docs/authentication-howto#authenticate_with_a_service_account_access_token)
+
+Cloud Runのoperationはサービス配下ではないため、`run.operations.get` はproject単位の読み取りroleへ付けます。初回適用ではoperation pollingの完了と、検証後のタグ削除まで実測します。
 
 初回にこの認証方式を実環境で検証し、成功するまでCDの有効化を完了扱いにしません。拒否された場合もIAPの解除や一般公開で回避せず、応答層と認証条件を確認します。
 

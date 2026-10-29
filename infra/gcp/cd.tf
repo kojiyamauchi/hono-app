@@ -9,6 +9,7 @@ locals {
     "iap.webServices.getIamPolicy", "resourcemanager.projects.get", "resourcemanager.projects.getIamPolicy",
     "secretmanager.secrets.get", "secretmanager.secrets.getIamPolicy",
     "serviceusage.services.get", "serviceusage.services.list", "storage.buckets.getIamPolicy",
+    "run.operations.get",
   ]
 }
 
@@ -101,7 +102,7 @@ resource "google_project_iam_custom_role" "cd_deploy" {
   role_id     = "honoDevCdDeploy"
   title       = "Hono dev CD deploy"
   description = "既存Cloud Runの更新と状態確認だけ。作成・削除・IAM変更を許可しない"
-  permissions = ["run.services.get", "run.services.update", "run.services.getIamPolicy", "run.operations.get", "run.revisions.get"]
+  permissions = ["run.services.get", "run.services.update", "run.services.getIamPolicy", "run.revisions.get"]
 }
 
 resource "google_service_account_iam_member" "cd_runtime" {
