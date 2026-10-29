@@ -58,12 +58,10 @@ export function assertDeploymentPlan(plan, expectedImage, noChanges = false) {
   }
   const allowedUnknown = structuredClone(unknown)
   for (const key of computedFields) delete allowedUnknown[key]
-  if (allowedUnknown.template?.[0]) delete allowedUnknown.template[0].revision
   if (hasUnknown(allowedUnknown)) throw new DeploymentError('設定属性に未確定値があります。')
   const normalized = [before, after].map((value) => {
     const result = structuredClone(value)
     for (const key of computedFields) delete result[key]
-    delete result.template[0].revision
     delete result.template[0].containers[0].image
     return result
   })
