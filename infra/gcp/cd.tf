@@ -5,7 +5,8 @@ locals {
   cd_read_permissions = [
     "artifactregistry.repositories.get", "artifactregistry.repositories.getIamPolicy",
     "iam.roles.get", "iam.serviceAccounts.get", "iam.serviceAccounts.getIamPolicy",
-    "iam.workloadIdentityPools.get", "iam.workloadIdentityPoolProviders.get",
+    "iam.workloadIdentityPools.get", "iam.workloadIdentityPools.getAttestationRules",
+    "iam.workloadIdentityPoolProviders.get",
     "iap.webServices.getIamPolicy", "resourcemanager.projects.get", "resourcemanager.projects.getIamPolicy",
     "secretmanager.secrets.get", "secretmanager.secrets.getIamPolicy",
     "serviceusage.services.get", "serviceusage.services.list", "storage.buckets.getIamPolicy",
