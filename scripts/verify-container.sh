@@ -7,6 +7,14 @@ smoke_id="hono-app-smoke-$(date +%s)-$$"
 smoke_dir="$(mktemp -d)"
 runtime_image="${smoke_id}:runtime"
 migration_image="${smoke_id}:migration"
+use_existing_images=false
+if [ -n "${VERIFY_RUNTIME_IMAGE:-}${VERIFY_MIGRATION_IMAGE:-}" ]; then
+  : "${VERIFY_RUNTIME_IMAGE:?両方の検証用イメージを指定してください}"
+  : "${VERIFY_MIGRATION_IMAGE:?両方の検証用イメージを指定してください}"
+  runtime_image="$VERIFY_RUNTIME_IMAGE"
+  migration_image="$VERIFY_MIGRATION_IMAGE"
+  use_existing_images=true
+fi
 database_url="postgresql://postgres:smoke-password@${smoke_id}-db:5432/postgres"
 
 # 自分が作成したコンテナ・匿名ボリューム・ネットワーク・タグだけを削除する。
@@ -27,7 +35,9 @@ cleanup() {
   fi
   docker rm -fv "${smoke_id}-app" "${smoke_id}-db" >/dev/null 2>&1 || true
   docker network rm "$smoke_id" >/dev/null 2>&1 || true
-  docker image rm "$runtime_image" "$migration_image" >/dev/null 2>&1 || true
+  if [ "$use_existing_images" = false ]; then
+    docker image rm "$runtime_image" "$migration_image" >/dev/null 2>&1 || true
+  fi
   rm -rf "$smoke_dir"
   exit "$result"
 }
@@ -36,13 +46,15 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 docker info >/dev/null
-docker build --platform linux/amd64 --target runtime -t "$runtime_image" .
-docker build --platform linux/amd64 --target migration -t "$migration_image" .
+if [ "$use_existing_images" = false ]; then
+  docker build --platform linux/amd64 --target runtime -t "$runtime_image" .
+  docker build --platform linux/amd64 --target migration -t "$migration_image" .
+fi
 
 # 検証用の自己署名証明書は一時生成し、公開CAの同梱と証明書検証の維持を確認する。
 mkdir "$smoke_dir/tls"
 if ! openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
-  -subj '/CN=localhost' -addext 'subjectAltName=DNS:localhost' \
+  -subj '/CN=localhost' -addext "subjectAltName=DNS:localhost,DNS:${smoke_id}-db" \
   -keyout "$smoke_dir/tls/server.key" -out "$smoke_dir/tls/server.crt" >/dev/null 2>"$smoke_dir/tls/openssl.log"; then
   echo '検証用証明書の生成に失敗しました。-addextに対応したOpenSSLが必要です。' >&2
   cat "$smoke_dir/tls/openssl.log" >&2
@@ -61,7 +73,14 @@ done
 
 docker network create "$smoke_id" >/dev/null
 docker run -d --name "${smoke_id}-db" --network "$smoke_id" \
-  -e POSTGRES_PASSWORD=smoke-password postgres:17-alpine >/dev/null
+  --mount "type=bind,source=$smoke_dir/tls,target=/tls,readonly" \
+  -e POSTGRES_PASSWORD=smoke-password postgres:17-alpine sh -c '
+    cp /tls/server.crt /tmp/server.crt
+    cp /tls/server.key /tmp/server.key
+    chown postgres:postgres /tmp/server.key
+    chmod 600 /tmp/server.key
+    exec docker-entrypoint.sh postgres -c ssl=on -c ssl_cert_file=/tmp/server.crt -c ssl_key_file=/tmp/server.key
+  ' >/dev/null
 
 database_ready=false
 for _ in {1..60}; do
@@ -76,6 +95,29 @@ done
 # 2回実行し、初回適用と再実行時の冪等性を確認する。
 docker run --rm --platform linux/amd64 --network "$smoke_id" -e "DATABASE_URL=$database_url" "$migration_image"
 docker run --rm --platform linux/amd64 --network "$smoke_id" -e "DATABASE_URL=$database_url" "$migration_image"
+
+# CD用処理を実DBで検証する。追加SQLは使い捨てDBだけへ適用し、Gitや実環境へ持ち込まない。
+mkdir "$smoke_dir/cd-migration"
+echo 'SELECT 1;' > "$smoke_dir/cd-migration/migration.sql"
+verify_cd_migration() {
+  docker run --rm --platform linux/amd64 --network "$smoke_id" \
+    -e "DATABASE_URL=${database_url}?sslmode=verify-full" \
+    -e NODE_EXTRA_CA_CERTS=/tmp/container-tls/server.crt \
+    --mount "type=bind,source=$smoke_dir/tls,target=/tmp/container-tls,readonly" \
+    --mount "type=bind,source=$smoke_dir/cd-migration,target=/app/prisma/migrations/99999999999999_gcp_cd_smoke,readonly" \
+    --mount "type=bind,source=$PWD/scripts/gcp-migrate.mjs,target=/app/gcp-migrate.mjs,readonly" \
+    --mount "type=bind,source=$PWD/scripts/gcp-cd-policy.mjs,target=/app/gcp-cd-policy.mjs,readonly" \
+    "$migration_image" bun /app/gcp-migrate.mjs
+}
+verify_cd_migration
+verify_cd_migration
+docker exec "${smoke_id}-db" psql -U postgres -v ON_ERROR_STOP=1 -c \
+  "UPDATE public._prisma_migrations SET checksum = 'invalid' WHERE migration_name = '99999999999999_gcp_cd_smoke'" >/dev/null
+if verify_cd_migration >/dev/null 2>&1; then
+  echo '改変されたmigrationをCDが拒否しませんでした。' >&2
+  exit 1
+fi
+echo 'CD用migration検証成功: verify-full接続、未適用の適用・再実行、チェックサム不一致の拒否。'
 
 # メール送信キーを渡さず、外部サービスへの実配達を発生させない。
 docker run -d --platform linux/amd64 --name "${smoke_id}-app" --network "$smoke_id" \
