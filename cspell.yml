@@ -1,6 +1,7 @@
 version: 0.2
 language: en
 words:
+  - accesstoken
   - addext
   - artifactregistry
   - autoincrement
@@ -10,7 +11,9 @@ words:
   - bunx
   - chdir
   - cloudresourcemanager
+  - CLOUDSDK
   - cpus
+  - creds
   - datasource
   - dotenv
   - dtos
@@ -21,19 +24,24 @@ words:
   - hono
   - Hono
   - hostnames
+  - iamcredentials
   - isready
   - keyout
   - kojiyamauchi
   - logdelivery
   - mappers
+  - Millis
   - newkey
   - noout
   - octocat
   - oneline
+  - opencontainers
   - pooler
   - postgresql
+  - psql
   - Prisma
   - Refreshable
+  - resourcemanager
   - secretmanager
   - serviceusage
   - sslmode
@@ -44,6 +52,7 @@ words:
   - tfstate
   - tfvars
   - tonumber
+  - userinfo
 flagWords:
   - null
 ignorePaths:
