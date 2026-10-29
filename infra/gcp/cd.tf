@@ -51,13 +51,13 @@ resource "google_iam_workload_identity_pool_provider" "github" {
     "google.subject"          = "assertion.sub"
     "attribute.repository_id" = "assertion.repository_id"
   }
-  # 数値IDに加え、mainのpushから呼ばれた対象の再利用workflowだけを受け入れる。
+  # 数値IDに加え、対象workflowのmainへのpushとdev Environmentだけを受け入れる。
   attribute_condition = join(" && ", [
     "assertion.repository_id == '${var.github_cd.repository_id}'",
     "assertion.repository_owner_id == '${var.github_cd.owner_id}'",
     "assertion.ref == 'refs/heads/main'",
     "assertion.event_name == 'push'",
-    "assertion.job_workflow_ref == '${var.github_cd.repository}/.github/workflows/cd-gcp.yml@refs/heads/main'",
+    "assertion.workflow_ref == '${var.github_cd.repository}/.github/workflows/cd-gcp.yml@refs/heads/main'",
     "assertion.environment == 'gcp-dev'",
   ])
   oidc {
