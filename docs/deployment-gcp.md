@@ -15,8 +15,8 @@ Bun / HonoをCloud Run、DBとSupabase Authをクラウド版Supabase Freeで動
 - シークレットの実値とversionの作成はTerraform管理外とし、stateへ保存しません。Supabaseは `SUPABASE_PUBLISHABLE_KEY` にPublishable keyを設定します。管理権限を持つSecret key・service roleキーは使いません。既存ローカル・AWS用の `SUPABASE_ANON_KEY` は互換設定として利用できます。
 - GCPではPublishable keyを公開設定（tfvars・state）で扱い、Secret Managerの無料枠である有効6 versionをDB接続情報・4種類の鍵・Resend APIキーに割り当てます。
 - dev環境では `enable_api_docs = true` により、IAPの内側にOpenAPIとScalarを公開します。staging / prodでは公開しません。ScalarのAPI呼び出しは同じOriginへ送り、外部のAPIプロキシは使いません。
-- 通常起動ではmigrationを実行しません。既存Dockerfileの `migration` ターゲットをローカルで実行してからCloud Runを更新します。
-- AWS用CDは引き続きECRへの登録だけを行います。GCPへの自動push・自動デプロイは追加しません。
+- 通常起動ではmigrationを実行しません。初回手動配備ではDockerfileの `migration` ターゲットをローカルで実行し、devの通常CDでは同じターゲットをActions runnerで実行してからCloud Runを更新します。
+- AWS用CDは引き続きECRへの登録だけを行います。GCP devの自動配備・初回認証構築・有効化条件は[自動配備の手順](deployment-gcp-cd.md)を参照してください。CDは明示的に有効化するまで動きません。
 
 ## 無料枠と費用の前提
 
@@ -200,7 +200,7 @@ Cloud Run標準URLへ直接接続する構成だけを対象とし、IP単位の
 
 ### 更新・ロールバック・利用終了
 
-更新時も同じソースでビルドしたmigrationを先に実行し、登録済みイメージのダイジェストとシークレットversionを変更してplan・applyします。Cloud Runを直接更新してTerraformと不一致を作らないでください。
+devの通常更新は[自動配備の手順](deployment-gcp-cd.md)に従い、mainへのマージとCI成功後に追加承認なしで配備します。手動更新時も同じソースでビルドしたmigrationを先に実行し、登録済みイメージのダイジェストと数値シークレット参照を明示してplan・applyします。Cloud Runを直接更新してTerraformと不一致を作らないでください。
 
 ロールバックは前の保護されたイメージのダイジェストへ戻してplan・applyします。DBの変更は戻らないため、migrationは旧アプリと互換性を維持します。不要な `release-` タグは稼働・復旧対象でないことを確認して整理します。
 

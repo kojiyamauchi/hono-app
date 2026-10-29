@@ -247,6 +247,8 @@ bun run build
 
 通常のCIテストはDB非依存とし、Repositoryと外部サービスをmockします。
 
+mainへのpushでも同じ検査を実行します。GCP devのCDは全CI成功後、明示的に有効化された場合だけ動きます。配備前のコンテナ検証は通常のUnit Testとは分離し、使い捨てDBで行います。CDのplan許可範囲・migration失敗時の停止・IAP検証・イメージ保持は `scripts/gcp-cd*.test.js` とGCPのTerraformモックテストで確認します。[GCP devの自動配備](deployment-gcp-cd.md)
+
 実DB integration testを自動化する場合は、通常のテストとは別のCI jobとして実行します。
 
 ## 新機能・修正時の確認
