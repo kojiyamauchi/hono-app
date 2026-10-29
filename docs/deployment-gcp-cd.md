@@ -4,11 +4,14 @@ mainへのマージをdevへの配備判断とし、追加承認なしで配備�
 
 ## 実行範囲
 
-- `ci.yml` はPRに加えてmainへのpushでもアプリ・AWS/GCP Terraformの検査を実行します。全検査成功後に `cd-gcp.yml` を呼び出します。
-- repository variable `GCP_DEV_CD_ENABLED` が文字列 `true` の場合だけCDを実行します。未設定・falseでは認証・ビルド・push・migration・applyを行いません。
+- `ci.yml` は `pull_request` と `workflow_call` を受け付ける検査専用workflowです。PRのChecksにはCIの7項目だけを表示し、CDジョブは定義しません。
+- `cd-gcp.yml` はmainへのpushで起動し、先に `ci.yml` を呼び出します。全検査成功後に配備ジョブを実行します。mainへの直接pushも同じ起動条件です。
+- repository variable `GCP_DEV_CD_ENABLED` が文字列 `true` の場合だけ配備ジョブを実行します。未設定・falseでもCIは実行しますが、配備用認証・Dockerビルド・イメージpush・migration・applyは行いません。
 - 対象は `hono-app-dev-512908-f3`、`asia-northeast1`、Terraform workspace `dev`、既存サービス `hono-app-dev` です。AWS用CD、prod用CD、一般公開への変更は含みません。
 - 配備全体を `gcp-dev-deployment` concurrency groupで直列化します。新しいpushで実行中のmigration・applyをキャンセルしません。古い待機runはmainのSHAと照合して省略します。
 - devのGitHub Environment `gcp-dev` はmainだけを許可し、required reviewersを設定しません。将来prodを作る場合は別Environmentでmigration前の承認を設け、DB・Secret・state・サービスも分離します。prodブランチやprodリソースは今回作りません。
+
+CIとCDの入口を分ける理由は、PRのChecksへ配備ジョブのskip項目を出さず、レビュー時の検査とマージ後の配備を区別するためです。`cd-gcp.yml` から共通CIを呼ぶことで検査定義を重複させず、`main.yml` も追加しません。mainへの直接pushは既存のPR必須・承認・必須CIのルールで制限し、CDではmainへのpushを起点として維持します。
 
 ## 配備の順序
 
@@ -48,7 +51,7 @@ JSONのdriftには、etag・update_timeなどの計算属性だけの差分も�
 
 Cloud Runの作成・削除・IAM変更、WIF変更、Secret値の更新権限はCDへ渡しません。Cloud Runの更新権限はフィールド単位にimageだけへ限定できず、任意コードをruntime SAで動かせる権限でもあるため、mainのレビューとplan検査も信頼境界になります。SAの切り替えは完全な信頼分離ではなく、直接取得する権限とログ誤出力の範囲を減らすためのものです。
 
-WIFはGitHub issuerに対し、repository ID `1251281818`、owner ID `13247377`、`refs/heads/main`、pushイベント、再利用workflow `kojiyamauchi/hono-app/.github/workflows/cd-gcp.yml@refs/heads/main`、Environment `gcp-dev` をすべて検査します。長期鍵は保存しません。CI・ビルドの後、用途ごとに短命認証を取り直します。
+WIFはGitHub issuerに対し、repository ID `1251281818`、owner ID `13247377`、`refs/heads/main`、pushイベント、起動元workflow（`workflow_ref`）`kojiyamauchi/hono-app/.github/workflows/cd-gcp.yml@refs/heads/main`、Environment `gcp-dev` をすべて検査します。長期鍵は保存しません。CI・ビルドの後、用途ごとに短命認証を取り直します。
 
 IAP検証には検証用SAの `openid` / `userinfo.email` scope付きアクセストークンを使います。既存のユーザー用アクセストークンやCloud Run URL向けIDトークンでの成功を前提にしません。プログラム用OAuth client allowlistをCDが書き換えることもありません。[IAPのサービスアカウント認証](https://docs.cloud.google.com/iap/docs/authentication-howto#authenticate_with_a_service_account_access_token)
 
@@ -71,7 +74,7 @@ Cloud Runのoperationはサービス配下ではないため、`run.operations.g
 4. ユーザーがそのplanを確認した後にだけ、保存planをapplyします。この文書の追加や通常CDの承認省略を、初回IAM変更への承認として扱いません。
 5. IAP検証用SAの短命認証と、固定Originの未認証拒否・認証付きhealthを実測します。トークンは保護された一時ファイルまたはプロセス内だけで扱い、コマンド引数・ログへ出しません。
 6. GitHub側の変更も内容を提示して確認後、`gcp-dev` Environmentを作り、mainだけを許可・required reviewersなしとします。repository variable `GCP_DEV_CD_ENABLED=true` を設定します。
-7. 最新mainのpush CIを再実行します。全CIとCDが成功したこと、revision・digest・再plan・IAP・イメージ保持を記録します。実クラウドでの初回CD成功は、ローカル検証の成功とは分けて記録します。
+7. 最新mainへのpushで起動した `GCP dev CD` workflowを再実行します。全CIとCDが成功したこと、revision・digest・再plan・IAP・イメージ保持を記録します。実クラウドでの初回CD成功は、ローカル検証の成功とは分けて記録します。
 
 手動のインフラ変更・復旧時も `dev.cd.tfvars.json` を使い、現在のdigestまたは明示した復旧digestを引数で渡します。古い `dev.local.tfvars` のdigestを不用意にapplyして、アプリを巻き戻さないでください。
 
