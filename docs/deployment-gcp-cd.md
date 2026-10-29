@@ -8,7 +8,7 @@ mainへのマージをdevへの配備判断とし、追加承認なしで配備�
 - `cd-gcp.yml` はmainへのpushで起動し、先に `ci.yml` を呼び出します。全検査成功後に配備ジョブを実行します。mainへの直接pushも同じ起動条件です。
 - repository variable `GCP_DEV_CD_ENABLED` が文字列 `true` の場合だけ配備ジョブを実行します。未設定・falseでもCIは実行しますが、配備用認証・Dockerビルド・イメージpush・migration・applyは行いません。
 - 対象は `hono-app-dev-512908-f3`、`asia-northeast1`、Terraform workspace `dev`、既存サービス `hono-app-dev` です。AWS用CD、prod用CD、一般公開への変更は含みません。
-- 配備全体を `gcp-dev-deployment` concurrency groupで直列化します。新しいpushで実行中のmigration・applyをキャンセルしません。古い待機runはmainのSHAと照合して省略します。
+- CIは各pushで実行し、配備待ちで止めません。配備ジョブだけを `gcp-dev-deployment` concurrency groupで直列化し、新しいpushで実行中のmigration・applyをキャンセルしません。待機後の配備ジョブはmainのSHAと照合し、古い対象を省略します。
 - devのGitHub Environment `gcp-dev` はmainだけを許可し、required reviewersを設定しません。将来prodを作る場合は別Environmentでmigration前の承認を設け、DB・Secret・state・サービスも分離します。prodブランチやprodリソースは今回作りません。
 
 CIとCDの入口を分ける理由は、PRのChecksへ配備ジョブのskip項目を出さず、レビュー時の検査とマージ後の配備を区別するためです。`cd-gcp.yml` から共通CIを呼ぶことで検査定義を重複させず、`main.yml` も追加しません。mainへの直接pushは既存のPR必須・承認・必須CIのルールで制限し、CDではmainへのpushを起点として維持します。

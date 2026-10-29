@@ -8,11 +8,6 @@ on:
 permissions:
   contents: read
 
-# migrationから検証・保持タグ整理まで直列化し、実行中の配備は新しいpushで止めない。
-concurrency:
-  group: gcp-dev-deployment
-  cancel-in-progress: false
-
 jobs:
   ci:
     name: CI
@@ -21,6 +16,10 @@ jobs:
   deploy:
     needs: ci
     if: vars.GCP_DEV_CD_ENABLED == 'true'
+    # migrationから検証・保持タグ整理まで直列化し、実行中の配備は新しいpushで止めない。
+    concurrency:
+      group: gcp-dev-deployment
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 40
     environment: gcp-dev
