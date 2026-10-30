@@ -2,7 +2,19 @@
 
 Bun / HonoをCloud Run、DBとSupabase Authをクラウド版Supabase Freeで動かします。AWSは `infra/aws/`、GCPは `infra/gcp/` で別々に管理します。Dockerfileは共用します。
 
-この変更だけではGCPリソースは作成されません。前半のローカル検証と、後半の実環境を変更する操作を分けて進めてください。
+devでは2026-10-30に初回CDが成功し、mainへのマージ後の自動配備を有効化済みです。初回構築を行う場合は、前半のローカル検証と、後半の実環境を変更する操作を分けて進めてください。
+
+## dev環境のアクセス先
+
+利用にはIAPで許可済みのGoogleアカウントが必要です。ブラウザで開くと、必要に応じてGoogle認証へ進みます。
+
+- API: [https://hono-app-dev-669070496198.asia-northeast1.run.app](https://hono-app-dev-669070496198.asia-northeast1.run.app)
+- Scalar: [APIリファレンスを開く](https://hono-app-dev-669070496198.asia-northeast1.run.app/open-api/scalar)
+- health: [稼働確認](https://hono-app-dev-669070496198.asia-northeast1.run.app/health)
+
+上記はメール・Supabaseの転送先や `ALLOWED_ORIGINS` と合わせた採用済みOriginです。Terraformの `service_url` が別形式の有効なOriginを返す場合があるため、その出力で案内URLを置き換えません。
+
+初回CDのSHA・workflow・revision・digestと検証範囲は[初回CDの検証記録](deployment-gcp-cd.md#初回cdの検証記録2026-10-30)を参照してください。最新の配備状況は [GCP dev CDのActions一覧](https://github.com/kojiyamauchi/hono-app/actions/workflows/cd-gcp.yml)で確認できます。認証付きhealthの成功は、ブラウザの全ユーザーフローやメール配達まで検証済みという意味ではありません。
 
 ## 管理範囲とアクセス制限
 
@@ -16,7 +28,7 @@ Bun / HonoをCloud Run、DBとSupabase Authをクラウド版Supabase Freeで動
 - GCPではPublishable keyを公開設定（tfvars・state）で扱い、Secret Managerの無料枠である有効6 versionをDB接続情報・4種類の鍵・Resend APIキーに割り当てます。
 - dev環境では `enable_api_docs = true` により、IAPの内側にOpenAPIとScalarを公開します。staging / prodでは公開しません。ScalarのAPI呼び出しは同じOriginへ送り、外部のAPIプロキシは使いません。
 - 通常起動ではmigrationを実行しません。初回手動配備ではDockerfileの `migration` ターゲットをローカルで実行し、devの通常CDでは同じターゲットをActions runnerで実行してからCloud Runを更新します。
-- AWS用CDは引き続きECRへの登録だけを行います。GCP devの自動配備・初回認証構築・有効化条件は[自動配備の手順](deployment-gcp-cd.md)を参照してください。CDは明示的に有効化するまで動きません。
+- AWS用CDは引き続きECRへの登録だけを行います。GCP devの自動配備は2026-10-30に有効化済みです。通常配備・初回認証構築・有効化条件・停止と復旧は[自動配備の手順](deployment-gcp-cd.md)を参照してください。新しい環境では明示的に有効化するまでCDは動きません。
 
 ## 無料枠と費用の前提
 
@@ -53,9 +65,9 @@ bun run test:container
 
 `test:container` はDocker Desktop・Bun・OpenSSLを使用します。両イメージの公開CA同梱と未知のCA・異なるホスト名の拒否を確認し、使い捨てPostgreSQLでmigrationと認証の動作を検証します。GCPやクラウド版Supabaseへは接続しません。既存DBはresetしません。
 
-## 公開を決めた後の操作
+## 初回構築・手動配備の操作
 
-ここからはプロジェクト・リソース作成、イメージのpush、クラウドDBへの書き込みを行います。対象アカウント・プロジェクトを確認してから実施してください。
+ここからはプロジェクト・リソース作成、イメージのpush、クラウドDBへの書き込みを行います。対象アカウント・プロジェクトを確認してから実施してください。構築済みdevの通常更新は[自動配備の手順](deployment-gcp-cd.md)を使います。手動変更は実行中CDと重ねず、CD構築済み環境では `dev.cd.tfvars.json` と現在または復旧対象のdigestを使ってCD用リソースもplanへ含めます。
 
 ### 1. プロジェクトとstateを準備する
 
@@ -172,7 +184,7 @@ CookieはSecureを強制します。cross-siteのフロントエンドでCookie�
 
 サービス作成前にURLが必要な場合は、短いサービス名で利用できる `https://<サービス名>-<プロジェクト番号>.<リージョン>.run.app` の形式を使います。apply後に実際の出力URLとも照合します。[標準URLの仕様](https://docs.cloud.google.com/run/docs/triggering/https-request#service_url)
 
-今回のScalarは、メールとSupabaseの転送先に設定した上記の形式のURLで開きます。Terraformの `service_url` は別形式の有効な標準URLを返す場合があるため、その出力URLをScalarの案内へそのまま置き換えません。別のOriginでも利用する場合は、先に `ALLOWED_ORIGINS` へそのOriginを明示的に追加して配備し、ブラウザでPOSTの成功を確認します。
+devのScalarは、メールとSupabaseの転送先に設定した[採用済みURL](https://hono-app-dev-669070496198.asia-northeast1.run.app/open-api/scalar)で開きます。Terraformの `service_url` は別形式の有効な標準URLを返す場合があるため、その出力URLをScalarの案内へそのまま置き換えません。別のOriginでも利用する場合は、先に `ALLOWED_ORIGINS` へそのOriginを明示的に追加して配備し、ブラウザでPOSTの成功を確認します。
 
 ```bash
 terraform -chdir=infra/gcp workspace show
@@ -194,7 +206,7 @@ curl --silent --output /dev/null --write-out '%{http_code}\n' "$gcp_service_url/
 
 ブラウザのScalarでも登録・ログイン・本人取得・refresh・メール内トークンによる確認を行います。Resendの送信受付だけで配達成功とは扱わず、配達イベントまたは本人の受信を確認します。Supabase Authは既存の登録・ログイン・本人取得と確認メールを検証し、作成した検証ユーザーを削除します。
 
-必要な変更と配備前の確認を1つのPRへまとめ、Claudeとユーザーのレビュー後にマージします。実配備はマージ済みソースからビルドし、最終リリースplanを確認してapplyします。配備後の結果・稼働revision・実イメージのダイジェスト・再plan・検証データ削除・容量と費用も同じPRへ記録します。CDは別PRで扱います。
+初回構築や手動配備に必要な変更と配備前の確認はPRへまとめ、Claudeとユーザーのレビュー後にマージします。手動配備はマージ済みソースからビルドし、最終リリースplanを確認してapplyします。実施した配備後の結果・稼働revision・実イメージのダイジェスト・再plan・検証データ削除・容量と費用の確認結果を記録します。devの通常更新は導入済みのCDがmigration・保存planの検査と適用・IAP付きhealth・再planを実行します。文書だけの変更もmainへマージすると通常CDが起動します。
 
 Cloud Run標準URLへ直接接続する構成だけを対象とし、IP単位のレート制限は `X-Forwarded-For` の末尾を使います。公開前に、偽の先頭IPを変えても制限を回避できないことを確認します。追加のロードバランサー・CDN・プロキシを導入する場合は、この信頼境界を見直してください。
 
