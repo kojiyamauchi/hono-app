@@ -149,9 +149,10 @@ jobs:
           cache: true
 
       # Google認証やbackend接続を使わず、providerのモックで構成を検証する。
+      # CDと同じreadonly初期化で、Linux用ハッシュの記録漏れも検出する。
       # 整形検査はAWSジョブのtf:fmt:checkでinfra全体を対象に実行する。
       - name: Initialize Terraform Without Backend
-        run: bun run tf:gcp:init:no-backend
+        run: bun run tf:gcp:init:no-backend -lockfile=readonly
 
       - name: Initialize TFLint
         run: bun run tf:gcp:lint:init

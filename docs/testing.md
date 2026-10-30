@@ -249,6 +249,8 @@ bun run build
 
 PRでは検査専用の `ci.yml` を実行し、ChecksにCDジョブを含めません。mainへのpushでは `cd-gcp.yml` から同じ `ci.yml` を呼び出します。GCP devの配備は全CI成功後、明示的に有効化された場合だけ動きます。配備前のコンテナ検証は通常のUnit Testとは分離し、使い捨てDBで行います。CDのplan許可範囲・migration失敗時の停止・IAP検証・イメージ保持は `scripts/gcp-cd*.test.js` とGCPのTerraformモックテストで確認します。[GCP devの自動配備](deployment-gcp-cd.md)
 
+GCPのCIは `init -backend=false -lockfile=readonly` の後にvalidate・モックテストを実行します。初期化時にlockfileへハッシュを自動追加して成功扱いにせず、Mac/ARM64とLinux/AMD64の両方が記録されていることを前提にします。platformやproviderを更新する手順は[lockfile管理](deployment-gcp-cd.md#providerのlockfile管理)を参照してください。
+
 plan検査では、対象Registryの `resource_drift` が `update_time` だけの場合を配備前後で許容し、cleanup設定・IAM・他の属性・別リソース・未確定値・作成削除を引き続き拒否することを回帰テストで確認します。`resource_changes` のRegistry更新を許可するものではありません。Terraformのモックテストでは、WIF poolのrefresh用roleに `getAttestationRules` を含め、`setAttestationRules` を付けないことを確認します。モックは実APIの認可を再現しないため、実際のSAによるplanと配備全体の検証は、確認済みのクラウド設定適用後に別途行います。
 
 実DB integration testを自動化する場合は、通常のテストとは別のCI jobとして実行します。
