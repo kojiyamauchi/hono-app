@@ -58,6 +58,7 @@ flagWords:
 ignorePaths:
   - certificates/**/*.crt
   - ./**/.terraform/**
+  - infra/gcp/.terraform.lock.hcl
   - ./**/*.tfstate*
   - ./**/node_modules/**
   - .claude/settings.local.json
