@@ -84,15 +84,27 @@ Cloud Runのoperationはサービス配下ではないため、`run.operations.g
 
 ## 初回試行後の修正と再開
 
-2026-10-30の初回試行では、CD用基盤とGitHub Environmentの構築、WIF認証、runtime登録まで成功し、TerraformのWIF pool読み取りで前述の権限不足が判明しました。イメージ登録後のRegistry更新日時も、従来のdrift検査では停止対象になることを確認しました。migration・Cloud Run更新には進んでおらず、初回CD全体はまだ未検証です。
+2026-10-30の初回試行では、CD用基盤とGitHub Environmentの構築、WIF認証、runtime登録まで成功しました。WIF pool読み取りの403は `getAttestationRules` の追加後、配備用SAのinit・planで解消を確認しています。イメージ登録後のRegistry更新日時も、前述の限定条件で許容します。
 
-調査に使ったOwnerユーザーへの期限付きTokenCreator権限は削除済みで、通常運用の前提にはしません。調査終了時点では `GCP_DEV_CD_ENABLED=false` として停止しています。この修正のコードをマージするだけでは、クラウドの読み取りroleは更新されません。
+その後の再試行では、Linux/AMD64の `init -lockfile=readonly` 後のplanでproviderのチェックサム不一致を再現しました。Mac用の `h1` しか記録されておらず、通常のCIは初期化時にLinux用のハッシュを補っていました。CDはlockfileを書き換えないため失敗します。providerを更新したり検証を無効化したりせず、公式Registryの署名済み配布物からLinux用のハッシュを記録します。
 
-1. 修正をマージした最新mainで、現在のReady revisionのdigestを取得し、`dev.cd.tfvars.json` を使って全体planを作ります。上の初回構築用コマンドと同じ入力を使い、保存先は `cd-read-permission.tfplan` などで区別します。
-2. 想定する設定変更は `google_project_iam_custom_role.cd_read[0]` の更新1件で、permissionsへ `iam.workloadIdentityPools.getAttestationRules` を追加することだけです。サービス・Secret・WIF信頼条件や他の権限が変わらないことを確認し、ユーザーへplanを提示します。
-3. ユーザー確認後にその保存planを手動適用し、全体planの設定差分なしを再確認します。配備用SAによるplanは、次のActions実行でWIF経由の認証を使って確認します。承認済みIAM操作に伴うetagなどをstateへ同期する場合も、差分を個別確認してから行い、未確認のdriftを一括で取り込まないでください。
+調査に使ったOwnerユーザーへの期限付きTokenCreator権限は削除済みで、通常運用の前提にはしません。読み取りroleの修正は適用済みですが、調査終了時点では `GCP_DEV_CD_ENABLED=false` として停止しています。migration・Cloud Run更新には進んでおらず、初回CD全体はまだ未検証です。
+
+1. 修正をマージした最新mainで、現在のReady revisionのdigestを取得し、`dev.cd.tfvars.json` を使って全体planを作ります。上の初回構築用コマンドと同じ入力を使い、保存先は `cd-resume.tfplan` などで区別します。
+2. 読み取りroleの修正を適用済みのdevでは、設定変更なしを想定します。未適用の環境では `google_project_iam_custom_role.cd_read[0]` のpermissionsへの `iam.workloadIdentityPools.getAttestationRules` 追加だけかを確認し、ユーザーへplanを提示します。lockfileのハッシュ追加自体にクラウド設定の適用は不要です。
+3. 設定変更がある場合はユーザー確認後にその保存planを手動適用します。配備用SAによるplanは、次のActions実行でWIF経由の認証を使って確認します。承認済みIAM操作に伴うetagなどをstateへ同期する場合も、差分を個別確認してから行い、未確認のdriftを一括で取り込まないでください。
 4. ユーザー確認後にrepository variableを `GCP_DEV_CD_ENABLED=true` に戻し、最新mainの `GCP dev CD` workflowを再実行します。
-5. CI・migration・配備・IAP・再plan・保持タグ整理の成功と、SHA・revision・配備/復旧用digestを記録します。権限不足を解消しただけで初回CDの完了とは扱いません。
+5. CI・migration・配備・IAP・再plan・保持タグ整理の成功と、SHA・revision・配備/復旧用digestを記録します。権限不足やハッシュ不足を解消しただけで初回CDの完了とは扱いません。
+
+## providerのlockfile管理
+
+GCPの `.terraform.lock.hcl` は、ローカルのMac/ARM64とActionsのLinux/AMD64を両方対象にします。providerの更新やplatform追加を行う場合は、公式Registryで署名を確認し、対象platformのハッシュをまとめて記録してレビューします。
+
+```bash
+terraform -chdir=infra/gcp providers lock -platform=darwin_arm64 -platform=linux_amd64
+```
+
+このコマンドは既存の選択済みバージョンを使ってハッシュを補います。バージョン更新を意図しない修正に `init -upgrade` は使いません。CIもCDと同じ `-lockfile=readonly` で初期化し、その後のvalidate・モックテストまで通してハッシュの記録漏れを検出します。別のplatformを使う場合も、必要な `-platform` を追加してlockfileを更新します。[HashiCorp公式のproviders lock手順](https://developer.hashicorp.com/terraform/cli/commands/providers/lock)
 
 ## 失敗と復旧
 
