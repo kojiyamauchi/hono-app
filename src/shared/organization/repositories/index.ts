@@ -45,12 +45,16 @@ export const organizationRepository = {
   },
 
   /**
-   * 指定ユーザーが所属する組織の一覧を取得する。
+   * 指定ユーザーが所属する組織を、ID昇順でオフセット式に1ページ分取得する。
+   * 所属条件をDBのqueryへ適用してからoffset・limitで範囲を指定する（取得後の配列分割はしない）。
+   * `take` はそのままDBへ渡す（次ページ判定のための `limit + 1` は呼び出し側が渡す）。
    */
-  findByUserId: async (userId: number): Promise<Organization[]> => {
+  findPageByUserId: async (userId: number, take: number, offset: number): Promise<Organization[]> => {
     return prisma.organization.findMany({
       where: { memberships: { some: { userId } } },
       orderBy: { id: 'asc' },
+      skip: offset,
+      take,
     })
   },
 
