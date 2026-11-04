@@ -206,7 +206,7 @@ describe('listMembersQuerySchema', () => {
     expect(listMembersQuerySchema.safeParse({ limit }).success).toBe(true)
   })
 
-  test.each(['0', '101', 'abc', '', '1.5', '-1'])('不正なlimit(%p)を拒否する', (limit) => {
+  test.each(['0', '101', 'abc', '', ' ', '1.5', '-1'])('不正なlimit(%p)を拒否する', (limit) => {
     expect(listMembersQuerySchema.safeParse({ limit }).success).toBe(false)
   })
 
@@ -244,11 +244,13 @@ describe('listMineQuerySchema', () => {
     expect(listMineQuerySchema.safeParse({ offset }).success).toBe(true)
   })
 
-  test.each(['10001', '-1', 'abc', '1.5'])('不正なoffset(%p)を拒否する', (offset) => {
+  // 明示された空文字・空白は Number('') === 0 で既定値と同じ結果になってしまうため、
+  // 未指定（既定値0）と区別して拒否されることを固定する。
+  test.each(['10001', '-1', 'abc', '1.5', '', ' '])('不正なoffset(%p)を拒否する', (offset) => {
     expect(listMineQuerySchema.safeParse({ offset }).success).toBe(false)
   })
 
-  test.each(['0', '101', 'abc', ''])('不正なlimit(%p)を拒否する', (limit) => {
+  test.each(['0', '101', 'abc', '', ' '])('不正なlimit(%p)を拒否する', (limit) => {
     expect(listMineQuerySchema.safeParse({ limit }).success).toBe(false)
   })
 

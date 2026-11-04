@@ -183,7 +183,7 @@ describe('organizations routes', () => {
     expect(findPageByUserId).toHaveBeenCalledWith(1, 6, 10)
   })
 
-  test.each(['limit=0', 'offset=abc', 'cursor=abc'])('GET /organizations?%s は400を返す', async (query) => {
+  test.each(['limit=0', 'offset=abc', 'cursor=abc', 'offset=', 'limit=', 'offset=%20'])('GET /organizations?%s は400を返す', async (query) => {
     const token = await createToken(1)
 
     const response = await app.request(`/organizations?${query}`, {

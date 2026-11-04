@@ -113,13 +113,19 @@ export const invitationRouteParamSchema = z.object({
     .openapi({ param: { name: 'invitationId', in: 'path' }, example: 1 }),
 })
 
+/**
+ * ページネーションの数値queryを `z.coerce.number()` へ渡す前の前処理。
+ * `Number('')` と `Number(' ')` と `Number(null)` はいずれも0になるため、
+ * 明示された空文字・空白・nullが既定値や0として通ってしまう（`offset=` が200で先頭ページになる）。
+ * 未指定（`undefined`）だけを `.default()` へ委ね、それ以外はNaNへ寄せて400にする。
+ */
+const rejectBlankNumericQuery = (value: unknown): unknown => (value === null || (typeof value === 'string' && value.trim() === '') ? Number.NaN : value)
+
 /** ページネーション共通のlimit。省略時20、1〜100の整数。 */
-const paginationLimitSchema = z.coerce
-  .number()
-  .int('limitは整数で指定してください')
-  .min(1, 'limitは1以上で指定してください')
-  .max(100, 'limitは100以下で指定してください')
-  .default(20)
+const paginationLimitSchema = z.preprocess(
+  rejectBlankNumericQuery,
+  z.coerce.number().int('limitは整数で指定してください').min(1, 'limitは1以上で指定してください').max(100, 'limitは100以下で指定してください').default(20),
+)
 
 /**
  * メンバー一覧（カーソル式）のqueryスキーマ。
@@ -147,12 +153,16 @@ export const listMembersQuerySchema = z
 export const listMineQuerySchema = z
   .looseObject({
     limit: paginationLimitSchema.openapi({ param: { name: 'limit', in: 'query', required: false }, example: 20 }),
-    offset: z.coerce
-      .number()
-      .int('offsetは整数で指定してください')
-      .min(0, 'offsetは0以上で指定してください')
-      .max(10000, 'offsetは10000以下で指定してください')
-      .default(0)
+    offset: z
+      .preprocess(
+        rejectBlankNumericQuery,
+        z.coerce
+          .number()
+          .int('offsetは整数で指定してください')
+          .min(0, 'offsetは0以上で指定してください')
+          .max(10000, 'offsetは10000以下で指定してください')
+          .default(0),
+      )
       .openapi({ param: { name: 'offset', in: 'query', required: false }, example: 0 }),
   })
   .refine((value) => value.cursor === undefined, {

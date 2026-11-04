@@ -97,6 +97,10 @@ describe('organizations routes OpenAPI定義', () => {
     expect(listMembersQueryNames).toContain('cursor')
     expect(listMembersQueryNames).not.toContain('offset')
     expect(listMembersGet.parameters?.find((parameter) => parameter.name === 'id')?.in).toBe('path')
+
+    // coerceがnullを0として受けると生成schemaへ nullable: true が付くため、整数のみであることを固定する
+    const offsetParam = listMineGet.parameters?.find((parameter) => parameter.name === 'offset') as { schema?: Record<string, unknown> } | undefined
+    expect(offsetParam?.schema).toEqual({ type: 'integer', minimum: 0, maximum: 10000, default: 0, example: 0 })
   })
 
   test('所有権移譲endpointのrequest bodyとresponseが定義されている', async () => {
