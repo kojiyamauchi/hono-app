@@ -4,10 +4,7 @@ import type { Organization } from '@/shared/organization/entities'
 import { toOrganizationResponse } from '@/shared/organization/mappers'
 
 import type { MemberListDtoType, OrganizationListDtoType } from '../dtos'
-import { memberListCursorPayloadSchema } from '../schemas'
-
-/** カーソルのペイロード形式のバージョン。形式を変える場合はここを上げ、旧カーソルを不正として扱う。 */
-const MEMBER_LIST_CURSOR_VERSION = 1
+import { MEMBER_LIST_CURSOR_VERSION, memberListCursorPayloadSchema } from '../schemas'
 
 /**
  * メンバー一覧カーソルが指す境界値（この行より後ろを取得する）。

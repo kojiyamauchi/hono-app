@@ -160,12 +160,15 @@ export const listMineQuerySchema = z
     path: ['cursor'],
   })
 
+/** メンバー一覧カーソルのペイロード形式のバージョン。形式を変える場合はここを上げ、旧カーソルを不正として扱う。 */
+export const MEMBER_LIST_CURSOR_VERSION = 1
+
 /**
  * メンバー一覧カーソルのデコード後ペイロードのスキーマ。
  * 受信値は信用せず、バージョン・対象組織・境界値の形式をここで検証する。
  */
 export const memberListCursorPayloadSchema = z.object({
-  version: z.literal(1),
+  version: z.literal(MEMBER_LIST_CURSOR_VERSION),
   organizationId: z.number().int().positive(),
   createdAt: z.iso.datetime(),
   id: z.number().int().positive(),
