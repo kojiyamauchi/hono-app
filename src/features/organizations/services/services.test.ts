@@ -3,13 +3,15 @@ import { beforeEach, describe, expect, mock, test } from 'bun:test'
 import type { Membership } from '@/shared/membership/entities'
 import type { Organization } from '@/shared/organization/entities'
 
+import { encodeMemberListCursor } from '../mappers'
+
 const createWithOwner = mock()
-const findByUserId = mock()
+const findPageByUserId = mock()
 const findById = mock()
 const update = mock()
 const deleteById = mock()
 
-const findAllByOrganization = mock()
+const findPageByOrganization = mock()
 const membershipFindById = mock()
 const membershipCreate = mock()
 const updateRole = mock()
@@ -45,12 +47,12 @@ await mock.module('@/features/organizations/repositories', () => ({
 }))
 
 await mock.module('@/shared/organization/repositories', () => ({
-  organizationRepository: { createWithOwner, findByUserId, findById, update, deleteById },
+  organizationRepository: { createWithOwner, findPageByUserId, findById, update, deleteById },
 }))
 await mock.module('@/shared/membership/repositories', () => ({
   membershipRepository: {
     findByUserAndOrganization,
-    findAllByOrganization,
+    findPageByOrganization,
     findById: membershipFindById,
     create: membershipCreate,
     updateRole,
@@ -95,17 +97,61 @@ describe('organizationsService.create', () => {
 })
 
 describe('organizationsService.listMine', () => {
+  const organizations = (count: number): Organization[] => Array.from({ length: count }, (_, index) => ({ ...organization, id: index + 1 }))
+
   beforeEach(() => {
-    findByUserId.mockReset()
+    findPageByUserId.mockReset()
   })
 
-  test('所属する組織の一覧を返す', async () => {
-    findByUserId.mockResolvedValue([organization])
+  test('次ページ判定のためlimit + 1件をrepositoryへ要求し、offsetをそのまま渡す', async () => {
+    findPageByUserId.mockResolvedValue([])
 
-    const result = await organizationsService.listMine(1)
+    await organizationsService.listMine(1, 20, 40)
 
-    expect(result).toHaveLength(1)
-    expect(result[0]?.name).toBe('Acme')
+    expect(findPageByUserId).toHaveBeenCalledWith(1, 21, 40)
+  })
+
+  test('0件ならitemsは空でhasNextはfalseになる', async () => {
+    findPageByUserId.mockResolvedValue([])
+
+    const result = await organizationsService.listMine(1, 20, 0)
+
+    expect(result).toEqual({ items: [], limit: 20, offset: 0, hasNext: false })
+  })
+
+  test('limit未満ならhasNextはfalseになる', async () => {
+    findPageByUserId.mockResolvedValue(organizations(2))
+
+    const result = await organizationsService.listMine(1, 3, 0)
+
+    expect(result.items).toHaveLength(2)
+    expect(result.hasNext).toBe(false)
+  })
+
+  test('limit件ちょうどならhasNextはfalseになる', async () => {
+    findPageByUserId.mockResolvedValue(organizations(3))
+
+    const result = await organizationsService.listMine(1, 3, 0)
+
+    expect(result.items).toHaveLength(3)
+    expect(result.hasNext).toBe(false)
+  })
+
+  test('limitを超えて取得できたらhasNextはtrueになり、itemsはlimit件に切り詰める', async () => {
+    findPageByUserId.mockResolvedValue(organizations(4))
+
+    const result = await organizationsService.listMine(1, 3, 0)
+
+    expect(result.items.map((item) => item.id)).toEqual([1, 2, 3])
+    expect(result).toMatchObject({ limit: 3, offset: 0, hasNext: true })
+  })
+
+  test('取得対象件数以上のoffsetならitemsは空でhasNextはfalseになる', async () => {
+    findPageByUserId.mockResolvedValue([])
+
+    const result = await organizationsService.listMine(1, 20, 10000)
+
+    expect(result).toEqual({ items: [], limit: 20, offset: 10000, hasNext: false })
   })
 })
 
@@ -266,17 +312,70 @@ const membership: Membership = {
 }
 
 describe('organizationsService.listMembers', () => {
+  const memberships = (count: number): Membership[] =>
+    Array.from({ length: count }, (_, index) => ({ ...membership, id: index + 1, createdAt: new Date(Date.UTC(2026, 0, index + 1)) }))
+
   beforeEach(() => {
-    findAllByOrganization.mockReset()
+    findPageByOrganization.mockReset()
   })
 
-  test('組織のメンバー一覧を返す', async () => {
-    findAllByOrganization.mockResolvedValue([membership])
+  test('cursorなしなら境界なしで、次ページ判定のためlimit + 1件をrepositoryへ要求する', async () => {
+    findPageByOrganization.mockResolvedValue([])
 
-    const result = await organizationsService.listMembers(1)
+    await organizationsService.listMembers(1, 20)
 
-    expect(result).toHaveLength(1)
-    expect(result[0]?.role).toBe('MEMBER')
+    expect(findPageByOrganization).toHaveBeenCalledWith(1, 21, null)
+  })
+
+  test('0件ならitemsは空でnextCursorはnullになる', async () => {
+    findPageByOrganization.mockResolvedValue([])
+
+    const result = await organizationsService.listMembers(1, 20)
+
+    expect(result).toEqual({ items: [], nextCursor: null })
+  })
+
+  test('limit件ちょうどならnextCursorはnullになる', async () => {
+    findPageByOrganization.mockResolvedValue(memberships(3))
+
+    const result = await organizationsService.listMembers(1, 3)
+
+    expect(result.items).toHaveLength(3)
+    expect(result.nextCursor).toBeNull()
+  })
+
+  test('limitを超えて取得できたらitemsをlimit件に切り詰め、最後のitemの境界からnextCursorを作る', async () => {
+    const rows = memberships(4)
+    findPageByOrganization.mockResolvedValue(rows)
+
+    const result = await organizationsService.listMembers(1, 3)
+
+    expect(result.items.map((item) => item.id)).toEqual([1, 2, 3])
+    expect(result.nextCursor).toBe(encodeMemberListCursor({ organizationId: 1, createdAt: rows[2]!.createdAt, id: 3 }))
+  })
+
+  test('cursor指定時はデコードした境界値をrepositoryへ渡す', async () => {
+    findPageByOrganization.mockResolvedValue([])
+    const createdAt = new Date('2026-01-03T00:00:00.000Z')
+    const cursor = encodeMemberListCursor({ organizationId: 1, createdAt, id: 3 })
+
+    await organizationsService.listMembers(1, 20, cursor)
+
+    expect(findPageByOrganization).toHaveBeenCalledWith(1, 21, { createdAt, id: 3 })
+  })
+
+  test('形式が不正なcursorは400エラーになりrepositoryを呼ばない', async () => {
+    await expect(organizationsService.listMembers(1, 20, 'invalid')).rejects.toMatchObject({ statusCode: 400 })
+
+    expect(findPageByOrganization).not.toHaveBeenCalled()
+  })
+
+  test('別組織で発行されたcursorは400エラーになりrepositoryを呼ばない', async () => {
+    const cursor = encodeMemberListCursor({ organizationId: 2, createdAt: new Date('2026-01-03T00:00:00.000Z'), id: 3 })
+
+    await expect(organizationsService.listMembers(1, 20, cursor)).rejects.toMatchObject({ statusCode: 400 })
+
+    expect(findPageByOrganization).not.toHaveBeenCalled()
   })
 })
 
