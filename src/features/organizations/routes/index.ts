@@ -11,11 +11,14 @@ import { organizationDto } from '@/shared/organization/dtos'
 import { openApiDefaultHook } from '@/utils/validation'
 
 import { organizationsController, organizationsInvitationsController, organizationsMembersController } from '../controllers'
+import { memberListDto, organizationListDto } from '../dtos'
 import {
   addMemberBodySchema,
   createInvitationBodySchema,
   createOrganizationSchema,
   invitationRouteParamSchema,
+  listMembersQuerySchema,
+  listMineQuerySchema,
   memberRouteParamSchema,
   organizationIdParamSchema,
   transferOwnershipBodySchema,
@@ -67,11 +70,15 @@ const listMineRoute = createRoute({
   summary: '認証済みユーザーが所属する組織の一覧を取得する',
   middleware: [authMiddleware],
   security: bearerSecurity,
+  request: {
+    query: listMineQuerySchema,
+  },
   responses: {
     200: {
-      content: { 'application/json': { schema: organizationDto.array() } },
-      description: '所属組織の一覧',
+      content: { 'application/json': { schema: organizationListDto } },
+      description: '所属組織の一覧（オフセット式ページネーション）',
     },
+    400: errorResponse('queryが不正'),
     401: errorResponse('認証が必要、またはトークンが無効'),
     500: errorResponse('サーバーエラー'),
   },
@@ -192,13 +199,14 @@ const listMembersRoute = createRoute({
   security: bearerSecurity,
   request: {
     params: organizationIdParamSchema,
+    query: listMembersQuerySchema,
   },
   responses: {
     200: {
-      content: { 'application/json': { schema: memberDto.array() } },
-      description: '組織のメンバー一覧',
+      content: { 'application/json': { schema: memberListDto } },
+      description: '組織のメンバー一覧（カーソル式ページネーション）',
     },
-    400: errorResponse('組織IDが不正'),
+    400: errorResponse('組織IDまたはqueryが不正'),
     401: errorResponse('認証が必要、またはトークンが無効'),
     404: errorResponse('組織が見つからない'),
     500: errorResponse('サーバーエラー'),
@@ -404,14 +412,14 @@ const cancelInvitationRoute = createRoute({
  */
 export const organizationsRoutes = new OpenAPIHono({ defaultHook: openApiDefaultHook })
   .openapi(createRouteDef, (c) => organizationsController.create(c, c.get('userId'), c.req.valid('json')))
-  .openapi(listMineRoute, (c) => organizationsController.listMine(c, c.get('userId')))
+  .openapi(listMineRoute, (c) => organizationsController.listMine(c, c.get('userId'), c.req.valid('query')))
   .openapi(getByIdRoute, (c) => organizationsController.getById(c, c.req.valid('param').id))
   .openapi(updateRoute, (c) => organizationsController.update(c, c.req.valid('param').id, c.req.valid('json'), c.get('membership').role))
   .openapi(removeRoute, (c) => organizationsController.remove(c, c.req.valid('param').id, c.get('membership').role))
   .openapi(transferOwnershipRoute, (c) =>
     organizationsController.transferOwnership(c, c.req.valid('param').id, c.get('userId'), c.get('membership').role, c.req.valid('json')),
   )
-  .openapi(listMembersRoute, (c) => organizationsMembersController.listMembers(c, c.req.valid('param').id))
+  .openapi(listMembersRoute, (c) => organizationsMembersController.listMembers(c, c.req.valid('param').id, c.req.valid('query')))
   .openapi(addMemberRoute, (c) => organizationsMembersController.addMember(c, c.req.valid('param').id, c.get('membership').role, c.req.valid('json')))
   .openapi(leaveOrganizationRoute, (c) => organizationsMembersController.leave(c, c.req.valid('param').id, c.get('userId')))
   .openapi(updateMemberRoleRoute, (c) =>
