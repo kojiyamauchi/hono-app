@@ -57,25 +57,46 @@ describe('organizations routes OpenAPI定義', () => {
     expect(createPost.responses['401'].content?.['application/json'].schema?.$ref).toBe('#/components/schemas/ErrorResponse')
     expect(createPost.requestBody.content['application/json'].schema?.$ref).toBe('#/components/schemas/CreateOrganizationRequest')
 
-    // 一覧の200はOrganization DTOの配列
-    const listMineGet = doc.paths?.['/organizations']?.get as {
-      responses: Record<string, { content?: Record<string, { schema?: { type?: string; items?: { $ref?: string } } }> }>
-    }
-    expect(listMineGet.responses['200'].content?.['application/json'].schema).toEqual({
-      type: 'array',
-      items: { $ref: '#/components/schemas/Organization' },
-    })
-
     // component schemasが登録されている
     expect(doc.components?.schemas?.Organization).toBeDefined()
     expect(doc.components?.schemas?.Member).toBeDefined()
     expect(doc.components?.schemas?.Invitation).toBeDefined()
+    expect(doc.components?.schemas?.OrganizationList).toBeDefined()
+    expect(doc.components?.schemas?.MemberList).toBeDefined()
     expect(doc.components?.schemas?.CreateOrganizationRequest).toBeDefined()
     expect(doc.components?.schemas?.UpdateOrganizationRequest).toBeDefined()
     expect(doc.components?.schemas?.AddMemberRequest).toBeDefined()
     expect(doc.components?.schemas?.UpdateMemberRoleRequest).toBeDefined()
     expect(doc.components?.schemas?.TransferOrganizationOwnershipRequest).toBeDefined()
     expect(doc.components?.schemas?.CreateInvitationRequest).toBeDefined()
+  })
+
+  test('一覧endpointの200がページネーションDTOを参照し、queryパラメータが方式ごとに定義されている', async () => {
+    const doc = await fetchOpenApiDoc()
+
+    type ListOperation = {
+      parameters?: { name: string; in: string; required?: boolean }[]
+      responses: Record<string, { content?: Record<string, { schema?: { $ref?: string } }> }>
+    }
+    const listMineGet = doc.paths?.['/organizations']?.get as ListOperation
+    const listMembersGet = doc.paths?.['/organizations/{id}/members']?.get as ListOperation
+
+    expect(listMineGet.responses['200'].content?.['application/json'].schema?.$ref).toBe('#/components/schemas/OrganizationList')
+    expect(listMembersGet.responses['200'].content?.['application/json'].schema?.$ref).toBe('#/components/schemas/MemberList')
+    expect(listMineGet.responses['400'].content?.['application/json'].schema?.$ref).toBe('#/components/schemas/ErrorResponse')
+
+    // オフセット式: limit + offset。未対応のcursorは出さない
+    const listMineQueryNames = listMineGet.parameters?.filter((parameter) => parameter.in === 'query').map((parameter) => parameter.name)
+    expect(listMineQueryNames).toContain('limit')
+    expect(listMineQueryNames).toContain('offset')
+    expect(listMineQueryNames).not.toContain('cursor')
+
+    // カーソル式: limit + cursor。未対応のoffsetは出さない
+    const listMembersQueryNames = listMembersGet.parameters?.filter((parameter) => parameter.in === 'query').map((parameter) => parameter.name)
+    expect(listMembersQueryNames).toContain('limit')
+    expect(listMembersQueryNames).toContain('cursor')
+    expect(listMembersQueryNames).not.toContain('offset')
+    expect(listMembersGet.parameters?.find((parameter) => parameter.name === 'id')?.in).toBe('path')
   })
 
   test('所有権移譲endpointのrequest bodyとresponseが定義されている', async () => {
