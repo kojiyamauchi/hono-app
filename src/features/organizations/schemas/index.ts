@@ -113,6 +113,64 @@ export const invitationRouteParamSchema = z.object({
     .openapi({ param: { name: 'invitationId', in: 'path' }, example: 1 }),
 })
 
+/** ページネーション共通のlimit。省略時20、1〜100の整数。 */
+const paginationLimitSchema = z.coerce
+  .number()
+  .int('limitは整数で指定してください')
+  .min(1, 'limitは1以上で指定してください')
+  .max(100, 'limitは100以下で指定してください')
+  .default(20)
+
+/**
+ * メンバー一覧（カーソル式）のqueryスキーマ。
+ * 未対応の `offset` を黙って無視せず400とするため、`looseObject` で未知キーを残してrefineで検出する。
+ * OpenAPIのquery parameterにはshapeに書いたキー（limit・cursor）だけが出力される。
+ */
+export const listMembersQuerySchema = z
+  .looseObject({
+    limit: paginationLimitSchema.openapi({ param: { name: 'limit', in: 'query', required: false }, example: 20 }),
+    cursor: z
+      .string()
+      .min(1, 'cursorは空文字では指定できません')
+      .optional()
+      .openapi({ param: { name: 'cursor', in: 'query', required: false } }),
+  })
+  .refine((value) => value.offset === undefined, {
+    error: 'メンバー一覧はカーソル式のため、offsetは指定できません',
+    path: ['offset'],
+  })
+
+/**
+ * 所属組織一覧（オフセット式）のqueryスキーマ。
+ * 未対応の `cursor` を黙って無視せず400とするため、`looseObject` で未知キーを残してrefineで検出する。
+ */
+export const listMineQuerySchema = z
+  .looseObject({
+    limit: paginationLimitSchema.openapi({ param: { name: 'limit', in: 'query', required: false }, example: 20 }),
+    offset: z.coerce
+      .number()
+      .int('offsetは整数で指定してください')
+      .min(0, 'offsetは0以上で指定してください')
+      .max(10000, 'offsetは10000以下で指定してください')
+      .default(0)
+      .openapi({ param: { name: 'offset', in: 'query', required: false }, example: 0 }),
+  })
+  .refine((value) => value.cursor === undefined, {
+    error: '所属組織一覧はオフセット式のため、cursorは指定できません',
+    path: ['cursor'],
+  })
+
+/**
+ * メンバー一覧カーソルのデコード後ペイロードのスキーマ。
+ * 受信値は信用せず、バージョン・対象組織・境界値の形式をここで検証する。
+ */
+export const memberListCursorPayloadSchema = z.object({
+  version: z.literal(1),
+  organizationId: z.number().int().positive(),
+  createdAt: z.iso.datetime(),
+  id: z.number().int().positive(),
+})
+
 export type CreateOrganizationSchemaType = z.infer<typeof createOrganizationSchema>
 export type UpdateOrganizationSchemaType = z.infer<typeof updateOrganizationSchema>
 export type OrganizationIdParamSchemaType = z.infer<typeof organizationIdParamSchema>
@@ -122,3 +180,6 @@ export type TransferOwnershipBodySchemaType = z.infer<typeof transferOwnershipBo
 export type MemberRouteParamSchemaType = z.infer<typeof memberRouteParamSchema>
 export type CreateInvitationBodySchemaType = z.infer<typeof createInvitationBodySchema>
 export type InvitationRouteParamSchemaType = z.infer<typeof invitationRouteParamSchema>
+export type ListMembersQuerySchemaType = z.infer<typeof listMembersQuerySchema>
+export type ListMineQuerySchemaType = z.infer<typeof listMineQuerySchema>
+export type MemberListCursorPayloadSchemaType = z.infer<typeof memberListCursorPayloadSchema>
