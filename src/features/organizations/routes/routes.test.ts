@@ -536,19 +536,27 @@ describe('organizations routes', () => {
     expect(findPageByOrganization).not.toHaveBeenCalled()
   })
 
-  test.each(['limit=0', 'cursor=invalid', 'offset=0'])('GET /organizations/:id/members?%s は所属ユーザーなら400を返す', async (query) => {
-    findByUserAndOrganization.mockResolvedValue(membershipWithRole('MEMBER'))
-    const token = await createToken(1)
+  // 0年の日時を含むカーソルはPostgreSQLへバインドできないため、DBへ到達する前に400で止める。
+  const zeroYearCursor = Buffer.from(JSON.stringify({ version: 1, organizationId: 1, createdAt: '0000-01-01T00:00:00.000Z', id: 1 }), 'utf8').toString(
+    'base64url',
+  )
 
-    const response = await app.request(`/organizations/1/members?${query}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+  test.each(['limit=0', 'cursor=invalid', 'offset=0', `cursor=${zeroYearCursor}`])(
+    'GET /organizations/:id/members?%s は所属ユーザーなら400を返す',
+    async (query) => {
+      findByUserAndOrganization.mockResolvedValue(membershipWithRole('MEMBER'))
+      const token = await createToken(1)
 
-    expect(response.status).toBe(400)
-    const body = (await response.json()) as { error?: { message?: string } }
-    expect(typeof body.error?.message).toBe('string')
-    expect(findPageByOrganization).not.toHaveBeenCalled()
-  })
+      const response = await app.request(`/organizations/1/members?${query}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      expect(response.status).toBe(400)
+      const body = (await response.json()) as { error?: { message?: string } }
+      expect(typeof body.error?.message).toBe('string')
+      expect(findPageByOrganization).not.toHaveBeenCalled()
+    },
+  )
 
   test('POST /organizations/:id/members はOWNERならADMINを追加できる', async () => {
     findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))

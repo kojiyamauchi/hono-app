@@ -170,7 +170,10 @@ export const MEMBER_LIST_CURSOR_VERSION = 1
 export const memberListCursorPayloadSchema = z.object({
   version: z.literal(MEMBER_LIST_CURSOR_VERSION),
   organizationId: z.number().int().positive(),
-  createdAt: z.iso.datetime(),
+  // `z.iso.datetime()` は4桁年を許容するため0年（`0000-01-01T00:00:00.000Z`）も通る。
+  // PostgreSQLに0年は存在せず、Dateとしてバインドすると `22008 date/time field value out of range` で
+  // 500になる。カーソルはクライアントが改変できる入力のため、DBへ渡す前にここで弾いて400にする。
+  createdAt: z.iso.datetime().refine((value) => new Date(value).getUTCFullYear() >= 1, { error: 'カーソルの日時が範囲外です' }),
   id: z.number().int().positive(),
 })
 

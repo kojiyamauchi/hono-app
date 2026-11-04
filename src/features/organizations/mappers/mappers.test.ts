@@ -42,6 +42,16 @@ describe('encodeMemberListCursor / decodeMemberListCursor', () => {
     expect(decodeMemberListCursor(toBase64Url(JSON.stringify({ ...validPayload, id: 0 })))).toBeNull()
   })
 
+  // z.iso.datetime() は0年を許容するが、PostgreSQLへバインドすると 22008 で500になるため
+  // デコード時点で弾き、400へ落とす（カーソルは改変できる入力である前提）。
+  test('PostgreSQLで扱えない0年の日時はnullを返す', () => {
+    expect(decodeMemberListCursor(toBase64Url(JSON.stringify({ ...validPayload, createdAt: '0000-01-01T00:00:00.000Z' })))).toBeNull()
+  })
+
+  test('1年以降の日時は受け付ける', () => {
+    expect(decodeMemberListCursor(toBase64Url(JSON.stringify({ ...validPayload, createdAt: '0001-01-01T00:00:00.000Z' })))).not.toBeNull()
+  })
+
   test('正しいペイロードはデコードできる', () => {
     expect(decodeMemberListCursor(toBase64Url(JSON.stringify(validPayload)))).toEqual({
       organizationId: 1,
