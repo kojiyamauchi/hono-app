@@ -46,8 +46,10 @@ model Membership {
   organization   Organization @relation(fields: [organizationId], references: [id])
 
   @@unique([userId, organizationId])
-  // 組織単位のメンバー一覧取得（参加日時順）と、組織削除時の一括削除を支援する
-  @@index([organizationId, createdAt])
+  // 組織単位のメンバー一覧取得（参加日時順）と、組織削除時の一括削除を支援する。
+  // カーソル式ページネーションの行値比較（("createdAt", id) > (...)）の境界条件をIndex Condへ入れるため、idまで含める。
+  // 2カラム構成ではFilterとIncremental Sortが残るため、末尾にidを足した形へ置き換えている（旧indexはprefixで冗長）。
+  @@index([organizationId, createdAt, id])
 }
 
 enum InvitationStatus {
