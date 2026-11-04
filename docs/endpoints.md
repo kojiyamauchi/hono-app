@@ -56,24 +56,26 @@ GCPのdev環境では、以下を含む全エンドポイントへのアクセ�
 
 ## Organizations
 
-| Method | Path                                    | 認証 | 概要                                                   |
-| ------ | --------------------------------------- | ---- | ------------------------------------------------------ |
-| POST   | `/organizations`                        | 必要 | 組織を作成する                                         |
-| GET    | `/organizations`                        | 必要 | 自分が所属する組織一覧を取得する                       |
-| GET    | `/organizations/:id`                    | 必要 | 所属している組織の詳細を取得する                       |
-| PATCH  | `/organizations/:id`                    | 必要 | OWNERまたはADMINが組織情報を更新する                   |
-| DELETE | `/organizations/:id`                    | 必要 | OWNERのみ、組織を削除する                              |
-| POST   | `/organizations/:id/transfer-ownership` | 必要 | OWNERが既存のADMINまたはMEMBERへ組織の所有権を移譲する |
+一覧APIのページネーション仕様・利用例・カーソル式とオフセット式の使い分けは [pagination.md](pagination.md) を参照してください。
+
+| Method | Path                                    | 認証 | 概要                                                                                                                        |
+| ------ | --------------------------------------- | ---- | --------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/organizations`                        | 必要 | 組織を作成する                                                                                                              |
+| GET    | `/organizations`                        | 必要 | 自分が所属する組織一覧をオフセット式ページネーションで取得する（`limit` / `offset`、詳細は [pagination.md](pagination.md)） |
+| GET    | `/organizations/:id`                    | 必要 | 所属している組織の詳細を取得する                                                                                            |
+| PATCH  | `/organizations/:id`                    | 必要 | OWNERまたはADMINが組織情報を更新する                                                                                        |
+| DELETE | `/organizations/:id`                    | 必要 | OWNERのみ、組織を削除する                                                                                                   |
+| POST   | `/organizations/:id/transfer-ownership` | 必要 | OWNERが既存のADMINまたはMEMBERへ組織の所有権を移譲する                                                                      |
 
 ## Organization Members
 
-| Method | Path                                       | 認証 | 概要                                            |
-| ------ | ------------------------------------------ | ---- | ----------------------------------------------- |
-| GET    | `/organizations/:id/members`               | 必要 | 所属している組織のメンバー一覧を取得する        |
-| POST   | `/organizations/:id/members`               | 必要 | OWNERまたはADMINがメンバーを追加する            |
-| DELETE | `/organizations/:id/members/me`            | 必要 | ADMINまたはMEMBERが自分自身を組織から脱退させる |
-| PATCH  | `/organizations/:id/members/:membershipId` | 必要 | OWNERまたはADMINがメンバーのロールを更新する    |
-| DELETE | `/organizations/:id/members/:membershipId` | 必要 | OWNERまたはADMINがメンバーを削除する            |
+| Method | Path                                       | 認証 | 概要                                                                                                                              |
+| ------ | ------------------------------------------ | ---- | --------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/organizations/:id/members`               | 必要 | 所属している組織のメンバー一覧をカーソル式ページネーションで取得する（`limit` / `cursor`、詳細は [pagination.md](pagination.md)） |
+| POST   | `/organizations/:id/members`               | 必要 | OWNERまたはADMINがメンバーを追加する                                                                                              |
+| DELETE | `/organizations/:id/members/me`            | 必要 | ADMINまたはMEMBERが自分自身を組織から脱退させる                                                                                   |
+| PATCH  | `/organizations/:id/members/:membershipId` | 必要 | OWNERまたはADMINがメンバーのロールを更新する                                                                                      |
+| DELETE | `/organizations/:id/members/:membershipId` | 必要 | OWNERまたはADMINがメンバーを削除する                                                                                              |
 
 ## Organization Invitations
 
