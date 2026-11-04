@@ -154,6 +154,7 @@ flowchart LR
 |-- Dockerfile                       # デプロイ用のBun実行コンテナ
 |-- docs/
 |   |-- endpoints.md                 # 公開API一覧
+|   |-- pagination.md                # 一覧APIのページネーション仕様
 |   `-- observability.md             # OpenTelemetry / New Relic運用手順
 |-- infra/
 |   |-- aws/                         # AWS用root（S3 state・環境別workspace）
@@ -389,6 +390,8 @@ make stop
 ## API
 
 公開エンドポイント一覧は [docs/endpoints.md](docs/endpoints.md) を参照してください。
+
+一覧APIのページネーション仕様、リクエスト／レスポンスの利用例、カーソル式とオフセット式の使い分けは [docs/pagination.md](docs/pagination.md) を参照してください。
 
 ### OpenAPI / Scalar
 

@@ -113,6 +113,80 @@ export const invitationRouteParamSchema = z.object({
     .openapi({ param: { name: 'invitationId', in: 'path' }, example: 1 }),
 })
 
+/**
+ * ページネーションの数値queryを `z.coerce.number()` へ渡す前の前処理。
+ * `Number('')` と `Number(' ')` と `Number(null)` はいずれも0になるため、
+ * 明示された空文字・空白・nullが既定値や0として通ってしまう（`offset=` が200で先頭ページになる）。
+ * 未指定（`undefined`）だけを `.default()` へ委ね、それ以外はNaNへ寄せて400にする。
+ */
+const rejectBlankNumericQuery = (value: unknown): unknown => (value === null || (typeof value === 'string' && value.trim() === '') ? Number.NaN : value)
+
+/** ページネーション共通のlimit。省略時20、1〜100の整数。 */
+const paginationLimitSchema = z.preprocess(
+  rejectBlankNumericQuery,
+  z.coerce.number().int('limitは整数で指定してください').min(1, 'limitは1以上で指定してください').max(100, 'limitは100以下で指定してください').default(20),
+)
+
+/**
+ * メンバー一覧（カーソル式）のqueryスキーマ。
+ * 未対応の `offset` を黙って無視せず400とするため、`looseObject` で未知キーを残してrefineで検出する。
+ * OpenAPIのquery parameterにはshapeに書いたキー（limit・cursor）だけが出力される。
+ */
+export const listMembersQuerySchema = z
+  .looseObject({
+    limit: paginationLimitSchema.openapi({ param: { name: 'limit', in: 'query', required: false }, example: 20 }),
+    cursor: z
+      .string()
+      .min(1, 'cursorは空文字では指定できません')
+      .optional()
+      .openapi({ param: { name: 'cursor', in: 'query', required: false } }),
+  })
+  .refine((value) => value.offset === undefined, {
+    error: 'メンバー一覧はカーソル式のため、offsetは指定できません',
+    path: ['offset'],
+  })
+
+/**
+ * 所属組織一覧（オフセット式）のqueryスキーマ。
+ * 未対応の `cursor` を黙って無視せず400とするため、`looseObject` で未知キーを残してrefineで検出する。
+ */
+export const listMineQuerySchema = z
+  .looseObject({
+    limit: paginationLimitSchema.openapi({ param: { name: 'limit', in: 'query', required: false }, example: 20 }),
+    offset: z
+      .preprocess(
+        rejectBlankNumericQuery,
+        z.coerce
+          .number()
+          .int('offsetは整数で指定してください')
+          .min(0, 'offsetは0以上で指定してください')
+          .max(10000, 'offsetは10000以下で指定してください')
+          .default(0),
+      )
+      .openapi({ param: { name: 'offset', in: 'query', required: false }, example: 0 }),
+  })
+  .refine((value) => value.cursor === undefined, {
+    error: '所属組織一覧はオフセット式のため、cursorは指定できません',
+    path: ['cursor'],
+  })
+
+/** メンバー一覧カーソルのペイロード形式のバージョン。形式を変える場合はここを上げ、旧カーソルを不正として扱う。 */
+export const MEMBER_LIST_CURSOR_VERSION = 1
+
+/**
+ * メンバー一覧カーソルのデコード後ペイロードのスキーマ。
+ * 受信値は信用せず、バージョン・対象組織・境界値の形式をここで検証する。
+ */
+export const memberListCursorPayloadSchema = z.object({
+  version: z.literal(MEMBER_LIST_CURSOR_VERSION),
+  organizationId: z.number().int().positive(),
+  // `z.iso.datetime()` は4桁年を許容するため0年（`0000-01-01T00:00:00.000Z`）も通る。
+  // PostgreSQLに0年は存在せず、Dateとしてバインドすると `22008 date/time field value out of range` で
+  // 500になる。カーソルはクライアントが改変できる入力のため、DBへ渡す前にここで弾いて400にする。
+  createdAt: z.iso.datetime().refine((value) => new Date(value).getUTCFullYear() >= 1, { error: 'カーソルの日時が範囲外です' }),
+  id: z.number().int().positive(),
+})
+
 export type CreateOrganizationSchemaType = z.infer<typeof createOrganizationSchema>
 export type UpdateOrganizationSchemaType = z.infer<typeof updateOrganizationSchema>
 export type OrganizationIdParamSchemaType = z.infer<typeof organizationIdParamSchema>
@@ -122,3 +196,6 @@ export type TransferOwnershipBodySchemaType = z.infer<typeof transferOwnershipBo
 export type MemberRouteParamSchemaType = z.infer<typeof memberRouteParamSchema>
 export type CreateInvitationBodySchemaType = z.infer<typeof createInvitationBodySchema>
 export type InvitationRouteParamSchemaType = z.infer<typeof invitationRouteParamSchema>
+export type ListMembersQuerySchemaType = z.infer<typeof listMembersQuerySchema>
+export type ListMineQuerySchemaType = z.infer<typeof listMineQuerySchema>
+export type MemberListCursorPayloadSchemaType = z.infer<typeof memberListCursorPayloadSchema>

@@ -5,10 +5,13 @@ import type { MemberDtoType } from '@/shared/membership/dtos'
 import type { Role } from '@/shared/membership/entities'
 import type { OrganizationDtoType } from '@/shared/organization/dtos'
 
+import type { MemberListDtoType, OrganizationListDtoType } from '../dtos'
 import type {
   AddMemberBodySchemaType,
   CreateInvitationBodySchemaType,
   CreateOrganizationSchemaType,
+  ListMembersQuerySchemaType,
+  ListMineQuerySchemaType,
   TransferOwnershipBodySchemaType,
   UpdateMemberRoleBodySchemaType,
   UpdateOrganizationSchemaType,
@@ -31,10 +34,10 @@ export const organizationsController = {
   },
 
   /**
-   * 認証済みユーザーが所属する組織の一覧を返す。
+   * 認証済みユーザーが所属する組織の一覧を、検証済みqueryのlimit・offsetで1ページ分返す。
    */
-  listMine: async (c: Context, userId: number): Promise<TypedResponse<OrganizationDtoType[], 200, 'json'>> => {
-    const result = await organizationsService.listMine(userId)
+  listMine: async (c: Context, userId: number, query: ListMineQuerySchemaType): Promise<TypedResponse<OrganizationListDtoType, 200, 'json'>> => {
+    const result = await organizationsService.listMine(userId, query.limit, query.offset)
     return c.json(result, 200)
   },
 
@@ -95,10 +98,10 @@ export const organizationsMembersController = {
   },
 
   /**
-   * 組織のメンバー一覧を返す。
+   * 組織のメンバー一覧を、検証済みqueryのlimit・cursorで1ページ分返す。
    */
-  listMembers: async (c: Context, organizationId: number): Promise<TypedResponse<MemberDtoType[], 200, 'json'>> => {
-    const result = await organizationsService.listMembers(organizationId)
+  listMembers: async (c: Context, organizationId: number, query: ListMembersQuerySchemaType): Promise<TypedResponse<MemberListDtoType, 200, 'json'>> => {
+    const result = await organizationsService.listMembers(organizationId, query.limit, query.cursor)
     return c.json(result, 200)
   },
 

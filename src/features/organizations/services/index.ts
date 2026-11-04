@@ -4,13 +4,15 @@ import { invitationRepository } from '@/shared/invitation/repositories'
 import type { MemberDtoType } from '@/shared/membership/dtos'
 import type { Role } from '@/shared/membership/entities'
 import { toMemberResponse } from '@/shared/membership/mappers'
-import { membershipRepository } from '@/shared/membership/repositories'
+import { type MembershipPageBoundary, membershipRepository } from '@/shared/membership/repositories'
 import type { OrganizationDtoType } from '@/shared/organization/dtos'
 import { toOrganizationResponse } from '@/shared/organization/mappers'
 import { organizationRepository } from '@/shared/organization/repositories'
 import { userRepository } from '@/shared/user/repositories'
 import { AppError } from '@/utils/errors'
 
+import type { MemberListDtoType, OrganizationListDtoType } from '../dtos'
+import { decodeMemberListCursor, encodeMemberListCursor, toMemberListResponse, toOrganizationListResponse } from '../mappers'
 import { leaveOrganizationResults, organizationMembershipRepository, organizationOwnershipRepository, ownershipTransferResults } from '../repositories'
 import type {
   AddMemberBodySchemaType,
@@ -34,11 +36,13 @@ export const organizationsService = {
   },
 
   /**
-   * 認証済みユーザーが所属する組織の一覧を返す。
+   * 認証済みユーザーが所属する組織の一覧をオフセット式で1ページ分返す。
+   * 次ページの有無は `limit + 1` 件の取得で判定し、レスポンスのitemsは `limit` 件以下にする。
    */
-  listMine: async (userId: number): Promise<OrganizationDtoType[]> => {
-    const organizations = await organizationRepository.findByUserId(userId)
-    return organizations.map(toOrganizationResponse)
+  listMine: async (userId: number, limit: number, offset: number): Promise<OrganizationListDtoType> => {
+    const organizations = await organizationRepository.findPageByUserId(userId, limit + 1, offset)
+    const hasNext = organizations.length > limit
+    return toOrganizationListResponse(organizations.slice(0, limit), limit, offset, hasNext)
   },
 
   /**
@@ -118,11 +122,29 @@ export const organizationsService = {
   },
 
   /**
-   * 組織のメンバー一覧を返す。MEMBER以上であれば閲覧可（ミドルウェアで確認済み）。
+   * 組織のメンバー一覧をカーソル式で1ページ分返す。MEMBER以上であれば閲覧可（ミドルウェアで確認済み）。
+   * カーソルは境界値としてのみ使い、基準行が削除されても続きが取得できる（行の存在に依存しない）。
+   * 次ページの有無は `limit + 1` 件の取得で判定し、レスポンスのitemsは `limit` 件以下にする。
+   * 形式が不正なカーソルと、別組織で発行されたカーソルはどちらも400とする。
    */
-  listMembers: async (organizationId: number): Promise<MemberDtoType[]> => {
-    const memberships = await membershipRepository.findAllByOrganization(organizationId)
-    return memberships.map(toMemberResponse)
+  listMembers: async (organizationId: number, limit: number, cursor?: string): Promise<MemberListDtoType> => {
+    let boundary: MembershipPageBoundary | null = null
+    if (cursor !== undefined) {
+      const decoded = decodeMemberListCursor(cursor)
+      if (decoded === null || decoded.organizationId !== organizationId) {
+        throw new AppError(400, 'カーソルが不正です')
+      }
+      boundary = { createdAt: decoded.createdAt, id: decoded.id }
+    }
+
+    // 認可はカーソル内の組織情報ではなく、引数で渡された認可済みのorganizationIdで毎回適用する
+    const memberships = await membershipRepository.findPageByOrganization(organizationId, limit + 1, boundary)
+    const items = memberships.slice(0, limit)
+    const last = items.at(-1)
+    const nextCursor =
+      memberships.length > limit && last !== undefined ? encodeMemberListCursor({ organizationId, createdAt: last.createdAt, id: last.id }) : null
+
+    return toMemberListResponse(items, nextCursor)
   },
 
   /**

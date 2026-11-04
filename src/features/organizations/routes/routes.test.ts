@@ -9,13 +9,13 @@ import type { User } from '@/shared/user/entities'
 process.env.JWT_SECRET = 'test-secret'
 
 const createWithOwner = mock()
-const findByUserId = mock()
+const findPageByUserId = mock()
 const findById = mock()
 const update = mock()
 const deleteById = mock()
 
 const findByUserAndOrganization = mock()
-const findAllByOrganization = mock()
+const findPageByOrganization = mock()
 const membershipFindById = mock()
 const membershipCreate = mock()
 const updateRole = mock()
@@ -51,12 +51,12 @@ await mock.module('@/features/organizations/repositories', () => ({
 }))
 
 await mock.module('@/shared/organization/repositories', () => ({
-  organizationRepository: { createWithOwner, findByUserId, findById, update, deleteById },
+  organizationRepository: { createWithOwner, findPageByUserId, findById, update, deleteById },
 }))
 await mock.module('@/shared/membership/repositories', () => ({
   membershipRepository: {
     findByUserAndOrganization,
-    findAllByOrganization,
+    findPageByOrganization,
     findById: membershipFindById,
     create: membershipCreate,
     updateRole,
@@ -120,12 +120,12 @@ describe('organizations routes', () => {
     existsById.mockReset()
     existsById.mockResolvedValue(true)
     createWithOwner.mockReset()
-    findByUserId.mockReset()
+    findPageByUserId.mockReset()
     findById.mockReset()
     update.mockReset()
     deleteById.mockReset()
     findByUserAndOrganization.mockReset()
-    findAllByOrganization.mockReset()
+    findPageByOrganization.mockReset()
     membershipFindById.mockReset()
     membershipCreate.mockReset()
     updateRole.mockReset()
@@ -155,8 +155,8 @@ describe('organizations routes', () => {
     expect(body.name).toBe('Acme')
   })
 
-  test('GET /organizations は所属組織一覧を返す', async () => {
-    findByUserId.mockResolvedValue([organization])
+  test('GET /organizations は所属組織一覧をページ情報つきで返す', async () => {
+    findPageByUserId.mockResolvedValue([organization])
     const token = await createToken(1)
 
     const response = await app.request('/organizations', {
@@ -164,8 +164,43 @@ describe('organizations routes', () => {
     })
 
     expect(response.status).toBe(200)
-    const body = (await response.json()) as unknown[]
-    expect(body).toHaveLength(1)
+    const body = (await response.json()) as { items: unknown[]; limit: number; offset: number; hasNext: boolean }
+    expect(body.items).toHaveLength(1)
+    // query未指定でも既定のlimit・offsetで先頭ページを返す
+    expect(body).toMatchObject({ limit: 20, offset: 0, hasNext: false })
+    expect(findPageByUserId).toHaveBeenCalledWith(1, 21, 0)
+  })
+
+  test('GET /organizations はlimit・offsetをqueryから受け取る', async () => {
+    findPageByUserId.mockResolvedValue([])
+    const token = await createToken(1)
+
+    const response = await app.request('/organizations?limit=5&offset=10', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(response.status).toBe(200)
+    expect(findPageByUserId).toHaveBeenCalledWith(1, 6, 10)
+  })
+
+  test.each(['limit=0', 'offset=abc', 'cursor=abc', 'offset=', 'limit=', 'offset=%20'])('GET /organizations?%s は400を返す', async (query) => {
+    const token = await createToken(1)
+
+    const response = await app.request(`/organizations?${query}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(response.status).toBe(400)
+    const body = (await response.json()) as { error?: { message?: string } }
+    expect(typeof body.error?.message).toBe('string')
+    expect(findPageByUserId).not.toHaveBeenCalled()
+  })
+
+  // route.middleware は query検証より先に走るため、不正queryでも認証エラーが優先される。
+  test('GET /organizations?limit=0 はトークンがなければ401を返す', async () => {
+    const response = await app.request('/organizations?limit=0')
+
+    expect(response.status).toBe(401)
   })
 
   test('GET /organizations/:id はメンバーなら200を返す', async () => {
@@ -369,10 +404,10 @@ describe('organizations routes', () => {
     expect(findByUserAndOrganization).not.toHaveBeenCalled()
   })
 
-  test('GET /organizations/:id/members は不正なID形式なら400を返す', async () => {
+  test('GET /organizations/:id/members は不正なID形式なら（不正queryがあっても）400を返す', async () => {
     const token = await createToken(1)
 
-    const response = await app.request('/organizations/not-number/members', {
+    const response = await app.request('/organizations/not-number/members?limit=0', {
       headers: { Authorization: `Bearer ${token}` },
     })
 
@@ -440,7 +475,7 @@ describe('organizations routes', () => {
 
   test('GET /organizations/:id/members はMEMBERなら200を返す', async () => {
     findByUserAndOrganization.mockResolvedValue(membershipWithRole('MEMBER'))
-    findAllByOrganization.mockResolvedValue([targetMembership('MEMBER')])
+    findPageByOrganization.mockResolvedValue([targetMembership('MEMBER')])
     const token = await createToken(1)
 
     const response = await app.request('/organizations/1/members', {
@@ -448,8 +483,33 @@ describe('organizations routes', () => {
     })
 
     expect(response.status).toBe(200)
-    const body = (await response.json()) as unknown[]
-    expect(body).toHaveLength(1)
+    const body = (await response.json()) as { items: unknown[]; nextCursor: string | null }
+    expect(body.items).toHaveLength(1)
+    expect(body.nextCursor).toBeNull()
+    expect(findPageByOrganization).toHaveBeenCalledWith(1, 21, null)
+  })
+
+  test('GET /organizations/:id/members は次ページがあればnextCursorを返し、そのカーソルで続きを取得できる', async () => {
+    findByUserAndOrganization.mockResolvedValue(membershipWithRole('MEMBER'))
+    findPageByOrganization.mockResolvedValueOnce([targetMembership('MEMBER'), { ...targetMembership('MEMBER'), id: 11 }])
+    const token = await createToken(1)
+
+    const first = await app.request('/organizations/1/members?limit=1', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(first.status).toBe(200)
+    const firstBody = (await first.json()) as { items: unknown[]; nextCursor: string | null }
+    expect(firstBody.items).toHaveLength(1)
+    expect(firstBody.nextCursor).not.toBeNull()
+
+    findPageByOrganization.mockResolvedValueOnce([])
+    const second = await app.request(`/organizations/1/members?limit=1&cursor=${firstBody.nextCursor}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(second.status).toBe(200)
+    expect(findPageByOrganization).toHaveBeenLastCalledWith(1, 2, { createdAt: new Date('2026-01-01T00:00:00.000Z'), id: 10 })
   })
 
   test('GET /organizations/:id/members は非メンバーなら404を返す', async () => {
@@ -462,6 +522,41 @@ describe('organizations routes', () => {
 
     expect(response.status).toBe(404)
   })
+
+  // route.middleware は query検証より先に走るため、不正queryでも所属確認（404）が優先される。
+  test('GET /organizations/:id/members?limit=0 は非メンバーなら404を返す', async () => {
+    findByUserAndOrganization.mockResolvedValue(null)
+    const token = await createToken(1)
+
+    const response = await app.request('/organizations/1/members?limit=0', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(response.status).toBe(404)
+    expect(findPageByOrganization).not.toHaveBeenCalled()
+  })
+
+  // 0年の日時を含むカーソルはPostgreSQLへバインドできないため、DBへ到達する前に400で止める。
+  const zeroYearCursor = Buffer.from(JSON.stringify({ version: 1, organizationId: 1, createdAt: '0000-01-01T00:00:00.000Z', id: 1 }), 'utf8').toString(
+    'base64url',
+  )
+
+  test.each(['limit=0', 'cursor=invalid', 'offset=0', `cursor=${zeroYearCursor}`])(
+    'GET /organizations/:id/members?%s は所属ユーザーなら400を返す',
+    async (query) => {
+      findByUserAndOrganization.mockResolvedValue(membershipWithRole('MEMBER'))
+      const token = await createToken(1)
+
+      const response = await app.request(`/organizations/1/members?${query}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      expect(response.status).toBe(400)
+      const body = (await response.json()) as { error?: { message?: string } }
+      expect(typeof body.error?.message).toBe('string')
+      expect(findPageByOrganization).not.toHaveBeenCalled()
+    },
+  )
 
   test('POST /organizations/:id/members はOWNERならADMINを追加できる', async () => {
     findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))

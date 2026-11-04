@@ -5,6 +5,7 @@ import type { Organization } from '@/shared/organization/entities'
 const queryRaw = mock()
 const organizationCreate = mock()
 const membershipCreate = mock()
+const organizationFindMany = mock()
 const transaction = mock(async (callback: (tx: unknown) => Promise<unknown>) =>
   callback({
     $queryRaw: queryRaw,
@@ -14,7 +15,7 @@ const transaction = mock(async (callback: (tx: unknown) => Promise<unknown>) =>
 )
 
 await mock.module('@/libs/prisma', () => ({
-  prisma: { $transaction: transaction },
+  prisma: { $transaction: transaction, organization: { findMany: organizationFindMany } },
 }))
 
 const { organizationRepository } = await import('.')
@@ -64,5 +65,25 @@ describe('organizationRepository.createWithOwner', () => {
 
     expect(organizationCreate).not.toHaveBeenCalled()
     expect(membershipCreate).not.toHaveBeenCalled()
+  })
+})
+
+describe('organizationRepository.findPageByUserId', () => {
+  beforeEach(() => {
+    organizationFindMany.mockReset()
+  })
+
+  test('所属条件・ID昇順・skip・takeをPrismaへ渡し、結果をそのまま返す', async () => {
+    organizationFindMany.mockResolvedValue([organization])
+
+    const result = await organizationRepository.findPageByUserId(10, 21, 40)
+
+    expect(result).toEqual([organization])
+    expect(organizationFindMany).toHaveBeenCalledWith({
+      where: { memberships: { some: { userId: 10 } } },
+      orderBy: { id: 'asc' },
+      skip: 40,
+      take: 21,
+    })
   })
 })
