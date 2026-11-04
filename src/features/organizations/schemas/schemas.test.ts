@@ -5,6 +5,8 @@ import {
   createInvitationBodySchema,
   createOrganizationSchema,
   invitationRouteParamSchema,
+  listMembersQuerySchema,
+  listMineQuerySchema,
   memberRouteParamSchema,
   organizationIdParamSchema,
   transferOwnershipBodySchema,
@@ -176,5 +178,81 @@ describe('invitationRouteParamSchema', () => {
 
   test('数値ではないinvitationIdを拒否する', () => {
     expect(invitationRouteParamSchema.safeParse({ id: '1', invitationId: 'abc' }).success).toBe(false)
+  })
+})
+
+describe('listMembersQuerySchema', () => {
+  test('query未指定ならlimitは20になり、cursorは未指定のままになる', () => {
+    const result = listMembersQuerySchema.safeParse({})
+
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.limit).toBe(20)
+      expect(result.data.cursor).toBeUndefined()
+    }
+  })
+
+  test('limitとcursorを受け付け、limitを数値へ変換する', () => {
+    const result = listMembersQuerySchema.safeParse({ limit: '50', cursor: 'abc' })
+
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.limit).toBe(50)
+      expect(result.data.cursor).toBe('abc')
+    }
+  })
+
+  test.each(['1', '100'])('limitの境界値%sを受け付ける', (limit) => {
+    expect(listMembersQuerySchema.safeParse({ limit }).success).toBe(true)
+  })
+
+  test.each(['0', '101', 'abc', '', '1.5', '-1'])('不正なlimit(%p)を拒否する', (limit) => {
+    expect(listMembersQuerySchema.safeParse({ limit }).success).toBe(false)
+  })
+
+  test('空文字のcursorを拒否する', () => {
+    expect(listMembersQuerySchema.safeParse({ cursor: '' }).success).toBe(false)
+  })
+
+  test('未対応のoffset指定を拒否する', () => {
+    expect(listMembersQuerySchema.safeParse({ offset: '0' }).success).toBe(false)
+  })
+})
+
+describe('listMineQuerySchema', () => {
+  test('query未指定ならlimitは20、offsetは0になる', () => {
+    const result = listMineQuerySchema.safeParse({})
+
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.limit).toBe(20)
+      expect(result.data.offset).toBe(0)
+    }
+  })
+
+  test('limitとoffsetを数値へ変換する', () => {
+    const result = listMineQuerySchema.safeParse({ limit: '5', offset: '10' })
+
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.limit).toBe(5)
+      expect(result.data.offset).toBe(10)
+    }
+  })
+
+  test.each(['0', '10000'])('offsetの境界値%sを受け付ける', (offset) => {
+    expect(listMineQuerySchema.safeParse({ offset }).success).toBe(true)
+  })
+
+  test.each(['10001', '-1', 'abc', '1.5'])('不正なoffset(%p)を拒否する', (offset) => {
+    expect(listMineQuerySchema.safeParse({ offset }).success).toBe(false)
+  })
+
+  test.each(['0', '101', 'abc', ''])('不正なlimit(%p)を拒否する', (limit) => {
+    expect(listMineQuerySchema.safeParse({ limit }).success).toBe(false)
+  })
+
+  test('未対応のcursor指定を拒否する', () => {
+    expect(listMineQuerySchema.safeParse({ cursor: 'abc' }).success).toBe(false)
   })
 })
