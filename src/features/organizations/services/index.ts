@@ -11,8 +11,8 @@ import { organizationRepository } from '@/shared/organization/repositories'
 import { userRepository } from '@/shared/user/repositories'
 import { AppError } from '@/utils/errors'
 
-import type { MemberListDtoType } from '../dtos'
-import { decodeMemberListCursor, encodeMemberListCursor, toMemberListResponse } from '../mappers'
+import type { MemberListDtoType, OrganizationListDtoType } from '../dtos'
+import { decodeMemberListCursor, encodeMemberListCursor, toMemberListResponse, toOrganizationListResponse } from '../mappers'
 import { leaveOrganizationResults, organizationMembershipRepository, organizationOwnershipRepository, ownershipTransferResults } from '../repositories'
 import type {
   AddMemberBodySchemaType,
@@ -36,11 +36,13 @@ export const organizationsService = {
   },
 
   /**
-   * 認証済みユーザーが所属する組織の一覧を返す。
+   * 認証済みユーザーが所属する組織の一覧をオフセット式で1ページ分返す。
+   * 次ページの有無は `limit + 1` 件の取得で判定し、レスポンスのitemsは `limit` 件以下にする。
    */
-  listMine: async (userId: number): Promise<OrganizationDtoType[]> => {
-    const organizations = await organizationRepository.findByUserId(userId)
-    return organizations.map(toOrganizationResponse)
+  listMine: async (userId: number, limit: number, offset: number): Promise<OrganizationListDtoType> => {
+    const organizations = await organizationRepository.findPageByUserId(userId, limit + 1, offset)
+    const hasNext = organizations.length > limit
+    return toOrganizationListResponse(organizations.slice(0, limit), limit, offset, hasNext)
   },
 
   /**
