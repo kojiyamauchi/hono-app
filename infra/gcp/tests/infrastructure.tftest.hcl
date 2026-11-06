@@ -1,6 +1,7 @@
 # GCPへの認証・API呼び出し・リソース作成なしで構成を検証する。
 mock_provider "google" {
   mock_resource "google_service_account" {
+    override_during = plan
     defaults = {
       email = "hono-app-dev-runtime@test-project.iam.gserviceaccount.com"
     }
@@ -55,8 +56,14 @@ run "bootstrap_without_service" {
     error_message = "初回は前提リソースだけを用意し、未準備のAPIを起動・公開してはいけません。"
   }
   assert {
-    condition     = length(google_secret_manager_secret.app) == 6 && length(google_secret_manager_secret_iam_member.runtime) == 6
-    error_message = "対象の6シークレットだけに読み取り権限を付ける必要があります。"
+    condition = (
+      length(google_secret_manager_secret.app) == 7 &&
+      length(google_secret_manager_secret_iam_member.runtime) == 7 &&
+      google_secret_manager_secret.app["OTEL_EXPORTER_OTLP_TRACES_HEADERS"].secret_id == "hono-app-dev-otel-exporter-otlp-traces-headers" &&
+      google_secret_manager_secret_iam_member.runtime["OTEL_EXPORTER_OTLP_TRACES_HEADERS"].role == "roles/secretmanager.secretAccessor" &&
+      google_secret_manager_secret_iam_member.runtime["OTEL_EXPORTER_OTLP_TRACES_HEADERS"].member == "serviceAccount:hono-app-dev-runtime@test-project.iam.gserviceaccount.com"
+    )
+    error_message = "devではOTLPヘッダー用の入れ物と実行用SAの参照権限も先に用意する必要があります。"
   }
   assert {
     condition     = alltrue([for api in google_project_service.required : !api.disable_on_destroy])
@@ -136,10 +143,12 @@ run "private_low_usage_service" {
     error_message = "Secure CookieとdevのScalarを有効化し、外部trace送信を無効にする必要があります。"
   }
   assert {
-    condition = length([for env in google_cloud_run_v2_service.app[0].template[0].containers[0].env : env
-      if length(env.value_source) > 0
-    ]) == 6
-    error_message = "6種類の機密値を環境変数の平文ではなくSecret Manager参照で渡す必要があります。"
+    condition = (
+      toset([for env in google_cloud_run_v2_service.app[0].template[0].containers[0].env : env.name if length(env.value_source) > 0]) == toset(keys(var.secret_versions)) &&
+      alltrue([for env in google_cloud_run_v2_service.app[0].template[0].containers[0].env : !startswith(env.name, "OTEL_")
+      if !contains(["OTEL_TRACES_ENABLED", "OTEL_SDK_DISABLED"], env.name)])
+    )
+    error_message = "OTLP無効時は既存6種類のSecret Manager参照だけを注入し、送信用設定を追加してはいけません。"
   }
   assert {
     condition     = endswith(google_cloud_run_v2_service.app[0].template[0].containers[0].image, "@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
