@@ -212,7 +212,7 @@ bun run tf:gcp:plan -var-file=env/dev.local.tfvars -out=bootstrap.tfplan
 bun run tf:gcp:apply bootstrap.tfplan
 ```
 
-planにCloud Runサービスが含まれず、API・リポジトリ・6つのシークレット・実行用サービスアカウントとシークレット権限だけが含まれることを確認します。シークレットの値はまだ登録されません。backendなしで初期化済みの場合も、実環境では必ず上記の `tf:gcp:init` を実行します。
+planにCloud Runサービスが含まれず、API・リポジトリ・7つのシークレットの入れ物（既存6用途とOTLPヘッダー用）・実行用サービスアカウントとシークレット参照権限が含まれることを確認します。シークレットの値はまだ登録されません。backendなしで初期化済みの場合も、実環境では必ず上記の `tf:gcp:init` を実行します。
 
 ### 2. Supabaseと機密値を準備する
 
