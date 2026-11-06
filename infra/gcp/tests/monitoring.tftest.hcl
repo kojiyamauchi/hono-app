@@ -76,3 +76,11 @@ run "reject_email_as_channel" {
   }
   expect_failures = [var.alert_notification_channel]
 }
+
+run "reject_placeholder_channel" {
+  command = plan
+  variables {
+    alert_notification_channel = "projects/REPLACE_ME/notificationChannels/REPLACE_ME"
+  }
+  expect_failures = [var.alert_notification_channel]
+}
