@@ -51,7 +51,7 @@ Cloud Runは最小0・最大1インスタンス、1 vCPU / 512 MiB、リクエ�
 
 Cloud Monitoringで、dev環境のCloud Runが返したHTTP 5xxの増加をメール通知します。対象は `hono-app-dev` が返した応答だけです。IAPが未認証リクエストを拒否した場合やサービスへ到達できない場合はCloud Runの `request_count` に現れないため、このアラートの対象外です。
 
-通知チャネル（メール）はGCP Consoleで作成・管理し、Terraformはチャネルのリソース名だけを参照します。`infra/gcp/env/dev.cd.tfvars.json` の `alert_notification_channel` に `projects/<プロジェクトID>/notificationChannels/<チャネルID>` を記載し、メールアドレスはリポジトリとTerraform stateへ載せません。この入力を省略した構成では、通知先のないアラートポリシーを作りません。
+通知チャネル（メール）はGCP Consoleで作成・管理し、Terraformはチャネルのリソース名だけを参照します。`infra/gcp/env/dev.cd.tfvars.json` の `alert_notification_channel` に `projects/<プロジェクトID>/notificationChannels/<チャネルID>` を記載し、メールアドレスはリポジトリとTerraform stateへ載せません。この入力を省略した構成では、通知先のないアラートポリシーを作りません。差し替え前のプレースホルダ（`REPLACE_ME` を含む値）は入力検証で拒否するため、チャネルを作成してリソース名を記載するまでplanは通りません。
 
 ### 初期条件としきい値の考え方
 
