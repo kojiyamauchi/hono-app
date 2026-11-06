@@ -48,10 +48,17 @@ run "server_error_alert_scoped_to_service" {
   assert {
     condition = (
       google_monitoring_alert_policy.server_errors[0].conditions[0].condition_threshold[0].comparison == "COMPARISON_GT" &&
-      google_monitoring_alert_policy.server_errors[0].conditions[0].condition_threshold[0].threshold_value > 0 &&
-      google_monitoring_alert_policy.server_errors[0].conditions[0].condition_threshold[0].evaluation_missing_data == "EVALUATION_MISSING_DATA_INACTIVE"
+      google_monitoring_alert_policy.server_errors[0].conditions[0].condition_threshold[0].threshold_value > 0
     )
-    error_message = "単発の5xxで発報せず、リクエストがない時間帯の欠損でも発報しない設定が必要です。"
+    error_message = "単発の5xxで発報しないしきい値が必要です。"
+  }
+  # 欠損データの扱いは60秒以上のdurationでのみ有効になるため、設定文字列だけでなく組み合わせを検証する。
+  assert {
+    condition = (
+      google_monitoring_alert_policy.server_errors[0].conditions[0].condition_threshold[0].evaluation_missing_data == "EVALUATION_MISSING_DATA_INACTIVE" &&
+      tonumber(trimsuffix(google_monitoring_alert_policy.server_errors[0].conditions[0].condition_threshold[0].duration, "s")) >= 60
+    )
+    error_message = "リクエストがない時間帯の欠損で発報・継続しない設定が必要です。欠損データの扱いは60秒以上のdurationでのみ有効です。"
   }
   assert {
     condition = (
