@@ -122,9 +122,10 @@ variable "alert_notification_channel" {
   description = "Consoleで管理するメール通知チャネルのリソース名。未指定時はアラートポリシーを作成しない。メールアドレスはこの入力とstateへ含めない"
 
   validation {
-    condition = var.alert_notification_channel == null ? true : can(
-      regex("^projects/[A-Za-z0-9_-]+/notificationChannels/[A-Za-z0-9_-]+$", var.alert_notification_channel)
+    condition = var.alert_notification_channel == null ? true : (
+      can(regex("^projects/[A-Za-z0-9_-]+/notificationChannels/[A-Za-z0-9_-]+$", var.alert_notification_channel)) &&
+      !strcontains(var.alert_notification_channel, "REPLACE_ME")
     )
-    error_message = "projects/<プロジェクトID>/notificationChannels/<チャネルID>の形式で指定してください。メールアドレスは指定しません。"
+    error_message = "projects/<プロジェクトID>/notificationChannels/<チャネルID>の形式で、Consoleで作成済みのチャネルを指定してください。メールアドレスと差し替え前のプレースホルダは使用できません。"
   }
 }
