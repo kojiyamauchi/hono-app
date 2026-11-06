@@ -11,6 +11,8 @@ locals {
     "secretmanager.secrets.get", "secretmanager.secrets.getIamPolicy",
     "serviceusage.services.get", "serviceusage.services.list", "storage.buckets.getIamPolicy",
     "run.operations.get",
+    # 監視リソース追加後も配備用SAが全体planをrefreshできるよう、アラートポリシーの参照だけを許可する。
+    "monitoring.alertPolicies.get",
   ]
 }
 

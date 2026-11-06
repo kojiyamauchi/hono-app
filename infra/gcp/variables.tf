@@ -115,3 +115,17 @@ variable "invoker_members" {
     error_message = "user:メールアドレス、group:メールアドレス、serviceAccount:メールアドレスで指定してください。不特定多数への公開は許可しません。"
   }
 }
+
+variable "alert_notification_channel" {
+  type        = string
+  default     = null
+  description = "Consoleで管理するメール通知チャネルのリソース名。未指定時はアラートポリシーを作成しない。メールアドレスはこの入力とstateへ含めない"
+
+  validation {
+    condition = var.alert_notification_channel == null ? true : (
+      can(regex("^projects/[A-Za-z0-9_-]+/notificationChannels/[A-Za-z0-9_-]+$", var.alert_notification_channel)) &&
+      !strcontains(var.alert_notification_channel, "REPLACE_ME")
+    )
+    error_message = "projects/<プロジェクトID>/notificationChannels/<チャネルID>の形式で、Consoleで作成済みのチャネルを指定してください。メールアドレスと差し替え前のプレースホルダは使用できません。"
+  }
+}

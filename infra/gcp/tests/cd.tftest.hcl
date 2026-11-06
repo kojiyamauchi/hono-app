@@ -82,6 +82,8 @@ run "cd_scoped_to_main_and_dev" {
       ]) &&
       contains(google_project_iam_custom_role.cd_read[0].permissions, "run.operations.get") &&
       contains(google_project_iam_custom_role.cd_read[0].permissions, "iam.workloadIdentityPools.getAttestationRules") &&
+      contains(google_project_iam_custom_role.cd_read[0].permissions, "monitoring.alertPolicies.get") &&
+      !contains(google_project_iam_custom_role.cd_read[0].permissions, "monitoring.alertPolicies.create") &&
       !contains(google_project_iam_custom_role.cd_read[0].permissions, "iam.workloadIdentityPools.setAttestationRules") &&
       alltrue([for permission in google_project_iam_custom_role.cd_read[0].permissions :
         !strcontains(permission, "setIamPolicy") && !strcontains(permission, "access") && !strcontains(permission, "update")

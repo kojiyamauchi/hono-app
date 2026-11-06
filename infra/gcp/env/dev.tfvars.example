@@ -6,6 +6,7 @@ region     = "asia-northeast1"
 # app_image_digest = "sha256:登録済みイメージの64桁ダイジェスト"
 # invoker_members = ["user:you@example.com"]
 # enable_api_docs = true # dev環境でIAPの内側にScalarを公開する。
+# alert_notification_channel = "projects/your-gcp-project-id/notificationChannels/Consoleで作成した通知チャネルの数値ID" # 5xxアラートの通知先。
 # app_environment = {
 #   SUPABASE_URL                  = "https://your-project.supabase.co"
 #   SUPABASE_PUBLISHABLE_KEY      = "sb_publishable_対象プロジェクトの公開キー"

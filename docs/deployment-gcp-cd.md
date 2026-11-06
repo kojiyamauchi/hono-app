@@ -137,7 +137,33 @@ terraform -chdir=infra/gcp providers lock -platform=darwin_arm64 -platform=linux
 - CI・ビルド・plan検査・migrationが失敗した場合はCloud Runを更新しません。migration途中の障害はDB状態を確認し、`resolve` やresetを自動実行しません。
 - applyや配備後検証の失敗では新revisionがすでに配信中の場合があります。自動で成功扱いにせず、保護タグを維持して停止します。
 - 復旧は、配備サマリーに記録した直前digestと現行設定からplanを作り、内容を確認して適用します。DBは戻らないため、通常CDへ載せるmigrationは旧アプリと後方互換を保つことが前提です。破壊的変更は段階的に分けるか個別手順へ切り出します。
-- CDを一時停止する場合は `GCP_DEV_CD_ENABLED=false` とします。実行中のmigration・applyを強制停止する操作ではありません。インフラ手動変更も実行中CDと重ねません。
+- CDを一時停止する場合は `GCP_DEV_CD_ENABLED=false` とします。実行中のmigration・applyを強制停止する操作ではありません。インフラ手動変更も実行中CDと重ねません。手順は[インフラ変更の手動適用](#インフラ変更の手動適用)に従います。
+
+## インフラ変更の手動適用
+
+通常CDが自動適用するのは既存Cloud Runのイメージ差し替えだけです。監視リソース・IAM・環境変数・Secret参照などの差分を含む変更は、PRでレビューしたうえで1件ずつ手動適用します。複数のインフラ変更を同時に適用せず、1件ごとに次の手順を最後まで通します。配備ジョブの一時停止から通常CDの成功確認までを一連の作業として扱い、この適用ウィンドウ中は対象外の通常PRのマージも重ねません。再開後の最初のCDが複数コミットをまとめて配備すると、インフラ適用の検証と切り分けられなくなるためです。
+
+1. マージ前に配備ジョブを一時停止し（repository variable `GCP_DEV_CD_ENABLED=false`）、実行中の配備ジョブが終了したことを確認します。その後に対象の変更をmainへマージします。
+2. マージ済みmainで対象プロジェクトと、Git管理外の `infra/gcp/env/backend.local.hcl` の接続先を確認します。リポジトリルートから `bun run tf:gcp:init` でGCS backendを初期化し、`bun run tf:gcp:workspace:dev` でdev workspaceを選びます。`terraform -chdir=infra/gcp workspace show` の出力が `dev` であることを確認し、現在のReady revisionのdigestを取得します。
+3. `<現在のdigest>` を取得した `sha256:...` に、`<保存先の絶対パス>` をGit管理外のplanファイルパスへ置き換えて、リポジトリルートで全体planを作ります。`bun run tf:gcp:plan` / `tf:gcp:apply` は変数を渡さないため、そのままでは使いません。
+
+   ```bash
+   TF_WORKSPACE=dev terraform -chdir=infra/gcp plan \
+     -var-file=env/dev.cd.tfvars.json \
+     -var='app_image_digest=<現在のdigest>' \
+     -out='<保存先の絶対パス>'
+   ```
+
+   既定値のままplanを作るとCloud RunやCD関連リソースが削除対象になり得るため、CDと同じtfvarsと稼働中のdigestを必ず明示します。Cloud Run・IAP・WIF・CD用SAなどに意図しない削除・置換があれば適用を中止します。
+
+4. 差分を確認した後、同じ保存済みplanを適用します。別のplanへ差し替えません。
+
+   ```bash
+   TF_WORKSPACE=dev terraform -chdir=infra/gcp apply '<保存先の絶対パス>'
+   ```
+
+5. 追加したリソースを配備用SAが全体planでrefreshできることを確認します。読み取り権限が不足する場合は読み取りroleへ参照権限だけを追加し、同じ手順で適用します。
+6. 稼働中のdigestを使った全体再planで設定差分がないことを確認し、repository variableを `GCP_DEV_CD_ENABLED=true` へ戻します。最新mainの `GCP dev CD` で配備ジョブまで成功したことを確認してから、次の変更へ進みます。
 
 ## 秘密値と費用
 
