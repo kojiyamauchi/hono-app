@@ -5,9 +5,10 @@ import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-proto'
 import type { Instrumentation } from '@opentelemetry/instrumentation'
 import { registerInstrumentations } from '@opentelemetry/instrumentation'
 import { resourceFromAttributes } from '@opentelemetry/resources'
-import { BasicTracerProvider, BatchSpanProcessor, ParentBasedSampler, TraceIdRatioBasedSampler } from '@opentelemetry/sdk-trace-base'
+import { BasicTracerProvider, ParentBasedSampler, TraceIdRatioBasedSampler } from '@opentelemetry/sdk-trace-base'
 
 import { createDatabaseSpanInstrumentations } from './db'
+import { RedactingSpanProcessor } from './spanProcessor'
 
 type TelemetryDisabledReason = 'invalid-endpoint' | 'missing-endpoint' | 'missing-headers' | 'sdk-disabled' | 'startup-error' | 'traces-disabled'
 
@@ -75,7 +76,7 @@ const defaultTelemetryDependencies: TelemetryDependencies = {
       sampler: new ParentBasedSampler({
         root: new TraceIdRatioBasedSampler(config.samplingRatio),
       }),
-      spanProcessors: [new BatchSpanProcessor(exporter)],
+      spanProcessors: [new RedactingSpanProcessor(exporter)],
     })
   },
   disableContext: () => context.disable(),

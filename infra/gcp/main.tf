@@ -28,17 +28,26 @@ provider "google-beta" {
 
 locals {
   service_name = "hono-app-${terraform.workspace}"
-  secret_names = toset([
+  base_secret_names = toset([
     "DATABASE_URL", "JWT_SECRET", "REFRESH_TOKEN_SECRET",
     "PASSWORD_RESET_TOKEN_SECRET", "EMAIL_VERIFICATION_TOKEN_SECRET", "RESEND_API_KEY",
   ])
+  otlp_secret_names = toset(["OTEL_EXPORTER_OTLP_TRACES_HEADERS"])
+  # devではCloud Runへの注入より先に、入れ物と実行用SAの参照権限を用意する。
+  secret_names          = terraform.workspace == "dev" ? setunion(local.base_secret_names, local.otlp_secret_names) : local.base_secret_names
+  required_secret_names = var.enable_otel_traces ? setunion(local.base_secret_names, local.otlp_secret_names) : local.base_secret_names
+
   app_environment = merge(var.app_environment == null ? {} : var.app_environment, {
     NODE_ENV            = "production"
     ENABLE_API_DOCS     = tostring(var.enable_api_docs)
     COOKIE_SECURE       = "true"
-    OTEL_TRACES_ENABLED = "false"
-    OTEL_SDK_DISABLED   = "true"
-  })
+    OTEL_TRACES_ENABLED = tostring(var.enable_otel_traces)
+    OTEL_SDK_DISABLED   = tostring(!var.enable_otel_traces)
+    }, var.enable_otel_traces ? {
+    OTEL_SERVICE_NAME                  = local.service_name
+    OTEL_TRACES_SAMPLER_RATIO          = tostring(var.otel_traces_sampler_ratio)
+    OTEL_EXPORTER_OTLP_TRACES_ENDPOINT = "https://otlp.nr-data.net:4318/v1/traces"
+  } : {})
 }
 
 resource "google_project_service" "required" {

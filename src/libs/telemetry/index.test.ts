@@ -1,5 +1,6 @@
 import type { Context, ContextManager, TracerProvider } from '@opentelemetry/api'
-import { ROOT_CONTEXT } from '@opentelemetry/api'
+import { ROOT_CONTEXT, trace } from '@opentelemetry/api'
+import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-proto'
 import type { Instrumentation } from '@opentelemetry/instrumentation'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 
@@ -222,6 +223,34 @@ describe('parseOtelHeaders', () => {
 })
 
 describe('initializeTelemetry', () => {
+  test('既定のproviderは機微情報を除いたspanをOTLP exporterへ渡す', async () => {
+    const exportSpans = spyOn(OTLPTraceExporter.prototype, 'export').mockImplementation((_spans, callback) => {
+      callback({ code: 0 })
+    })
+    try {
+      const state = initializeTelemetry({
+        OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: 'https://example.com/v1/traces',
+        OTEL_EXPORTER_OTLP_TRACES_HEADERS: 'api-key=test-key',
+        OTEL_TRACES_ENABLED: 'true',
+        OTEL_TRACES_SAMPLER_RATIO: '1',
+      })
+      expect(state.enabled).toBe(true)
+      trace
+        .getTracer('test')
+        .startSpan('GET /users/me', {
+          attributes: { 'url.full': 'https://example.com/users/me?token=private-token', 'http.route': '/users/me' },
+        })
+        .end()
+      await state.shutdown()
+
+      expect(exportSpans).toHaveBeenCalledTimes(1)
+      expect(exportSpans.mock.calls[0]?.[0][0]?.attributes).toEqual({ 'http.route': '/users/me' })
+    } finally {
+      await resetTelemetryForTest()
+      exportSpans.mockRestore()
+    }
+  })
+
   test('無効設定ではproviderやcontext managerを作成しない', () => {
     const { calls, dependencies } = createTestDependencies()
 

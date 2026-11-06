@@ -19,14 +19,14 @@ devでは2026-10-30に初回CDが成功し、mainへのマージ後の自動配�
 ## 管理範囲とアクセス制限
 
 - 既存の課金設定済みGCPプロジェクトを入力します。プロジェクトとstate保存用GCSバケットはTerraform管理外の前提リソースです。
-- Terraformは必要なAPI、Artifact Registry、6つのSecret Managerの入れ物、アプリ用サービスアカウント、IAPサービスエージェント、Cloud Run、呼び出し権限を管理します。
+- Terraformは必要なAPI、Artifact Registry、既存の6用途とdevのOTLP用のSecret Managerの入れ物、アプリ用サービスアカウント、IAPサービスエージェント、Cloud Run、呼び出し権限を管理します。
 - Cloud Monitoringの5xxアラートポリシーもTerraformで管理します。メール通知チャネルはConsoleで作成・管理し、Terraformはチャネルのリソース名だけを参照します。条件・しきい値・通知後のログ確認手順は[5xxアラートと通知後のログ確認](#5xxアラートと通知後のログ確認)を参照してください。
 - Supabaseプロジェクトは管理画面でFreeを選択します。APIとDBのリージョンは可能な限り近づけます。
 - APIは `run.app` のHTTPS URLを使い、Cloud Runへ直接IAPを設定します。ブラウザでURLを開くと必要に応じてGoogle認証へ進み、許可したアカウントだけがScalar・APIへアクセスできます。Basic認証は追加しません。
 - `roles/run.invoker` はIAPサービスエージェントだけへ付けます。利用者はサービス単位の `roles/iap.httpsResourceAccessor` で管理し、`invoker_members` をIAPの許可対象の正本にします。両方をbindingで一括管理し、手動で追加された権限もplanへ反映します。プロジェクト・組織から継承する権限は別途確認します。
 - 個人Gmail・組織外ユーザーの利用には、初回だけカスタムOAuthクライアントの準備が必要です。OAuthクライアントの作成・同意画面の設定はTerraform管理外とし、クライアントシークレットをtfvars・state・PRへ書きません。[Cloud Run直接IAPの設定](https://docs.cloud.google.com/run/docs/securing/identity-aware-proxy-cloud-run)
 - シークレットの実値とversionの作成はTerraform管理外とし、stateへ保存しません。Supabaseは `SUPABASE_PUBLISHABLE_KEY` にPublishable keyを設定します。管理権限を持つSecret key・service roleキーは使いません。既存ローカル・AWS用の `SUPABASE_ANON_KEY` は互換設定として利用できます。
-- GCPではPublishable keyを公開設定（tfvars・state）で扱い、Secret Managerの無料枠である有効6 versionをDB接続情報・4種類の鍵・Resend APIキーに割り当てます。
+- GCPではPublishable keyを公開設定（tfvars・state）で扱います。Cloud RunはDB接続情報・4種類の鍵・Resend APIキーを参照し、devでOTLP送信を有効にする場合だけOTLPヘッダーの参照を加えます。
 - dev環境では `enable_api_docs = true` により、IAPの内側にOpenAPIとScalarを公開します。staging / prodでは公開しません。ScalarのAPI呼び出しは同じOriginへ送り、外部のAPIプロキシは使いません。
 - 通常起動ではmigrationを実行しません。初回手動配備ではDockerfileの `migration` ターゲットをローカルで実行し、devの通常CDでは同じターゲットをActions runnerで実行してからCloud Runを更新します。
 - AWS用CDは引き続きECRへの登録だけを行います。GCP devの自動配備は2026-10-30に有効化済みです。通常配備・初回認証構築・有効化条件・停止と復旧は[自動配備の手順](deployment-gcp-cd.md)を参照してください。新しい環境では明示的に有効化するまでCDは動きません。
@@ -39,7 +39,7 @@ Cloud Runは最小0・最大1インスタンス、1 vCPU / 512 MiB、リクエ�
 
 - Cloud Runの無料枠は請求先アカウント全体で共有します。通信にも別の課金があり、東京からの通信をすべて無料とは扱いません。[Cloud Run料金](https://cloud.google.com/run/pricing)
 - Artifact Registryの無料保存枠は0.5 GBです。登録するのはruntimeイメージだけとし、migrationイメージは登録しません。古い通常タグのイメージは1日後から削除対象になります。`release-` タグは保護するため、稼働中・復旧用だけを残して容量を確認します。削除は即時ではありません。[保存料金](https://cloud.google.com/artifact-registry/pricing)
-- Secret Managerは6つの有効なversionまで無料です。各シークレットを1 versionで運用すればこの枠に収まります。古いversionは無効化だけでも課金対象のため、ローテーション後に参照・復旧方針を確認して不要なversionを破棄します。[Secret Manager料金](https://cloud.google.com/secret-manager/pricing)
+- Secret Managerは請求先アカウント全体で6つの有効なversionまで無料です。既存の6用途に各1 versionを保持する場合、OTLP用versionの登録で無料枠を超えます。無効化したversionも課金対象のため、ローテーション後に参照・復旧方針を確認して不要なversionを破棄します。[Secret Manager料金](https://cloud.google.com/secret-manager/pricing)
 - Supabase FreeはDB容量500 MBで、1週間利用がないと一時停止します。定期アクセスで停止を回避する前提にはしません。[Supabase料金](https://supabase.com/pricing)
 - 公開前にGCPのBilling画面で少額の予算とメール通知を設定し、公開後は費用レポートを確認します。予算通知は自動停止や課金の上限ではありません。
 
@@ -212,7 +212,7 @@ bun run tf:gcp:plan -var-file=env/dev.local.tfvars -out=bootstrap.tfplan
 bun run tf:gcp:apply bootstrap.tfplan
 ```
 
-planにCloud Runサービスが含まれず、API・リポジトリ・6つのシークレット・実行用サービスアカウントとシークレット権限だけが含まれることを確認します。シークレットの値はまだ登録されません。backendなしで初期化済みの場合も、実環境では必ず上記の `tf:gcp:init` を実行します。
+planにCloud Runサービスが含まれず、API・リポジトリ・7つのシークレットの入れ物（既存6用途とOTLPヘッダー用）・実行用サービスアカウントとシークレット参照権限が含まれることを確認します。シークレットの値はまだ登録されません。backendなしで初期化済みの場合も、実環境では必ず上記の `tf:gcp:init` を実行します。
 
 ### 2. Supabaseと機密値を準備する
 
@@ -236,6 +236,8 @@ terraform -chdir=infra/gcp output -json secret_ids
 | `PASSWORD_RESET_TOKEN_SECRET`     | 独立した十分に長いランダムな署名鍵  |
 | `EMAIL_VERIFICATION_TOKEN_SECRET` | 独立した十分に長いランダムな署名鍵  |
 | `RESEND_API_KEY`                  | Resend APIキー                      |
+
+devのOTLP用Secretには、送信を検証するときだけ別途versionを登録します。[GCP devでの実送信検証](observability.md#gcp-devでの実送信検証)
 
 メール機能を確認する場合はResendで送信ドメインを検証し、無料枠内の送信上限を確認します。Supabase Authの実メール配信はSupabase側のメール設定も必要です。
 

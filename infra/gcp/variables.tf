@@ -89,6 +89,30 @@ variable "enable_api_docs" {
   description = "dev環境でIAPの内側にScalarとOpenAPIドキュメントを公開する"
 }
 
+variable "enable_otel_traces" {
+  type        = bool
+  nullable    = false
+  default     = false
+  description = "dev環境からNew RelicへのOTLPトレース送信を有効にする"
+
+  validation {
+    condition     = !var.enable_otel_traces || terraform.workspace == "dev"
+    error_message = "OTLPトレース送信の有効化はdev workspaceに限定してください。"
+  }
+}
+
+variable "otel_traces_sampler_ratio" {
+  type        = number
+  nullable    = false
+  default     = 0.1
+  description = "OTLP有効時のサンプリング比率。実送信検証中だけ1にする"
+
+  validation {
+    condition     = var.otel_traces_sampler_ratio >= 0 && var.otel_traces_sampler_ratio <= 1
+    error_message = "OTLPトレースのサンプリング比率は0以上1以下を指定してください。"
+  }
+}
+
 variable "secret_versions" {
   type        = map(string)
   nullable    = false
@@ -97,10 +121,10 @@ variable "secret_versions" {
 
   validation {
     condition = alltrue([for name, version in var.secret_versions :
-      contains(["DATABASE_URL", "JWT_SECRET", "REFRESH_TOKEN_SECRET", "PASSWORD_RESET_TOKEN_SECRET", "EMAIL_VERIFICATION_TOKEN_SECRET", "RESEND_API_KEY"], name) &&
+      contains(local.secret_names, name) &&
       can(regex("^[1-9][0-9]*$", version))
     ])
-    error_message = "対応する6種類の機密環境変数に、latestではなく1以上の数値バージョンを指定してください。"
+    error_message = "対応する機密環境変数に、latestではなく1以上の数値バージョンを指定してください。"
   }
 }
 
