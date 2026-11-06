@@ -9,6 +9,11 @@ variables {
 run "bootstrap_without_alert" {
   command = plan
 
+  # 外部から-var-fileでチャネルを渡された場合もこのrunの前提を保つため、未設定を明示する。
+  variables {
+    alert_notification_channel = null
+  }
+
   assert {
     condition     = contains([for api in google_project_service.required : api.service], "monitoring.googleapis.com")
     error_message = "アラートポリシーの作成・参照に必要なMonitoring APIを有効化する必要があります。"
