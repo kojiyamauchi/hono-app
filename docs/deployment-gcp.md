@@ -119,6 +119,8 @@ Cloud Schedulerが15分おきに `hono-app-dev-iap-health` Workflowを起動し�
 
 起動用SAにはプロジェクト内のWorkflow実行開始だけを許可します。Workflow実行用SAのトークン発行権限は監視用SAに限定し、監視用SAには対象Cloud Runサービス単位のIAPアクセスを許可します。Terraformは配備済みのdevで通知チャネルが設定されている場合に監視を作成します。実行失敗のシステムログをCloud Monitoringで検知し、5xx監視と同じメールチャネルへ通知します。通知は15分に1回までで、最後の一致から30分でインシデントを自動クローズします。[Workflowsの実行ログ](https://docs.cloud.google.com/workflows/docs/log-workflow) · [Cloud Loggingによるアラート](https://docs.cloud.google.com/logging/docs/alerting/log-based-alerts)
 
+通知対象は起動後に失敗したWorkflow実行に限ります。ジョブの一時停止や起動失敗は、Cloud Schedulerのジョブ状態と起動試行ログで確認します。
+
 ### 方式と実行間隔
 
 Workflowsを採用すると、短命トークンの発行と応答判定を一つの定義で管理できます。Cloud Run JobやCloud Run functionsでも両方を実装できますが、実行用のイメージや関数の配備が別途必要です。Jobは起動したインスタンスごとに最低1分の課金があるため、短い処理を繰り返す用途ではWorkflowsを選びました。標準uptime checkのサービスエージェント認証はOIDCを使用するため、現行IAPで動作実績のあるスコープ付きアクセストークンを使う方針を優先しました。[Cloud Runの料金](https://cloud.google.com/run/pricing) · [標準uptime checkの認証](https://docs.cloud.google.com/monitoring/uptime-checks)
