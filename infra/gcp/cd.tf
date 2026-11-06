@@ -11,13 +11,17 @@ locals {
     "secretmanager.secrets.get", "secretmanager.secrets.getIamPolicy",
     "serviceusage.services.get", "serviceusage.services.list", "storage.buckets.getIamPolicy",
     "run.operations.get",
-    # 監視リソース追加後も配備用SAが全体planをrefreshできるよう、アラートポリシーの参照だけを許可する。
-    "monitoring.alertPolicies.get",
+    # 配備用SAが全体planをrefreshできるよう、監視リソースの参照だけを許可する。
+    "monitoring.alertPolicies.get", "cloudscheduler.jobs.get", "workflows.workflows.get",
   ]
 }
 
 resource "google_project_service" "cd" {
-  for_each           = local.cd_enabled ? toset(["sts.googleapis.com", "iamcredentials.googleapis.com", "cloudresourcemanager.googleapis.com"]) : toset([])
+  # IAM Credentials APIは監視でも使うため、既存のTerraformアドレスで共有する。
+  for_each = setunion(
+    local.cd_enabled ? toset(["sts.googleapis.com", "cloudresourcemanager.googleapis.com"]) : toset([]),
+    local.cd_enabled || local.health_monitor_enabled ? toset(["iamcredentials.googleapis.com"]) : toset([]),
+  )
   project            = var.project_id
   service            = each.value
   disable_on_destroy = false

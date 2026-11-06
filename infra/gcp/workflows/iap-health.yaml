@@ -1,0 +1,71 @@
+main:
+  params: [args]
+  steps:
+    - setTarget:
+        assign:
+          - path: /health
+    - selectFailureTest:
+        switch:
+          - condition: ${default(map.get(args, "test_failure"), false) == true}
+            steps:
+              - useMissingPath:
+                  assign:
+                    - path: /__iap-health-monitor-not-found
+    # HTTP例外の本文やヘッダーは実行ログへ渡さず、切り分けに使うタグとステータスだけを残す。
+    - issueToken:
+        try:
+          call: http.post
+          args:
+            url: ${"https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/" + sys.get_env("IAP_MONITOR_SA") + ":generateAccessToken"}
+            auth:
+              type: OAuth2
+            timeout: 10
+            body:
+              scope:
+                - openid
+                - https://www.googleapis.com/auth/userinfo.email
+              lifetime: 300s
+          result: token
+        except:
+          as: error
+          steps:
+            - tokenFailed:
+                raise:
+                  message: IAP token request failed
+                  tags: ${error.tags}
+                  code: ${map.get(error, "code")}
+    - getHealth:
+        try:
+          call: http.get
+          args:
+            url: ${"https://" + sys.get_env("CLOUD_RUN_SERVICE") + "-" + sys.get_env("GOOGLE_CLOUD_PROJECT_NUMBER") + "." + sys.get_env("GOOGLE_CLOUD_LOCATION") + ".run.app" + path}
+            timeout: 45
+            headers:
+              Accept: application/json
+              Proxy-Authorization: ${"Bearer " + token.body.accessToken}
+          result: response
+        except:
+          as: error
+          steps:
+            - requestFailed:
+                raise:
+                  message: IAP health request failed
+                  tags: ${error.tags}
+                  code: ${map.get(error, "code")}
+    - requireHttp200:
+        switch:
+          - condition: ${response.code != 200}
+            raise:
+              message: IAP health response was not HTTP 200
+              code: ${response.code}
+    - requireJsonObject:
+        switch:
+          - condition: ${get_type(response.body) != "map"}
+            raise: IAP health response was not a JSON object
+    - requireHealthy:
+        switch:
+          - condition: ${map.get(response.body, "ok") != true}
+            raise: IAP health response did not contain ok true
+    - finish:
+        return:
+          ok: true

@@ -11,6 +11,7 @@ words:
   - bunx
   - chdir
   - cloudresourcemanager
+  - cloudscheduler
   - CLOUDSDK
   - cpus
   - creds

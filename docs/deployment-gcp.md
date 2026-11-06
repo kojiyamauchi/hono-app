@@ -113,6 +113,52 @@ Cloud Monitoringには、メール通知チャネル単体へテスト送信す�
 
 ログの保存・取り込みにも無料枠を超えた分の課金があります。調査用のログ保持期間やログベースの指標を追加する場合は、費用を別途確認してください。
 
+## IAP経由の稼働監視
+
+Cloud Schedulerが15分おきに `hono-app-dev-iap-health` Workflowを起動します。Workflowsは5分間有効なアクセストークンを実行ごとに発行し、配備時の検証と同じ `openid` / `userinfo.email` スコープと `Proxy-Authorization` で `GET /health` を呼びます。HTTP 200かつJSONオブジェクトの `ok` が真偽値の `true` の場合だけ成功です。3xx、認証エラー、45秒のヘルス確認タイムアウト、想定外の本文は実行失敗として扱います。[WorkflowsのHTTPリクエスト](https://docs.cloud.google.com/workflows/docs/http-requests)
+
+起動用SAにはプロジェクト内のWorkflow実行開始だけを許可します。Workflow実行用SAのトークン発行権限は監視用SAに限定し、監視用SAには対象Cloud Runサービス単位のIAPアクセスを許可します。Terraformは配備済みのdevで通知チャネルが設定されている場合に監視を作成します。実行失敗のシステムログをCloud Monitoringで検知し、5xx監視と同じメールチャネルへ通知します。通知は15分に1回までで、最後の一致から30分でインシデントを自動クローズします。[Workflowsの実行ログ](https://docs.cloud.google.com/workflows/docs/log-workflow) · [Cloud Loggingによるアラート](https://docs.cloud.google.com/logging/docs/alerting/log-based-alerts)
+
+通知対象は起動後に失敗したWorkflow実行に限ります。ジョブの一時停止や起動失敗は、Cloud Schedulerのジョブ状態と起動試行ログで確認します。
+
+### 方式と実行間隔
+
+Workflowsを採用すると、短命トークンの発行と応答判定を一つの定義で管理できます。Cloud Run JobやCloud Run functionsでも両方を実装できますが、実行用のイメージや関数の配備が別途必要です。Jobは起動したインスタンスごとに最低1分の課金があるため、短い処理を繰り返す用途ではWorkflowsを選びました。標準uptime checkのサービスエージェント認証はOIDCを使用するため、現行IAPで動作実績のあるスコープ付きアクセストークンを使う方針を優先しました。[Cloud Runの料金](https://cloud.google.com/run/pricing) · [標準uptime checkの認証](https://docs.cloud.google.com/monitoring/uptime-checks)
+
+初期値は、利用者がいない時間帯でも約15分以内に次のチェックを始められる間隔です。通知までには実行とログ処理の時間が加わります。15分間隔なら31日で2,976回で、5分間隔の3分の1です。
+
+- Cloud Schedulerは1ジョブを使用します。請求先アカウントの無料枠3件を使い切っている場合は31日あたり0.10米ドルです。[Cloud Schedulerの料金](https://cloud.google.com/scheduler/pricing)
+- WorkflowsはIAM Credentials APIと `run.app` への呼び出しを含めて内部ステップ扱いです。通常実行を1回10ステップとして概算すると31日で29,760ステップです。内部ステップの無料枠5,000ステップをこの監視だけで使える場合、超過分は約0.25米ドルです。[Workflowsの料金](https://cloud.google.com/workflows/pricing)
+- 監視先のCloud Runは最小0インスタンスです。監視リクエストは既存インスタンスを再利用する場合も、コールドスタートを起こす場合もあります。リクエスト単位課金では起動・処理・終了の時間が対象です。仮に毎回の合計が5秒なら、31日で約14,880インスタンス秒（1 vCPU・0.5 GiBで14,880 vCPU秒・7,440 GiB秒）が加わります。適用後は起動ログと `run.googleapis.com/container/billable_instance_time` を確認し、実測に基づいて間隔を見直します。[Cloud Runの課金対象時間](https://cloud.google.com/run/pricing#billable-instance-time) · [Cloud Logging・Monitoringの料金](https://cloud.google.com/products/observability/pricing)
+
+### 適用後に稼働と通知を確認する
+
+1. [GCP dev CDの手動適用手順](./deployment-gcp-cd.md)に沿って適用します。Cloud Schedulerの定刻実行と、その直後のWorkflows実行が `SUCCEEDED` で結果が `{"ok":true}` であることを確認します。Cloud Loggingで対象時刻の `GET /health` のHTTP 200とリクエストのレイテンシを確認し、コールドスタートがあれば起動ログも確認します。
+2. 同じWorkflowを検証モードで1回実行します。この実行だけ存在しない固定パスを使用します。
+
+   ```bash
+   gcloud workflows run hono-app-dev-iap-health \
+     --project='<devプロジェクトID>' --location=asia-northeast1 \
+     --data='{"test_failure":true}'
+   ```
+
+3. 実行がHTTP 404で `FAILED` になり、Cloud Monitoringで該当インシデントが開いて同じメールチャネルに通知が届くことを確認します。すでにインシデントが開いている場合は、閉じた後に検証します。定刻実行と検証実行のID・時刻・所要時間、発報とメール受信の結果、全体再planの差分と通常CDの結果をPR本文へ記録します。
+
+### 障害時の切り分け
+
+1. 通知時刻付近のWorkflows実行履歴を開き、失敗ステップとステータスを確認します。トークン発行の失敗はIAM Credentials APIと対象SAの権限、3xx・401・403はIAPのサービス単位の許可、タイムアウト・5xxはCloud Runの起動とリクエストログから確認します。トークンや応答本文を記録する呼び出しログは有効化しないでください。
+2. Cloud Loggingで次の条件に絞ります。ヘルス確認と同じ時刻のCloud Runリクエストログがあれば `revision_name` を特定し、[5xxアラートと通知後のログ確認](#5xxアラートと通知後のログ確認)の手順でそのリビジョンのログを確認します。
+
+   ```txt
+   resource.type="workflows.googleapis.com/Workflow"
+   resource.labels.workflow_id="hono-app-dev-iap-health"
+   resource.labels.location="asia-northeast1"
+   log_id("workflows.googleapis.com/executions_system")
+   jsonPayload.state="FAILED"
+   ```
+
+3. 実行履歴自体が途切れている場合は、Cloud Schedulerでジョブの有効状態、直近の起動試行、起動用SAの権限を確認します。
+
 ## 外部環境を変更しない確認
 
 Google Cloud CLIやGCP認証情報は不要です。providerの取得にはネットワークを使います。
