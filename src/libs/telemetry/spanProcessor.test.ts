@@ -35,3 +35,32 @@ test('外部送信するspanから機微な値を除き、処理の識別情報�
   expect(exportedSpan?.events[0]?.attributes).toEqual({ 'exception.type': 'Error' })
   await provider.shutdown()
 })
+
+test('pg計装の定型文に含まれるエラーコードだけを残す', async () => {
+  const exporter = new InMemorySpanExporter()
+  const provider = new BasicTracerProvider({
+    spanProcessors: [new RedactingSpanProcessor(exporter)],
+  })
+  const pg = '@opentelemetry/instrumentation-pg'
+  const cases = [
+    { scope: pg, message: "PostgreSQL error of type 'error' occurred (code: 23505)", expected: '23505' },
+    { scope: pg, message: "PostgreSQL error of type 'Error' occurred (code: ECONNREFUSED)", expected: 'ECONNREFUSED' },
+    { scope: pg, message: "PostgreSQL error of type 'Error' occurred (code: private-token)", expected: undefined },
+    { scope: 'test', message: "PostgreSQL error of type 'error' occurred (code: 23505)", expected: undefined },
+  ]
+  for (const { scope, message } of cases) {
+    const span = provider.getTracer(scope).startSpan('DB接続の確認')
+    span.recordException(message)
+    span.setStatus({ code: SpanStatusCode.ERROR, message: 'private-data' })
+    span.end()
+  }
+  await provider.forceFlush()
+
+  const spans = exporter.getFinishedSpans()
+  expect(spans.map((span) => span.attributes['error.type'])).toEqual(cases.map(({ expected }) => expected))
+  for (const span of spans) {
+    expect(span.status).toEqual({ code: SpanStatusCode.ERROR })
+    expect(span.events[0]?.attributes).toEqual({})
+  }
+  await provider.shutdown()
+})
