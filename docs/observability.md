@@ -95,7 +95,43 @@ external.system = 'supabase'
 server.address = '<your-project>.supabase.co'
 ```
 
-DB spanはHTTP request spanの子spanとして表示されることを確認します。DB spanではSQL本文属性（`db.statement` または `db.query.text`）が送信される可能性があるため、SQLに個人情報やsecretを直接埋め込まないでください。
+DB spanはHTTP request spanの子spanとして表示されることを確認します。OTLP送信前に完全なURL、DB接続情報、SQL本文、例外メッセージとスタックトレースを除きます。ルートのテンプレート、DBシステム、処理時間とステータスから各処理を確認します。
+
+## GCP devでの実送信検証
+
+Git管理のCD用設定は `enable_otel_traces = false` です。有効にすると `hono-app-dev` のトレースを既存のUS向けOTLPエンドポイントへ送ります。事前にNew Relicの対象アカウントがUSリージョンであることを確認します。[New RelicのOTLPエンドポイント](https://docs.newrelic.com/docs/opentelemetry/best-practices/opentelemetry-otlp/)
+
+### Secretの準備と手動適用
+
+1. [インフラ変更の手動適用](deployment-gcp-cd.md#インフラ変更の手動適用)に従ってCDを停止し、PRをマージします。Git管理の `env/dev.cd.tfvars.json` と稼働中digestで全体planを作り、OTLP用Secretの入れ物 `hono-app-dev-otel-exporter-otlp-traces-headers` と実行用SAの参照権限だけを追加します。この段階のCloud Runは既存の6件を参照し、送信は無効です。全体再planに差分がないことを確認して通常CDでこのPRのイメージを配備し、機微情報を除外する実装を含むrevisionがReadyになったことを確認します。
+2. Secret ManagerのConsoleで `api-key=<license key>` を値とするversionを登録し、数値versionを控えます。実値はtfvars、state、コマンド引数、ログに残しません。
+3. 通常CDを再度停止し、他のインフラ変更と作業期間が重ならないようにします。Git管理のCD用tfvarsを元に、`enable_otel_traces` を `true`、`otel_traces_sampler_ratio` を `1` にした検証用tfvarsをGit管理外に用意します。`secret_versions` は既存6件を維持し、`OTEL_EXPORTER_OTLP_TRACES_HEADERS` に登録済みの数値versionを文字列で追加します。
+4. 検証用tfvarsと現在のReady revisionのdigestを指定して全体planを保存します。Cloud Runの送信用環境変数と7件目のSecret参照だけが変わることを確認し、同じ保存planを手動適用します。通常CDは検証後の復帰まで停止したままにします。
+
+### リクエストとトレースの確認
+
+IAP内のScalarで、独自認証の確認済みアカウントとSupabase Authの検証用アカウントを用意します。Resendの送信先には管理下の検証用アドレスを使います。
+
+| リクエスト                             | 確認する子span                                                                         |
+| -------------------------------------- | -------------------------------------------------------------------------------------- |
+| 独自認証でログイン後の `GET /users/me` | `db.system = 'postgresql'` の `pg.query:SELECT` で始まるspan                           |
+| `POST /supabase-auth/login`            | `supabase.auth.signInWithPassword`                                                     |
+| `POST /auth/password-reset/request`    | `resend.emails.send`。HTTP 202と合わせて子spanの `external.success` と実際の受信を確認 |
+
+New Relicの分散トレーシングで、検証時刻と `service.name = 'hono-app-dev'` で絞ります。各HTTP spanから同じtrace内の子spanを開き、処理時間、HTTPステータス、DBや外部APIの結果を確認します。認証情報、トークン、メール本文・アドレスなどの個人情報がspan属性とイベントにないことを確認します。記録には操作名、結果、所要時間だけを使います。
+
+Cloud Runのリクエスト単位課金では、アイドル中にバッチ送信が遅れる場合があります。反映が遅ければ、IAP経由の `/health` を短時間呼び出して送信を確認します。`/health` は既定のHTTPトレース対象外で、#180の定期チェックもトレース量に算入しません。[Cloud RunのCPU割り当て](https://docs.cloud.google.com/run/docs/configuring/billing-settings#cpu_allocation_impact)
+
+### 送信量と復帰
+
+<!-- cspell:words bytecountestimate -->
+
+検証期間の `Span` を `service.name` で絞り、`count(*)` と `bytecountestimate()` で件数と概算バイト数を記録します。同じ操作の構成とリクエスト数なら、継続時の比率 `0.1` では `1` の約10分の1が目安です。継続月の対象リクエスト数 × 検証時の1リクエストあたり概算バイト数 × 継続時の比率で月間量を見積もり、実際の請求対象の取り込み量はNew Relicのアカウント使用量で確認します。[New Relicの使用量確認](https://docs.newrelic.com/docs/accounts/accounts-billing/new-relic-one-pricing-billing/usage-queries-alerts/)
+
+- New Relic Original Dataの公開料金は月100 GBの無料枠と超過1 GBあたり0.40米ドルです。実際のプランと他サービスを含む使用量で見積もります。[New Relicの料金](https://newrelic.com/pricing)
+- Secret Managerは既存の6件に各1 version、OTLPに1 versionを月を通じて保持する場合、保管料は無料枠超過1件分の月0.06米ドルが目安です。検証期間だけの保管料は保持時間に応じ、月10,000回を超えるアクセスは10,000回あたり0.03米ドルです。他のversionやプロジェクト分も請求先アカウント単位で確認します。[Secret Managerの料金](https://cloud.google.com/secret-manager/pricing)
+
+このPRの継続設定は無効です。検証後はGit管理のCD用tfvarsに戻し、比率を既定の `0.1` に戻した入力で、送信の無効化と7件目の参照解除を同じ保存planで適用します。参照中のrevisionと復旧方針を確認してから、不要になった検証用versionをSecret Managerで破棄します。最終構成の全体再planに差分がないことを確認して通常CDを再開し、配備ジョブまで成功したことをPR本文に記録します。継続有効化を選ぶ場合は実測量、費用、機微情報の確認結果を記録し、比率と数値参照をCDの正本へ反映する別の変更として扱います。
 
 ## Samplingと送信量制御
 
@@ -116,7 +152,7 @@ New Relic無料枠を意識した送信量確認では、以下をservice名で�
 - `service.name` ごとのtrace ingest量
 - `http.route` ごとのtrace件数と高頻度endpoint
 - `external.system` ごとの外部API span件数
-- DB spanの件数と、SQL本文属性に機微情報が含まれていないこと
+- DB spanの件数と、送信された属性やイベントに機微情報が含まれていないこと
 
 ## 確認時の注意
 

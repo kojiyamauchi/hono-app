@@ -74,7 +74,7 @@ Cloud Runのoperationはサービス配下ではないため、`run.operations.g
    TF_WORKSPACE=dev bun run tf:gcp:plan -var-file=env/dev.cd.tfvars.json -var='app_image_digest=<現在のdigest>' -out=cd-bootstrap.tfplan
    ```
 
-3. 追加するのはAPI、3つのSA、WIF pool/provider、用途ごとのIAM・custom roleです。既存IAP利用者bindingには検証用SAだけを追加します。Cloud Runのimage・URL・公開範囲・既存6つのSecret参照が変わらないことを確認します。
+3. 追加するのはAPI、3つのSA、WIF pool/provider、用途ごとのIAM・custom roleです。既存IAP利用者bindingには検証用SAだけを追加します。Cloud Runのimage・URL・公開範囲・現在のSecret参照が変わらないことを確認します。
 4. ユーザーがそのplanを確認した後にだけ、保存planをapplyします。この文書の追加や通常CDの承認省略を、初回IAM変更への承認として扱いません。
 5. IAP検証用SAの短命認証と、固定Originの未認証拒否・認証付きhealthを実測します。トークンは保護された一時ファイルまたはプロセス内だけで扱い、コマンド引数・ログへ出しません。
 6. GitHub側の変更も内容を提示して確認後、`gcp-dev` Environmentを作り、mainだけを許可・required reviewersなしとします。repository variable `GCP_DEV_CD_ENABLED=true` を設定します。
@@ -166,6 +166,8 @@ terraform -chdir=infra/gcp providers lock -platform=darwin_arm64 -platform=linux
 6. 稼働中のdigestを使った全体再planで設定差分がないことを確認し、repository variableを `GCP_DEV_CD_ENABLED=true` へ戻します。最新mainの `GCP dev CD` で配備ジョブまで成功したことを確認してから、次の変更へ進みます。
 
 ## 秘密値と費用
+
+Cloud Runに注入する数値Secret参照は、OTLP無効時は既存の6件、有効時は `OTEL_EXPORTER_OTLP_TRACES_HEADERS` を加えた7件です。Git管理の `env/dev.cd.tfvars.json` は送信無効と6件の参照を保持します。OTLP用の入れ物と実行用SAの参照権限を先に手動適用し、実値とversionをSecret Managerで登録した後、別の保存planでCloud Runの参照と送信を有効にします。検証時の一時設定と通常CDに戻す手順は[GCP devでの実送信検証](observability.md#gcp-devでの実送信検証)を参照してください。
 
 秘密値・認証レスポンス・外部CLIの生出力は表示しません。DB値は権限700の一時ディレクトリ内の600ファイルを経由し、migrationの成否にかかわらず削除します。plan・state・認証ファイルをActions artifactへアップロードせず、runnerの一時領域を終了時に削除します。認証Actionの `gha-creds-*.json` はGitとDockerの対象から除外します。
 
