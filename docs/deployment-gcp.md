@@ -20,6 +20,7 @@ devでは2026-10-30に初回CDが成功し、mainへのマージ後の自動配�
 
 - 既存の課金設定済みGCPプロジェクトを入力します。プロジェクトとstate保存用GCSバケットはTerraform管理外の前提リソースです。
 - Terraformは必要なAPI、Artifact Registry、6つのSecret Managerの入れ物、アプリ用サービスアカウント、IAPサービスエージェント、Cloud Run、呼び出し権限を管理します。
+- Cloud Monitoringの5xxアラートポリシーもTerraformで管理します。メール通知チャネルはConsoleで作成・管理し、Terraformはチャネルのリソース名だけを参照します。条件・しきい値・通知後のログ確認手順は[5xxアラートと通知後のログ確認](#5xxアラートと通知後のログ確認)を参照してください。
 - Supabaseプロジェクトは管理画面でFreeを選択します。APIとDBのリージョンは可能な限り近づけます。
 - APIは `run.app` のHTTPS URLを使い、Cloud Runへ直接IAPを設定します。ブラウザでURLを開くと必要に応じてGoogle認証へ進み、許可したアカウントだけがScalar・APIへアクセスできます。Basic認証は追加しません。
 - `roles/run.invoker` はIAPサービスエージェントだけへ付けます。利用者はサービス単位の `roles/iap.httpsResourceAccessor` で管理し、`invoker_members` をIAPの許可対象の正本にします。両方をbindingで一括管理し、手動で追加された権限もplanへ反映します。プロジェクト・組織から継承する権限は別途確認します。
@@ -45,6 +46,56 @@ Cloud Runは最小0・最大1インスタンス、1 vCPU / 512 MiB、リクエ�
 メールの無料枠、送信ドメイン、フロントエンドのホスティング、有料監視は別途確認します。
 
 既存の予算通知がある場合は重複作成せず、期間・対象プロジェクト・金額・実績か予測か・通知先を確認して記録します。今回のdevでは月100円、実績50%・90%・100%、Gmail宛ての既存通知を使用します。クレジット適用後の費用を対象とする予算は、無料トライアル中のリソース使用量そのものを通知する設定とは異なります。
+
+## 5xxアラートと通知後のログ確認
+
+Cloud Monitoringで、dev環境のCloud Runが返したHTTP 5xxの増加をメール通知します。対象は `hono-app-dev` が返した応答だけです。IAPが未認証リクエストを拒否した場合やサービスへ到達できない場合はCloud Runの `request_count` に現れないため、このアラートの対象外です。
+
+通知チャネル（メール）はGCP Consoleで作成・管理し、Terraformはチャネルのリソース名だけを参照します。`infra/gcp/env/dev.cd.tfvars.json` の `alert_notification_channel` に `projects/<プロジェクトID>/notificationChannels/<チャネルID>` を記載し、メールアドレスはリポジトリとTerraform stateへ載せません。この入力を省略した構成では、通知先のないアラートポリシーを作りません。
+
+### 初期条件としきい値の考え方
+
+| 項目         | 初期値                                                                    |
+| ------------ | ------------------------------------------------------------------------- |
+| 指標         | `run.googleapis.com/request_count` の `response_code_class = "5xx"`       |
+| 対象         | `resource.type = "cloud_run_revision"` と対象サービス名。リビジョンは合算 |
+| 集計         | 5分間（`300s`）の合計（`ALIGN_SUM` / `REDUCE_SUM`）                       |
+| 条件         | 合計が2件を超過（3件以上）で発報。`duration` は `0s`                      |
+| 欠損データ   | `EVALUATION_MISSING_DATA_INACTIVE`                                        |
+| 自動クローズ | 30分（`1800s`）                                                           |
+
+しきい値を件数で評価するのは、devの低トラフィックでは5xxの比率が1件で100%になり得て、割合では安定して判断できないためです。最小0インスタンスのためアクセス間隔が空くと毎回コールドスタートになり、起動遅延や30秒のリクエストタイムアウトに起因する単発の5xxが混ざり得ます。そのため1件では発報させません。一方で最大1インスタンス・リクエスト同時実行8の構成では、実際に壊れている場合は短時間に複数の5xxが並ぶため、5分間で3件以上を異常として扱います。
+
+リクエストがない時間帯は系列自体が欠損します。欠損を異常と扱わない設定にして、アクセスのない夜間などに発報しないようにしています。
+
+この値は実データに基づく確定値ではありません。運用開始後に、誤報（コールドスタート起因の単発5xx）と見逃し（短時間に収まる障害）の実績を見て、しきい値・集計期間・自動クローズ時間を見直す前提です。見直した場合は、このセクションの初期値と根拠も更新してください。リクエスト数とp95応答時間は、発報時の切り分け用にCloud Monitoringのメトリクスエクスプローラーで確認します。
+
+アラートポリシーの対象・集計条件・通知先の参照は `TF_WORKSPACE=dev bun run tf:gcp:test` のモックテストで検証します。実環境での発報とメール受信の確認は、Terraformの適用後に別途行います。
+
+### 通知を起点にログを特定する
+
+1. 通知メールのサービス名と発生時刻（incidentの開始時刻）を確認します。Cloud Monitoringのincident画面では、発報した条件と対象サービスを確認できます。
+2. Cloud Loggingのログエクスプローラーで、通知時刻の前後に絞って該当リクエストを探します。`timestamp` は通知時刻の前後10分程度から始めます。
+
+   ```txt
+   resource.type="cloud_run_revision"
+   resource.labels.service_name="hono-app-dev"
+   httpRequest.status>=500
+   ```
+
+3. 該当リクエストログの `resource.labels.revision_name` で、5xxを返したリビジョンを特定します。配備直後であれば、そのrevisionのdigestを[GCP dev CDのActions一覧](https://github.com/kojiyamauchi/hono-app/actions/workflows/cd-gcp.yml)の配備サマリーと照合します。
+4. 特定したリビジョンのアプリ側ログを確認します。Honoの `onError` が返す500は、リクエストログだけでは原因が分からないため、同じrevisionの標準出力・標準エラーを合わせて読みます。
+
+   ```txt
+   resource.type="cloud_run_revision"
+   resource.labels.service_name="hono-app-dev"
+   resource.labels.revision_name="<手順3で特定したrevision>"
+   severity>=ERROR
+   ```
+
+5. 起動に失敗している場合は、`/health` のstartup probeの失敗やコンテナ起動ログも確認します。リビジョン単位で切り分けたうえで、復旧が必要なら[更新・ロールバック・利用終了](#更新ロールバック利用終了)に従って直前のdigestへ戻します。
+
+ログの保存・取り込みにも無料枠を超えた分の課金があります。調査用のログ保持期間やログベースの指標を追加する場合は、費用を別途確認してください。
 
 ## 外部環境を変更しない確認
 
