@@ -79,8 +79,8 @@ resource "google_cloud_run_v2_service" "app" {
 
   lifecycle {
     precondition {
-      condition     = var.app_environment != null && toset(keys(var.secret_versions)) == local.secret_names
-      error_message = "API起動前に公開設定と6種類すべてのシークレットバージョンを指定してください。"
+      condition     = var.app_environment != null && toset(keys(var.secret_versions)) == local.required_secret_names
+      error_message = "API起動前に公開設定と必須のシークレットバージョンを指定してください。OTLP無効時は既存の6種類、有効時はOTEL_EXPORTER_OTLP_TRACES_HEADERSを含む7種類を指定してください。"
     }
     precondition {
       condition     = !var.enable_api_docs || terraform.workspace == "dev"
