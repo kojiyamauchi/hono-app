@@ -614,7 +614,7 @@ remote backendのS3バケットは、このTerraform構成の管理対象外で�
 
 DB spanは `@opentelemetry/instrumentation-pg` で計測します。Prismaは `@prisma/adapter-pg` 経由で `pg` を使うため、実アプリのDBアクセスは `pg` instrumentationで追跡します。DB spanは親spanがある場合だけ作成し、HTTP request spanの子spanとして紐づくことを前提にしています。
 
-DB spanではSQL本文属性（`db.statement` または `db.query.text`）が送信される可能性があります。クエリのパラメータ値は `enhancedDatabaseReporting=false` で送らない設定にしていますが、`$queryRawUnsafe` などで個人情報やsecretをSQL文字列へ直接埋め込まないでください。
+DB spanのSQL本文属性（`db.statement` または `db.query.text`）はOTLP送信前に除外します。クエリのパラメータ値は `enhancedDatabaseReporting=false` で計装時の収集を無効にしています。SQLの組み立てにはパラメータ化クエリを使ってください。
 
 外部API呼び出しは、Bun上でfetch / SDK内部の自動計装に寄せず、serviceやmiddlewareの境界で手動spanを作成します。対象はResendのメール送信とSupabase Auth呼び出しです。span属性には依存先名、操作名、HTTP method、host、HTTP status相当、成功/失敗だけを入れ、API key、Authorization header、メール本文、メールアドレス、リセットトークン、パスワードなどの機微情報は入れません。
 
