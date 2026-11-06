@@ -7,8 +7,10 @@ main:
     - selectFailureTest:
         switch:
           - condition: ${map.get(default(args, {}), "test_failure") == true}
-            assign:
-              - path: /__iap-health-monitor-not-found
+            steps:
+              - useMissingPath:
+                  assign:
+                    - path: /__iap-health-monitor-not-found
     # HTTP例外の本文やヘッダーは実行ログへ渡さず、切り分けに使うタグとステータスだけを残す。
     - issueToken:
         try:
