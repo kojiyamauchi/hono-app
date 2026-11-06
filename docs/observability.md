@@ -95,7 +95,7 @@ external.system = 'supabase'
 server.address = '<your-project>.supabase.co'
 ```
 
-DB spanはHTTP request spanの子spanとして表示されることを確認します。OTLP送信前に完全なURL、DB接続情報、SQL本文、例外メッセージとスタックトレースを除きます。ルートのテンプレート、DBシステム、処理時間とステータスから各処理を確認します。
+DB spanはHTTP request spanの子spanとして表示されることを確認します。OTLP送信前に完全なURL、DB接続文字列とDBユーザー、SQL本文、例外メッセージとスタックトレースを除きます。DBのホスト名・ポート・DB名は残ります。DBの失敗は、処理時間とステータスに加え、`error.type` に残るSQLSTATEや既知の接続エラーコードから確認します。
 
 ## GCP devでの実送信検証
 
@@ -124,7 +124,7 @@ Cloud Runのリクエスト単位課金では、アイドル中にバッチ送�
 
 ### 送信量と復帰
 
-<!-- cspell:words bytecountestimate -->
+<!-- cspell:words bytecountestimate SQLSTATE -->
 
 検証期間の `Span` を `service.name` で絞り、`count(*)` と `bytecountestimate()` で件数と概算バイト数を記録します。同じ操作の構成とリクエスト数なら、継続時の比率 `0.1` では `1` の約10分の1が目安です。継続月の対象リクエスト数 × 検証時の1リクエストあたり概算バイト数 × 継続時の比率で月間量を見積もり、実際の請求対象の取り込み量はNew Relicのアカウント使用量で確認します。[New Relicの使用量確認](https://docs.newrelic.com/docs/accounts/accounts-billing/new-relic-one-pricing-billing/usage-queries-alerts/)
 
