@@ -6,7 +6,7 @@ main:
           - path: /health
     - selectFailureTest:
         switch:
-          - condition: ${map.get(default(args, {}), "test_failure") == true}
+          - condition: ${default(map.get(args, "test_failure"), false) == true}
             steps:
               - useMissingPath:
                   assign:
