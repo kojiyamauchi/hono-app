@@ -67,6 +67,7 @@ run "server_error_alert_scoped_to_service" {
   }
   assert {
     condition = (
+      google_monitoring_alert_policy.server_errors[0].enabled &&
       google_monitoring_alert_policy.server_errors[0].combiner == "OR" &&
       join(",", google_monitoring_alert_policy.server_errors[0].notification_channels) == "projects/test-project/notificationChannels/1234567890"
     )

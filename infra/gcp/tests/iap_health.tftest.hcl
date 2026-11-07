@@ -102,6 +102,7 @@ run "scheduled_iap_health_check" {
   }
   assert {
     condition = (
+      !google_cloud_scheduler_job.iap_health[0].paused &&
       google_cloud_scheduler_job.iap_health[0].schedule == "*/15 * * * *" &&
       google_cloud_scheduler_job.iap_health[0].http_target[0].http_method == "POST" &&
       google_cloud_scheduler_job.iap_health[0].http_target[0].uri == "https://workflowexecutions.googleapis.com/v1/projects/test-project/locations/asia-northeast1/workflows/hono-app-dev-iap-health/executions" &&
@@ -122,6 +123,7 @@ run "scheduled_iap_health_check" {
   }
   assert {
     condition = (
+      google_monitoring_alert_policy.iap_health[0].enabled &&
       google_monitoring_alert_policy.iap_health[0].notification_channels == tolist([var.alert_notification_channel]) &&
       alltrue([for expression in [
         "resource.type=\"workflows.googleapis.com/Workflow\"",
@@ -132,5 +134,23 @@ run "scheduled_iap_health_check" {
       ] : strcontains(google_monitoring_alert_policy.iap_health[0].conditions[0].condition_matched_log[0].filter, expression)])
     )
     error_message = "対象のWorkflow実行失敗だけを、5xx監視と共通の通知チャネルへ送る必要があります。"
+  }
+}
+
+run "pause_service_monitoring" {
+  command = plan
+
+  variables {
+    enable_service_monitoring = false
+  }
+
+  assert {
+    condition = (
+      google_cloud_scheduler_job.iap_health[0].paused &&
+      !google_monitoring_alert_policy.iap_health[0].enabled &&
+      !google_monitoring_alert_policy.server_errors[0].enabled &&
+      length(google_workflows_workflow.iap_health) == 1
+    )
+    error_message = "監視停止時はジョブ・両アラート・Workflowを保持し、ジョブを一時停止して両アラートを無効化する必要があります。"
   }
 }
