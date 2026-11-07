@@ -121,6 +121,8 @@ Cloud Schedulerが15分おきに `hono-app-dev-iap-health` Workflowを起動し�
 
 通知対象は起動後に失敗したWorkflow実行に限ります。ジョブの一時停止や起動失敗は、Cloud Schedulerのジョブ状態と起動試行ログで確認します。
 
+devの定期ヘルスチェックと `IAP health`・`HTTP 5xx` アラートは、`infra/gcp/env/dev.cd.tfvars.json` の `enable_service_monitoring` で一括管理します。`false` でリソースを保持したままジョブを一時停止し、両アラートを無効化します。再開するには `true` に戻します。停止と再開はどちらも[インフラ変更の手動適用](deployment-gcp-cd.md#インフラ変更の手動適用)の手順で反映します。
+
 ### 方式と実行間隔
 
 Workflowsを採用すると、短命トークンの発行と応答判定を一つの定義で管理できます。Cloud Run JobやCloud Run functionsでも両方を実装できますが、実行用のイメージや関数の配備が別途必要です。Jobは起動したインスタンスごとに最低1分の課金があるため、短い処理を繰り返す用途ではWorkflowsを選びました。標準uptime checkのサービスエージェント認証はOIDCを使用するため、現行IAPで動作実績のあるスコープ付きアクセストークンを使う方針を優先しました。[Cloud Runの料金](https://cloud.google.com/run/pricing) · [標準uptime checkの認証](https://docs.cloud.google.com/monitoring/uptime-checks)
