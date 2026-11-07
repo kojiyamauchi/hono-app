@@ -519,6 +519,7 @@ Skill化した運用ルールは、詳細手順を `SKILL.md` に集約するこ
 - Issue作成・整理・本文レビューの詳細な手順は [`.claude/skills/issue-management/SKILL.md`](.claude/skills/issue-management/SKILL.md) を参照すること
 - レビュー対応の手順は [`.claude/skills/review-response/SKILL.md`](.claude/skills/review-response/SKILL.md) を参照すること
 - 他エージェントへレビュー依頼を委譲する手順は [`.claude/skills/agent-review-handoff/SKILL.md`](.claude/skills/agent-review-handoff/SKILL.md) を参照すること
+- Codexから合意済みの設計を受け取り、実装委譲からPR発行まで行う手順は [`.claude/skills/claude-implementation-handoff/SKILL.md`](.claude/skills/claude-implementation-handoff/SKILL.md) を参照すること
 - コミット粒度の確認手順は [`.claude/skills/commit-granularity/SKILL.md`](.claude/skills/commit-granularity/SKILL.md) を参照すること
 - DB性能調査（遅い/多いSQLの調査）の手順は [`.claude/skills/db-performance/SKILL.md`](.claude/skills/db-performance/SKILL.md) を参照すること
 - migrationを含む変更の実DB検証の詳細手順は [`.claude/skills/migration-verification/SKILL.md`](.claude/skills/migration-verification/SKILL.md) を参照すること
