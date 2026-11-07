@@ -49,7 +49,7 @@ Cloud Runは最小0・最大1インスタンス、1 vCPU / 512 MiB、リクエ�
 
 ## 5xxアラートと通知後のログ確認
 
-Cloud Monitoringで、dev環境のCloud Runが返したHTTP 5xxの増加をメール通知します。対象は `hono-app-dev` が返した応答だけです。IAPが未認証リクエストを拒否した場合やサービスへ到達できない場合はCloud Runの `request_count` に現れないため、このアラートの対象外です。
+アラートが有効な間は、Cloud Monitoringでdev環境のCloud Runが返したHTTP 5xxの増加をメール通知します。対象は `hono-app-dev` が返した応答だけです。IAPが未認証リクエストを拒否した場合やサービスへ到達できない場合はCloud Runの `request_count` に現れないため、このアラートの対象外です。停止・再開は[監視の一時停止と再開](#監視の一時停止と再開)を参照してください。
 
 通知チャネル（メール）はGCP Consoleで作成・管理し、Terraformはチャネルのリソース名だけを参照します。`infra/gcp/env/dev.cd.tfvars.json` の `alert_notification_channel` に `projects/<プロジェクトID>/notificationChannels/<チャネルID>` を記載し、メールアドレスはリポジトリとTerraform stateへ載せません。この入力を省略した構成では、通知先のないアラートポリシーを作りません。差し替え前のプレースホルダ（`REPLACE_ME` を含む値）は入力検証で拒否するため、チャネルを作成してリソース名を記載するまでplanは通りません。
 
@@ -115,13 +115,17 @@ Cloud Monitoringには、メール通知チャネル単体へテスト送信す�
 
 ## IAP経由の稼働監視
 
-Cloud Schedulerが15分おきに `hono-app-dev-iap-health` Workflowを起動します。Workflowsは5分間有効なアクセストークンを実行ごとに発行し、配備時の検証と同じ `openid` / `userinfo.email` スコープと `Proxy-Authorization` で `GET /health` を呼びます。HTTP 200かつJSONオブジェクトの `ok` が真偽値の `true` の場合だけ成功です。3xx、認証エラー、45秒のヘルス確認タイムアウト、想定外の本文は実行失敗として扱います。[WorkflowsのHTTPリクエスト](https://docs.cloud.google.com/workflows/docs/http-requests)
+監視が有効な間は、Cloud Schedulerが15分おきに `hono-app-dev-iap-health` Workflowを起動します。Workflowsは5分間有効なアクセストークンを実行ごとに発行し、配備時の検証と同じ `openid` / `userinfo.email` スコープと `Proxy-Authorization` で `GET /health` を呼びます。HTTP 200かつJSONオブジェクトの `ok` が真偽値の `true` の場合だけ成功です。3xx、認証エラー、45秒のヘルス確認タイムアウト、想定外の本文は実行失敗として扱います。[WorkflowsのHTTPリクエスト](https://docs.cloud.google.com/workflows/docs/http-requests)
 
 起動用SAにはプロジェクト内のWorkflow実行開始だけを許可します。Workflow実行用SAのトークン発行権限は監視用SAに限定し、監視用SAには対象Cloud Runサービス単位のIAPアクセスを許可します。Terraformは配備済みのdevで通知チャネルが設定されている場合に監視を作成します。実行失敗のシステムログをCloud Monitoringで検知し、5xx監視と同じメールチャネルへ通知します。通知は15分に1回までで、最後の一致から30分でインシデントを自動クローズします。[Workflowsの実行ログ](https://docs.cloud.google.com/workflows/docs/log-workflow) · [Cloud Loggingによるアラート](https://docs.cloud.google.com/logging/docs/alerting/log-based-alerts)
 
 通知対象は起動後に失敗したWorkflow実行に限ります。ジョブの一時停止や起動失敗は、Cloud Schedulerのジョブ状態と起動試行ログで確認します。
 
-devの定期ヘルスチェックと `IAP health`・`HTTP 5xx` アラートは、`infra/gcp/env/dev.cd.tfvars.json` の `enable_service_monitoring` で一括管理します。`false` でリソースを保持したままジョブを一時停止し、両アラートを無効化します。再開するには `true` に戻します。停止と再開はどちらも[インフラ変更の手動適用](deployment-gcp-cd.md#インフラ変更の手動適用)の手順で反映します。
+### 監視の一時停止と再開
+
+devの定期ヘルスチェックと `IAP health`・`HTTP 5xx` アラートは、`infra/gcp/env/dev.cd.tfvars.json` の `enable_service_monitoring` で一括管理します。`false` を適用すると、リソースを保持したままジョブを一時停止し、両アラートを無効化します。停止中は定期チェックが実行されず、両アラートからメール通知も届きません。
+
+設定値は変数ファイルで確認し、実際の状態はCloud Schedulerのジョブ状態とCloud Monitoringの両ポリシーの有効・無効で確認します。再開時は `true` に戻して適用し、ジョブが `ENABLED` で両ポリシーが有効になったことを確認してから、[稼働と通知の確認手順](#適用後に稼働と通知を確認する)を実施します。停止と再開はどちらも[インフラ変更の手動適用](deployment-gcp-cd.md#インフラ変更の手動適用)の手順で反映します。
 
 ### 方式と実行間隔
 
