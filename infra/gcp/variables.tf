@@ -140,6 +140,13 @@ variable "invoker_members" {
   }
 }
 
+variable "enable_service_monitoring" {
+  type        = bool
+  default     = true
+  nullable    = false
+  description = "作成済みのIAP稼働監視ジョブと、IAP稼働監視・HTTP 5xxのアラートを稼働させる。falseでもリソースは保持する"
+}
+
 variable "alert_notification_channel" {
   type        = string
   default     = null

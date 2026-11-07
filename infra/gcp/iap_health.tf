@@ -85,6 +85,7 @@ resource "google_cloud_scheduler_job" "iap_health" {
   project          = var.project_id
   region           = var.region
   name             = local.health_monitor_name
+  paused           = !var.enable_service_monitoring
   schedule         = "*/15 * * * *"
   time_zone        = "Asia/Tokyo"
   attempt_deadline = "30s"
@@ -112,6 +113,7 @@ resource "google_monitoring_alert_policy" "iap_health" {
 
   project               = var.project_id
   display_name          = "${local.service_name} IAP health"
+  enabled               = var.enable_service_monitoring
   combiner              = "OR"
   severity              = "WARNING"
   notification_channels = [var.alert_notification_channel]

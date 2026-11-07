@@ -14,6 +14,7 @@ resource "google_monitoring_alert_policy" "server_errors" {
 
   project      = var.project_id
   display_name = "${local.service_name} HTTP 5xx"
+  enabled      = var.enable_service_monitoring
   combiner     = "OR"
   severity     = "WARNING"
 
