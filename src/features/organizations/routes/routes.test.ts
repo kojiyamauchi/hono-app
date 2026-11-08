@@ -1017,6 +1017,8 @@ describe('organizations routes', () => {
     [`cursor=${encodeCursorPayload({ ...validAuditCursorPayload, kind: 'members' })}`],
     // PostgreSQLで扱えない0年の日時
     [`cursor=${encodeCursorPayload({ ...validAuditCursorPayload, createdAt: '0000-01-01T00:00:00.000Z' })}`],
+    // 有効なカーソルの末尾に不正な文字（`!`）を足した、正規のbase64urlではないカーソル
+    [`cursor=${encodeCursorPayload(validAuditCursorPayload)}%21`],
     // PostgreSQL INTEGERの上限（2147483647）を超える境界idとカーソルの組織ID
     [`cursor=${encodeCursorPayload({ ...validAuditCursorPayload, id: 2147483648 })}`],
     [`cursor=${encodeCursorPayload({ ...validAuditCursorPayload, organizationId: 2147483648 })}`],

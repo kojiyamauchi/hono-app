@@ -116,6 +116,54 @@ describe('encodeAuditLogCursor / decodeAuditLogCursor', () => {
 
     expect(decodeMemberListCursor(auditCursor)).not.toBeNull()
   })
+
+  // `Buffer.from(raw, 'base64url')` は不正な文字を黙って無視するため、改変されたカーソルも復元できてしまう。
+  // 発行時と同じ正規のbase64url文字列以外は、改変されたカーソルとしてnullにする。
+  describe('正規のbase64url形式ではないカーソル', () => {
+    const boundary = { organizationId: 1, createdAt: new Date('2026-01-01T00:00:00.000Z'), id: 3 }
+    const validCursor = encodeAuditLogCursor(boundary)
+
+    test('発行したカーソルはそのまま復元できる（比較用の前提）', () => {
+      expect(decodeAuditLogCursor(validCursor)).toEqual(boundary)
+    })
+
+    test.each(['!', '!!!', '*', ' ', '@'])('末尾に不正な文字（%j）を付加したものはnullを返す', (suffix) => {
+      expect(decodeAuditLogCursor(`${validCursor}${suffix}`)).toBeNull()
+    })
+
+    test('途中に不正な文字を挿入したものはnullを返す', () => {
+      expect(decodeAuditLogCursor(`${validCursor.slice(0, 10)}!${validCursor.slice(10)}`)).toBeNull()
+    })
+
+    test.each([
+      ['+', '>>>>>>'],
+      ['/', '??????'],
+    ])('URLセーフではない文字（%s）を含む標準base64形式のものはnullを返す', (character, filler) => {
+      // 無視される追加プロパティに、標準base64でのみ `+` や `/` へ符号化される値を入れて、URLセーフな形と標準形を作る
+      const json = JSON.stringify({ kind: 'auditLogs', version: 1, organizationId: 1, createdAt: '2026-01-01T00:00:00.000Z', id: 3, filler })
+      const standardBase64 = Buffer.from(json, 'utf8').toString('base64')
+      const urlSafeBase64 = Buffer.from(json, 'utf8').toString('base64url')
+
+      expect(standardBase64).toContain(character)
+      expect(decodeAuditLogCursor(urlSafeBase64)).toEqual(boundary)
+      expect(decodeAuditLogCursor(standardBase64.replace(/=+$/, ''))).toBeNull()
+    })
+
+    test('=パディングを付けたものはnullを返す', () => {
+      const json = JSON.stringify({ kind: 'auditLogs', version: 1, organizationId: 1, createdAt: '2026-01-01T00:00:00.000Z', id: 3, filler: 'a' })
+      const padded = Buffer.from(json, 'utf8').toString('base64')
+
+      expect(padded.endsWith('=')).toBe(true)
+      expect(decodeAuditLogCursor(padded.replace(/=+$/, ''))).toEqual(boundary)
+      expect(decodeAuditLogCursor(padded)).toBeNull()
+    })
+  })
+
+  test('メンバー一覧のデコードは従来どおり、末尾に不正な文字を付加したカーソルも受理する（既存仕様は変更しない）', () => {
+    const memberCursor = encodeMemberListCursor({ organizationId: 1, createdAt: new Date('2026-01-01T00:00:00.000Z'), id: 3 })
+
+    expect(decodeMemberListCursor(`${memberCursor}!`)).not.toBeNull()
+  })
 })
 
 describe('toAuditLogResponse / toAuditLogListResponse', () => {
