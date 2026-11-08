@@ -11,12 +11,15 @@ Codexが起票したIssueの本文レビュー・再レビューをClaudeのCLI�
 
 - 起票後または指摘対応後に、レビュー依頼とGitHubへの投稿がユーザーの依頼範囲に含まれることを確認する。
 - 対象IssueのURL、open状態、タイトル・本文の版を確認する。依頼時点の `updatedAt` を控え、レビュワーが取得する版と照合する。
-- 過去の投稿との混同を防ぐため、Issueコメントの最大IDを全ページから求める。コメントが0件の場合は `0` とする。
+- 過去の投稿との混同を防ぐため、Issueコメントの最大IDを全ページから求めて `comment_since` に保存する。コメントが0件の場合は `0` とする。取得に失敗した場合は依頼前に原因を確認する。
 
 ```bash
+issue_number='<Issue番号>'
+issue_url="https://github.com/kojiyamauchi/hono-app/issues/${issue_number}"
 gh issue view "$issue_url" --json title,body,state,updatedAt
 comments_endpoint="repos/kojiyamauchi/hono-app/issues/${issue_number}/comments?per_page=100"
-gh api "$comments_endpoint" --paginate --jq '[.[].id] | max // 0' | sort -n | tail -1
+comment_page_maxima="$(gh api "$comments_endpoint" --paginate --jq '[.[].id] | max // 0')" &&
+  comment_since="$(printf '%s\n' "$comment_page_maxima" | sort -n | tail -1)"
 ```
 
 ## 依頼プロンプト
@@ -54,7 +57,7 @@ claude -p "$review_prompt" \
 
 ## 投稿の確認と再レビュー
 
-CLIの完了後、GitHubから対象Issueのコメントを再取得し、CLIが返したURLのコメントが今回追加されたものか確認する。`comment_since` には依頼前に控えた最大IDを設定する。
+CLIの完了後、GitHubから対象Issueのコメントを再取得し、CLIが返したURLのコメントが今回追加されたものか確認する。依頼前に保存した `comment_since` を使う。
 
 ```bash
 ISSUE_REVIEW_COMMENT_SINCE="$comment_since" gh api "$comments_endpoint" --paginate \
