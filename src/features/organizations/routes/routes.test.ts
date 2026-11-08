@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, mock, test } from 'bun:test'
 import { sign } from 'hono/jwt'
 
+import type { AuditLog } from '@/features/organizations/entities'
 import type { Invitation } from '@/shared/invitation/entities'
 import type { Membership, Role } from '@/shared/membership/entities'
 import type { Organization } from '@/shared/organization/entities'
@@ -32,11 +33,13 @@ const invitationCancel = mock()
 const transferOwnership = mock()
 const leaveOrganization = mock()
 const changeRoleWithAuditLog = mock()
+const findAuditLogPage = mock()
 
 await mock.module('@/features/organizations/repositories', () => ({
   organizationMembershipRepository: { leave: leaveOrganization },
   organizationOwnershipRepository: { transferOwnership },
   organizationMemberRoleRepository: { changeRoleWithAuditLog },
+  organizationAuditLogRepository: { findPageByOrganization: findAuditLogPage },
   memberRoleChangeResults: {
     changed: 'CHANGED',
     unchanged: 'UNCHANGED',
@@ -137,6 +140,7 @@ describe('organizations routes', () => {
     membershipFindById.mockReset()
     membershipCreate.mockReset()
     changeRoleWithAuditLog.mockReset()
+    findAuditLogPage.mockReset()
     membershipDeleteById.mockReset()
     findByEmail.mockReset()
     invitationFindPendingByOrgAndEmail.mockReset()
@@ -845,6 +849,157 @@ describe('organizations routes', () => {
 
     expect(leaveResponse.status).toBe(204)
     expect(accessResponse.status).toBe(404)
+  })
+
+  // --- 監査ログルート ---
+
+  const auditLog = (id: number, createdAt = '2026-01-01T00:00:00.000Z'): AuditLog => ({
+    id,
+    organizationId: 1,
+    action: 'MEMBER_ROLE_CHANGED',
+    actorUserId: 1,
+    targetUserId: 2,
+    targetMembershipId: 10,
+    previousRole: 'MEMBER',
+    newRole: 'ADMIN',
+    createdAt: new Date(createdAt),
+  })
+
+  const auditLogsRequest = async (path: string, token?: string): Promise<Response> =>
+    app.request(path, token ? { headers: { Authorization: `Bearer ${token}` } } : undefined)
+
+  // 認証 → パス検証 → 所属確認 → ロール確認 → query検証の順
+  test('GET /organizations/:id/audit-logs は未認証なら不正queryでも401を返す', async () => {
+    const response = await auditLogsRequest('/organizations/1/audit-logs?limit=0')
+
+    expect(response.status).toBe(401)
+    expect(findByUserAndOrganization).not.toHaveBeenCalled()
+    expect(findAuditLogPage).not.toHaveBeenCalled()
+  })
+
+  test('GET /organizations/:id/audit-logs は不正な組織IDなら（不正queryでも）400を返し所属確認へ進まない', async () => {
+    const token = await createToken(1)
+
+    const response = await auditLogsRequest('/organizations/not-number/audit-logs?limit=0', token)
+
+    expect(response.status).toBe(400)
+    expect(findByUserAndOrganization).not.toHaveBeenCalled()
+    expect(findAuditLogPage).not.toHaveBeenCalled()
+  })
+
+  test('GET /organizations/:id/audit-logs は未所属・存在しない組織なら不正queryでも404を返す', async () => {
+    findByUserAndOrganization.mockResolvedValue(null)
+    const token = await createToken(1)
+
+    const response = await auditLogsRequest('/organizations/1/audit-logs?limit=0', token)
+
+    expect(response.status).toBe(404)
+    expect(findAuditLogPage).not.toHaveBeenCalled()
+  })
+
+  test.each(['', '?limit=0', '?cursor=invalid', '?offset=0'])(
+    'GET /organizations/:id/audit-logs%s はMEMBERなら403を返しrepositoryを呼ばない',
+    async (query) => {
+      findByUserAndOrganization.mockResolvedValue(membershipWithRole('MEMBER'))
+      const token = await createToken(1)
+
+      const response = await auditLogsRequest(`/organizations/1/audit-logs${query}`, token)
+
+      expect(response.status).toBe(403)
+      expect(findAuditLogPage).not.toHaveBeenCalled()
+    },
+  )
+
+  test.each<Role>(['OWNER', 'ADMIN'])('GET /organizations/:id/audit-logs は%sなら200で記録を新しい順のDTOで返す', async (role) => {
+    findByUserAndOrganization.mockResolvedValue(membershipWithRole(role))
+    findAuditLogPage.mockResolvedValue([auditLog(2, '2026-01-02T00:00:00.000Z'), auditLog(1)])
+    const token = await createToken(1)
+
+    const response = await auditLogsRequest('/organizations/1/audit-logs', token)
+
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as { items: Record<string, unknown>[]; nextCursor: string | null }
+    expect(body.items.map((item) => item.id)).toEqual([2, 1])
+    expect(body.items[0]).toEqual({
+      id: 2,
+      organizationId: 1,
+      action: 'MEMBER_ROLE_CHANGED',
+      actorUserId: 1,
+      targetUserId: 2,
+      targetMembershipId: 10,
+      previousRole: 'MEMBER',
+      newRole: 'ADMIN',
+      createdAt: '2026-01-02T00:00:00.000Z',
+    })
+    expect(body.nextCursor).toBeNull()
+    // 認可済みの組織IDで絞り込み、次ページ判定のためlimit + 1件を要求する
+    expect(findAuditLogPage).toHaveBeenCalledWith(1, 21, null)
+  })
+
+  test('GET /organizations/:id/audit-logs は0件なら空のitemsとnextCursor: nullを返す', async () => {
+    findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))
+    findAuditLogPage.mockResolvedValue([])
+    const token = await createToken(1)
+
+    const response = await auditLogsRequest('/organizations/1/audit-logs', token)
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ items: [], nextCursor: null })
+  })
+
+  test('GET /organizations/:id/audit-logs は同一createdAtの複数件でも、nextCursorの境界で重複・欠落なく続きを取得できる', async () => {
+    findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))
+    const sameCreatedAt = '2026-01-01T00:00:00.000Z'
+    const token = await createToken(1)
+
+    // 1ページ目: limit=2 に対して3件を返す（次ページあり）。同一createdAtで id の降順
+    findAuditLogPage.mockResolvedValueOnce([auditLog(12, sameCreatedAt), auditLog(11, sameCreatedAt), auditLog(10, sameCreatedAt)])
+    const first = await auditLogsRequest('/organizations/1/audit-logs?limit=2', token)
+    const firstBody = (await first.json()) as { items: { id: number }[]; nextCursor: string | null }
+
+    expect(first.status).toBe(200)
+    expect(firstBody.items.map((item) => item.id)).toEqual([12, 11])
+    expect(firstBody.nextCursor).not.toBeNull()
+
+    // 2ページ目: 最後に返したitem(id 11)を境界にし、残り1件で最終ページ
+    findAuditLogPage.mockResolvedValueOnce([auditLog(10, sameCreatedAt)])
+    const second = await auditLogsRequest(`/organizations/1/audit-logs?limit=2&cursor=${firstBody.nextCursor}`, token)
+    const secondBody = (await second.json()) as { items: { id: number }[]; nextCursor: string | null }
+
+    expect(second.status).toBe(200)
+    expect(findAuditLogPage).toHaveBeenLastCalledWith(1, 3, { createdAt: new Date(sameCreatedAt), id: 11 })
+    expect(secondBody.items.map((item) => item.id)).toEqual([10])
+    expect(secondBody.nextCursor).toBeNull()
+  })
+
+  const encodeCursorPayload = (payload: Record<string, unknown>): string => Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url')
+  const validAuditCursorPayload = { kind: 'auditLogs', version: 1, organizationId: 1, createdAt: '2026-01-01T00:00:00.000Z', id: 3 }
+
+  test.each([
+    ['limit=0'],
+    ['limit=101'],
+    ['limit='],
+    ['cursor='],
+    ['cursor=invalid'],
+    ['offset=0'],
+    // 別組織で発行されたカーソル
+    [`cursor=${encodeCursorPayload({ ...validAuditCursorPayload, organizationId: 2 })}`],
+    // メンバー一覧のカーソル（kindなし）
+    [`cursor=${encodeCursorPayload({ version: 1, organizationId: 1, createdAt: '2026-01-01T00:00:00.000Z', id: 3 })}`],
+    // 別種別のカーソル
+    [`cursor=${encodeCursorPayload({ ...validAuditCursorPayload, kind: 'members' })}`],
+    // PostgreSQLで扱えない0年の日時
+    [`cursor=${encodeCursorPayload({ ...validAuditCursorPayload, createdAt: '0000-01-01T00:00:00.000Z' })}`],
+  ])('GET /organizations/:id/audit-logs?%s はOWNER/ADMINでも400を返しrepositoryを呼ばない', async (query) => {
+    findByUserAndOrganization.mockResolvedValue(membershipWithRole('ADMIN'))
+    const token = await createToken(1)
+
+    const response = await auditLogsRequest(`/organizations/1/audit-logs?${query}`, token)
+
+    expect(response.status).toBe(400)
+    const body = (await response.json()) as { error?: { message?: string } }
+    expect(typeof body.error?.message).toBe('string')
+    expect(findAuditLogPage).not.toHaveBeenCalled()
   })
 
   // --- 招待管理ルート ---
