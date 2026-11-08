@@ -5,11 +5,12 @@ import type { MemberDtoType } from '@/shared/membership/dtos'
 import type { Role } from '@/shared/membership/entities'
 import type { OrganizationDtoType } from '@/shared/organization/dtos'
 
-import type { MemberListDtoType, OrganizationListDtoType } from '../dtos'
+import type { AuditLogListDtoType, MemberListDtoType, OrganizationListDtoType } from '../dtos'
 import type {
   AddMemberBodySchemaType,
   CreateInvitationBodySchemaType,
   CreateOrganizationSchemaType,
+  ListAuditLogsQuerySchemaType,
   ListMembersQuerySchemaType,
   ListMineQuerySchemaType,
   TransferOwnershipBodySchemaType,
@@ -139,6 +140,19 @@ export const organizationsMembersController = {
   removeMember: async (c: Context, organizationId: number, membershipId: number, operatorRole: Role): Promise<Response> => {
     await organizationsService.removeMember(organizationId, membershipId, operatorRole)
     return c.body(null, 204)
+  },
+}
+
+/**
+ * organizations/audit-logs featureのコントローラ。
+ */
+export const organizationsAuditLogsController = {
+  /**
+   * 組織の監査ログを、検証済みqueryのlimit・cursorで1ページ分返す。
+   */
+  listAuditLogs: async (c: Context, organizationId: number, query: ListAuditLogsQuerySchemaType): Promise<TypedResponse<AuditLogListDtoType, 200, 'json'>> => {
+    const result = await organizationsService.listAuditLogs(organizationId, query.limit, query.cursor)
+    return c.json(result, 200)
   },
 }
 
