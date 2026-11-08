@@ -119,16 +119,17 @@ export const organizationsMembersController = {
   },
 
   /**
-   * メンバーのロールを変更する。
+   * メンバーのロールを変更する。操作者の認証済みユーザーIDは監査ログの記録に使う。
    */
   updateMemberRole: async (
     c: Context,
     organizationId: number,
     membershipId: number,
+    actorUserId: number,
     operatorRole: Role,
     input: UpdateMemberRoleBodySchemaType,
   ): Promise<TypedResponse<MemberDtoType, 200, 'json'>> => {
-    const result = await organizationsService.updateMemberRole(organizationId, membershipId, operatorRole, input)
+    const result = await organizationsService.updateMemberRole(organizationId, membershipId, actorUserId, operatorRole, input)
     return c.json(result, 200)
   },
 
