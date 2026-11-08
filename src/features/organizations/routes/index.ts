@@ -427,6 +427,7 @@ export const organizationsRoutes = new OpenAPIHono({ defaultHook: openApiDefault
       c,
       c.req.valid('param').id,
       c.req.valid('param').membershipId,
+      c.get('userId'),
       c.get('membership').role,
       c.req.valid('json'),
     ),
