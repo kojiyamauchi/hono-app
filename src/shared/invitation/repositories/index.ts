@@ -1,8 +1,28 @@
+import type { Prisma } from '@/generated/prisma/client'
 import { prisma } from '@/libs/prisma'
 import type { Invitation, InvitationStatus, InvitationWithOrganization } from '@/shared/invitation/entities'
 import type { Membership, Role } from '@/shared/membership/entities'
 import type { User } from '@/shared/user/entities'
 import { isPrismaUniqueConstraintError } from '@/utils/prisma'
+
+/** `$transaction` のinteractive transactionで渡されるclient（`$queryRaw` だけを使う）。 */
+type RawQueryClient = Pick<Prisma.TransactionClient, '$queryRaw'>
+
+/**
+ * 招待を更新する前に、対象のOrganization行を `FOR KEY SHARE` で確保する。
+ * 組織削除はOrganization行を先に `FOR UPDATE` でロックしてから関連行を削除する。
+ * 招待の更新後にMembershipの外部キー検査で親行を待つと組織削除と逆順になるため、先に親行を確保して順序を揃える。
+ * 組織がすでに削除されていれば `false` を返し、呼び出し側は既存の競合結果（null）へ変換する。
+ */
+const lockOrganizationForShare = async (tx: RawQueryClient, organizationId: number): Promise<boolean> => {
+  const lockedOrganizations = await tx.$queryRaw<{ id: number }[]>`
+    SELECT id
+    FROM "Organization"
+    WHERE id = ${organizationId}
+    FOR KEY SHARE
+  `
+  return lockedOrganizations.length > 0
+}
 
 /**
  * Invitationのデータアクセスを提供するリポジトリ。
@@ -103,6 +123,9 @@ export const invitationRepository = {
   accept: async (invitationId: number, organizationId: number, userId: number, role: Role): Promise<Membership | null> => {
     try {
       return await prisma.$transaction(async (tx) => {
+        if (!(await lockOrganizationForShare(tx, organizationId))) {
+          return null
+        }
         const result = await tx.invitation.updateMany({
           where: { id: invitationId, status: 'PENDING' },
           data: { status: 'ACCEPTED' },
@@ -127,6 +150,9 @@ export const invitationRepository = {
   signup: async (invitationId: number, organizationId: number, email: string, name: string, password: string, role: Role): Promise<User | null> => {
     try {
       return await prisma.$transaction(async (tx) => {
+        if (!(await lockOrganizationForShare(tx, organizationId))) {
+          return null
+        }
         const result = await tx.invitation.updateMany({
           where: { id: invitationId, status: 'PENDING' },
           data: { status: 'ACCEPTED' },
