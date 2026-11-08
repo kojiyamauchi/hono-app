@@ -16,7 +16,7 @@ const fetchOpenApiDoc = async (): Promise<{
 }
 
 describe('organizations routes OpenAPI定義', () => {
-  test('14 path × method が paths へ反映されている', async () => {
+  test('15 path × method が paths へ反映されている', async () => {
     const doc = await fetchOpenApiDoc()
 
     expect(doc.paths?.['/organizations']?.get).toBeDefined()
@@ -30,6 +30,7 @@ describe('organizations routes OpenAPI定義', () => {
     expect(doc.paths?.['/organizations/{id}/members/me']?.delete).toBeDefined()
     expect(doc.paths?.['/organizations/{id}/members/{membershipId}']?.patch).toBeDefined()
     expect(doc.paths?.['/organizations/{id}/members/{membershipId}']?.delete).toBeDefined()
+    expect(doc.paths?.['/organizations/{id}/audit-logs']?.get).toBeDefined()
     expect(doc.paths?.['/organizations/{id}/invitations']?.get).toBeDefined()
     expect(doc.paths?.['/organizations/{id}/invitations']?.post).toBeDefined()
     expect(doc.paths?.['/organizations/{id}/invitations/{invitationId}']?.delete).toBeDefined()
@@ -63,6 +64,8 @@ describe('organizations routes OpenAPI定義', () => {
     expect(doc.components?.schemas?.Invitation).toBeDefined()
     expect(doc.components?.schemas?.OrganizationList).toBeDefined()
     expect(doc.components?.schemas?.MemberList).toBeDefined()
+    expect(doc.components?.schemas?.AuditLog).toBeDefined()
+    expect(doc.components?.schemas?.AuditLogList).toBeDefined()
     expect(doc.components?.schemas?.CreateOrganizationRequest).toBeDefined()
     expect(doc.components?.schemas?.UpdateOrganizationRequest).toBeDefined()
     expect(doc.components?.schemas?.AddMemberRequest).toBeDefined()
@@ -101,6 +104,49 @@ describe('organizations routes OpenAPI定義', () => {
     // coerceがnullを0として受けると生成schemaへ nullable: true が付くため、整数のみであることを固定する
     const offsetParam = listMineGet.parameters?.find((parameter) => parameter.name === 'offset') as { schema?: Record<string, unknown> } | undefined
     expect(offsetParam?.schema).toEqual({ type: 'integer', minimum: 0, maximum: 10000, default: 0, example: 0 })
+  })
+
+  test('監査ログ一覧endpointの認証、パス・queryパラメータ、responseが定義されている', async () => {
+    const doc = await fetchOpenApiDoc()
+
+    const auditLogsGet = doc.paths?.['/organizations/{id}/audit-logs']?.get as {
+      tags?: string[]
+      security?: unknown[]
+      parameters?: { name: string; in: string; required?: boolean; schema?: { maximum?: number } }[]
+      responses: Record<string, { content?: Record<string, { schema?: { $ref?: string } }> }>
+    }
+    expect(auditLogsGet.tags).toEqual(['Organization Audit Logs'])
+    expect(auditLogsGet.security).toEqual([{ bearerAuth: [] }])
+
+    const idParam = auditLogsGet.parameters?.find((parameter) => parameter.name === 'id')
+    expect(idParam?.in).toBe('path')
+    expect(idParam?.required).toBe(true)
+    // 監査ログ一覧専用のパスschemaはPostgreSQL INTEGERの上限をmaximumとして公開する
+    expect(idParam?.schema?.maximum).toBe(2147483647)
+
+    // カーソル式: limit + cursor。未対応のoffsetは出さない
+    const queryNames = auditLogsGet.parameters?.filter((parameter) => parameter.in === 'query').map((parameter) => parameter.name)
+    expect(queryNames).toContain('limit')
+    expect(queryNames).toContain('cursor')
+    expect(queryNames).not.toContain('offset')
+
+    expect(auditLogsGet.responses['200'].content?.['application/json'].schema?.$ref).toBe('#/components/schemas/AuditLogList')
+    for (const status of ['400', '401', '403', '404', '500']) {
+      expect(auditLogsGet.responses[status].content?.['application/json'].schema?.$ref).toBe('#/components/schemas/ErrorResponse')
+    }
+  })
+
+  test('組織IDの上限（maximum）は監査ログ一覧のpath parameterだけに出て、他の組織ルートには出ない', async () => {
+    const doc = await fetchOpenApiDoc()
+
+    type PathOperation = { parameters?: { name: string; in: string; schema?: { maximum?: number } }[] }
+    const idMaximum = (path: string, method: string): number | undefined =>
+      (doc.paths?.[path]?.[method] as PathOperation).parameters?.find((parameter) => parameter.name === 'id')?.schema?.maximum
+
+    expect(idMaximum('/organizations/{id}/audit-logs', 'get')).toBe(2147483647)
+    expect(idMaximum('/organizations/{id}', 'get')).toBeUndefined()
+    expect(idMaximum('/organizations/{id}/members', 'get')).toBeUndefined()
+    expect(idMaximum('/organizations/{id}/invitations', 'get')).toBeUndefined()
   })
 
   test('所有権移譲endpointのrequest bodyとresponseが定義されている', async () => {

@@ -6,11 +6,15 @@ const queryRaw = mock()
 const organizationCreate = mock()
 const membershipCreate = mock()
 const organizationFindMany = mock()
+const organizationDelete = mock()
+const membershipDeleteMany = mock()
+const invitationDeleteMany = mock()
 const transaction = mock(async (callback: (tx: unknown) => Promise<unknown>) =>
   callback({
     $queryRaw: queryRaw,
-    organization: { create: organizationCreate },
-    membership: { create: membershipCreate },
+    organization: { create: organizationCreate, delete: organizationDelete },
+    membership: { create: membershipCreate, deleteMany: membershipDeleteMany },
+    invitation: { deleteMany: invitationDeleteMany },
   }),
 )
 
@@ -85,5 +89,63 @@ describe('organizationRepository.findPageByUserId', () => {
       skip: 40,
       take: 21,
     })
+  })
+})
+
+describe('organizationRepository.deleteById', () => {
+  beforeEach(() => {
+    queryRaw.mockReset()
+    organizationDelete.mockReset()
+    membershipDeleteMany.mockReset()
+    invitationDeleteMany.mockReset()
+    transaction.mockClear()
+  })
+
+  test('Organization行をFOR UPDATEでロックしてから、招待・メンバーシップ・組織の順に削除する', async () => {
+    const callOrder: string[] = []
+    queryRaw.mockImplementation(async (strings: string[], ...values: unknown[]) => {
+      callOrder.push('organization-lock')
+      expect(strings.join('?').replace(/\s+/g, ' ')).toContain('FROM "Organization" WHERE id = ? FOR UPDATE')
+      expect(values).toEqual([1])
+      return [{ id: 1 }]
+    })
+    invitationDeleteMany.mockImplementation(async () => {
+      callOrder.push('invitation-delete')
+      return { count: 0 }
+    })
+    membershipDeleteMany.mockImplementation(async () => {
+      callOrder.push('membership-delete')
+      return { count: 1 }
+    })
+    organizationDelete.mockImplementation(async () => {
+      callOrder.push('organization-delete')
+      return organization
+    })
+
+    const result = await organizationRepository.deleteById(1)
+
+    expect(result).toBe(true)
+    expect(callOrder).toEqual(['organization-lock', 'invitation-delete', 'membership-delete', 'organization-delete'])
+    expect(invitationDeleteMany).toHaveBeenCalledWith({ where: { organizationId: 1 } })
+    expect(membershipDeleteMany).toHaveBeenCalledWith({ where: { organizationId: 1 } })
+    expect(organizationDelete).toHaveBeenCalledWith({ where: { id: 1 } })
+  })
+
+  test('ロックで組織が取得できなければ何も削除せずfalseを返す', async () => {
+    queryRaw.mockResolvedValue([])
+
+    const result = await organizationRepository.deleteById(999)
+
+    expect(result).toBe(false)
+    expect(invitationDeleteMany).not.toHaveBeenCalled()
+    expect(membershipDeleteMany).not.toHaveBeenCalled()
+    expect(organizationDelete).not.toHaveBeenCalled()
+  })
+
+  test('削除中のエラーはそのままthrowする', async () => {
+    queryRaw.mockResolvedValue([{ id: 1 }])
+    invitationDeleteMany.mockRejectedValue(new Error('削除エラー'))
+
+    await expect(organizationRepository.deleteById(1)).rejects.toThrow('削除エラー')
   })
 })

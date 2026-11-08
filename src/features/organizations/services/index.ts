@@ -11,9 +11,26 @@ import { organizationRepository } from '@/shared/organization/repositories'
 import { userRepository } from '@/shared/user/repositories'
 import { AppError } from '@/utils/errors'
 
-import type { MemberListDtoType, OrganizationListDtoType } from '../dtos'
-import { decodeMemberListCursor, encodeMemberListCursor, toMemberListResponse, toOrganizationListResponse } from '../mappers'
-import { leaveOrganizationResults, organizationMembershipRepository, organizationOwnershipRepository, ownershipTransferResults } from '../repositories'
+import type { AuditLogListDtoType, MemberListDtoType, OrganizationListDtoType } from '../dtos'
+import {
+  decodeAuditLogCursor,
+  decodeMemberListCursor,
+  encodeAuditLogCursor,
+  encodeMemberListCursor,
+  toAuditLogListResponse,
+  toMemberListResponse,
+  toOrganizationListResponse,
+} from '../mappers'
+import {
+  type AuditLogPageBoundary,
+  leaveOrganizationResults,
+  memberRoleChangeResults,
+  organizationAuditLogRepository,
+  organizationMemberRoleRepository,
+  organizationMembershipRepository,
+  organizationOwnershipRepository,
+  ownershipTransferResults,
+} from '../repositories'
 import type {
   AddMemberBodySchemaType,
   CreateInvitationBodySchemaType,
@@ -21,6 +38,27 @@ import type {
   UpdateMemberRoleBodySchemaType,
   UpdateOrganizationSchemaType,
 } from '../schemas'
+
+/**
+ * ロック後に確定した操作者・対象のロールに対して、ロール変更の認可規則を適用する。
+ * 許可なら `null`、拒否ならステータス付きの `AppError` を返す（repositoryはHTTPエラーを知らないため、返却値を呼び出し側でthrowする）。
+ * 判定順は通常時のエラー順（操作者の権限 → 対象OWNER → ADMINの制限）に揃える。
+ */
+const authorizeMemberRoleChange = (operatorRole: Role, targetRole: Role, newRole: Role): AppError | null => {
+  if (operatorRole === 'MEMBER') {
+    return new AppError(403, 'この操作には管理者以上の権限が必要です')
+  }
+  if (targetRole === 'OWNER') {
+    return new AppError(409, 'OWNERのロールは変更できません')
+  }
+  if (operatorRole === 'ADMIN' && targetRole === 'ADMIN') {
+    return new AppError(403, 'ADMINは他のADMINを操作できません')
+  }
+  if (operatorRole === 'ADMIN' && newRole === 'ADMIN') {
+    return new AppError(403, 'ADMINはADMINへの昇格を実行できません')
+  }
+  return null
+}
 
 /**
  * organizations featureのユースケースを提供するサービス。
@@ -148,6 +186,31 @@ export const organizationsService = {
   },
 
   /**
+   * 組織の監査ログを新しい順にカーソル式で1ページ分返す。OWNER/ADMINのみ閲覧可（ミドルウェアで確認済み）。
+   * カーソルは境界値としてのみ使い、基準行が削除されても続きが取得できる（行の存在に依存しない）。
+   * 次ページの有無は `limit + 1` 件の取得で判定し、レスポンスのitemsは `limit` 件以下にする。
+   * 形式が不正なカーソル、別APIで発行されたカーソル（kind不一致）、別組織で発行されたカーソルはいずれも400とする。
+   */
+  listAuditLogs: async (organizationId: number, limit: number, cursor?: string): Promise<AuditLogListDtoType> => {
+    let boundary: AuditLogPageBoundary | null = null
+    if (cursor !== undefined) {
+      const decoded = decodeAuditLogCursor(cursor)
+      if (decoded === null || decoded.organizationId !== organizationId) {
+        throw new AppError(400, 'カーソルが不正です')
+      }
+      boundary = { createdAt: decoded.createdAt, id: decoded.id }
+    }
+
+    // 認可はカーソル内の組織情報ではなく、引数で渡された認可済みのorganizationIdで毎回適用する
+    const auditLogs = await organizationAuditLogRepository.findPageByOrganization(organizationId, limit + 1, boundary)
+    const items = auditLogs.slice(0, limit)
+    const last = items.at(-1)
+    const nextCursor = auditLogs.length > limit && last !== undefined ? encodeAuditLogCursor({ organizationId, createdAt: last.createdAt, id: last.id }) : null
+
+    return toAuditLogListResponse(items, nextCursor)
+  },
+
+  /**
    * メンバーを追加する。
    * OWNERはMEMBER/ADMINを追加可。ADMINはMEMBERのみ追加可。MEMBERは操作不可。
    */
@@ -177,35 +240,50 @@ export const organizationsService = {
   },
 
   /**
-   * メンバーのロールを変更する。
+   * メンバーのロールを変更する。実際にロールが変わったときは監査ログを同じtransactionで記録する。
    * OWNERはADMIN/MEMBERへ変更可。ADMINはMEMBERのみ操作可でADMINへの昇格不可。MEMBERは操作不可。
    * 対象がOWNERの場合は操作不可（OWNERは自身に対しても含む）。
+   *
+   * 引数の `operatorRole` はmiddlewareが読んだ値で、通常時のエラー順を保つ事前判定にだけ使う。
+   * 最終的な認可は、repositoryがロックした後の最新ロールに同じ規則を適用して判定する。
+   * 同じロールの指定は許可されるが、実変更ではないため記録しない。
    */
-  updateMemberRole: async (organizationId: number, membershipId: number, operatorRole: Role, input: UpdateMemberRoleBodySchemaType): Promise<MemberDtoType> => {
+  updateMemberRole: async (
+    organizationId: number,
+    membershipId: number,
+    actorUserId: number,
+    operatorRole: Role,
+    input: UpdateMemberRoleBodySchemaType,
+  ): Promise<MemberDtoType> => {
     if (input.role === 'OWNER') {
       throw new AppError(422, 'OWNERへの変更はできません')
     }
     if (operatorRole === 'MEMBER') {
       throw new AppError(403, 'この操作には管理者以上の権限が必要です')
     }
-    const target = await membershipRepository.findById(membershipId)
-    if (!target || target.organizationId !== organizationId) {
+
+    const result = await organizationMemberRoleRepository.changeRoleWithAuditLog<AppError>(
+      { organizationId, targetMembershipId: membershipId, actorUserId, newRole: input.role },
+      (locked) => authorizeMemberRoleChange(locked.operatorRole, locked.targetRole, input.role),
+    )
+
+    // 成功値を明示的に判定し、未知の結果を暗黙の成功として扱わない。
+    if (result.status === memberRoleChangeResults.changed || result.status === memberRoleChangeResults.unchanged) {
+      return toMemberResponse(result.membership)
+    }
+    if (result.status === memberRoleChangeResults.organizationNotFound) {
+      throw new AppError(404, '組織が見つかりません')
+    }
+    if (result.status === memberRoleChangeResults.targetNotFound) {
       throw new AppError(404, 'メンバーが見つかりません')
     }
-    if (target.role === 'OWNER') {
-      throw new AppError(409, 'OWNERのロールは変更できません')
+    if (result.status === memberRoleChangeResults.rejected) {
+      throw result.rejection
     }
-    if (operatorRole === 'ADMIN' && target.role === 'ADMIN') {
-      throw new AppError(403, 'ADMINは他のADMINを操作できません')
+    if (result.status === memberRoleChangeResults.conflict) {
+      throw new AppError(409, '競合によりロールを変更できませんでした')
     }
-    if (operatorRole === 'ADMIN' && input.role === 'ADMIN') {
-      throw new AppError(403, 'ADMINはADMINへの昇格を実行できません')
-    }
-    const updated = await membershipRepository.updateRole(membershipId, input.role)
-    if (!updated) {
-      throw new AppError(404, 'メンバーが見つかりません')
-    }
-    return toMemberResponse(updated)
+    throw new Error('メンバーロール変更の結果が不明です')
   },
 
   /**

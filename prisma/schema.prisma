@@ -34,6 +34,7 @@ model Organization {
   updatedAt   DateTime     @updatedAt
   memberships Membership[]
   invitations Invitation[]
+  auditLogs   AuditLog[]
 }
 
 model Membership {
@@ -49,6 +50,31 @@ model Membership {
   // 組織単位のメンバー一覧取得（参加日時順）と、組織削除時の一括削除を支援する。
   // カーソル式ページネーションの行値比較（("createdAt", id) > (...)）の境界条件をIndex Condへ入れるため、idまで含める。
   // 2カラム構成ではFilterとIncremental Sortが残るため、末尾にidを足した形へ置き換えている（旧indexはprefixで冗長）。
+  @@index([organizationId, createdAt, id])
+}
+
+enum AuditAction {
+  MEMBER_ROLE_CHANGED
+}
+
+model AuditLog {
+  id                 Int          @id @default(autoincrement())
+  organizationId     Int
+  action             AuditAction
+  // 操作者・対象のIDは記録時点の値として保存する。ユーザーやメンバーシップが削除された後も
+  // 記録を残すため、UserとMembershipへの外部キーは設定しない。
+  actorUserId        Int
+  targetUserId       Int
+  targetMembershipId Int
+  previousRole       Role
+  newRole            Role
+  createdAt          DateTime     @default(now())
+  // 組織が削除されたときは、同じトランザクション内で記録も削除する。
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // 組織単位の監査ログ一覧取得（新しい順）を支援する。
+  // カーソル式ページネーションの行値比較（("createdAt", id) < (...)）の境界条件をIndex Condへ入れるため、idまで含める。
+  // 並びはDESCだが、btreeの逆方向スキャンで満たせるためindexはASCのまま定義する。
   @@index([organizationId, createdAt, id])
 }
 
