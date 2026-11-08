@@ -112,7 +112,7 @@ describe('organizations routes OpenAPI定義', () => {
     const auditLogsGet = doc.paths?.['/organizations/{id}/audit-logs']?.get as {
       tags?: string[]
       security?: unknown[]
-      parameters?: { name: string; in: string; required?: boolean }[]
+      parameters?: { name: string; in: string; required?: boolean; schema?: { maximum?: number } }[]
       responses: Record<string, { content?: Record<string, { schema?: { $ref?: string } }> }>
     }
     expect(auditLogsGet.tags).toEqual(['Organization Audit Logs'])
@@ -121,6 +121,8 @@ describe('organizations routes OpenAPI定義', () => {
     const idParam = auditLogsGet.parameters?.find((parameter) => parameter.name === 'id')
     expect(idParam?.in).toBe('path')
     expect(idParam?.required).toBe(true)
+    // 監査ログ一覧専用のパスschemaはPostgreSQL INTEGERの上限をmaximumとして公開する
+    expect(idParam?.schema?.maximum).toBe(2147483647)
 
     // カーソル式: limit + cursor。未対応のoffsetは出さない
     const queryNames = auditLogsGet.parameters?.filter((parameter) => parameter.in === 'query').map((parameter) => parameter.name)
@@ -132,6 +134,19 @@ describe('organizations routes OpenAPI定義', () => {
     for (const status of ['400', '401', '403', '404', '500']) {
       expect(auditLogsGet.responses[status].content?.['application/json'].schema?.$ref).toBe('#/components/schemas/ErrorResponse')
     }
+  })
+
+  test('組織IDの上限（maximum）は監査ログ一覧のpath parameterだけに出て、他の組織ルートには出ない', async () => {
+    const doc = await fetchOpenApiDoc()
+
+    type PathOperation = { parameters?: { name: string; in: string; schema?: { maximum?: number } }[] }
+    const idMaximum = (path: string, method: string): number | undefined =>
+      (doc.paths?.[path]?.[method] as PathOperation).parameters?.find((parameter) => parameter.name === 'id')?.schema?.maximum
+
+    expect(idMaximum('/organizations/{id}/audit-logs', 'get')).toBe(2147483647)
+    expect(idMaximum('/organizations/{id}', 'get')).toBeUndefined()
+    expect(idMaximum('/organizations/{id}/members', 'get')).toBeUndefined()
+    expect(idMaximum('/organizations/{id}/invitations', 'get')).toBeUndefined()
   })
 
   test('所有権移譲endpointのrequest bodyとresponseが定義されている', async () => {

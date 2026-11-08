@@ -887,6 +887,33 @@ describe('organizations routes', () => {
     expect(findAuditLogPage).not.toHaveBeenCalled()
   })
 
+  // PostgreSQL INTEGERの上限（2147483647）を超える組織IDは、DBの整数変換で500になるため所属確認の前に400にする
+  test.each(['2147483648', '9007199254740991'])(
+    'GET /organizations/%s/audit-logs は上限を超える組織IDなら400を返し所属確認へ進まない',
+    async (organizationId) => {
+      const token = await createToken(1)
+
+      const response = await auditLogsRequest(`/organizations/${organizationId}/audit-logs`, token)
+
+      expect(response.status).toBe(400)
+      const body = (await response.json()) as { error?: { message?: string } }
+      expect(body.error?.message).toContain('2147483647以下')
+      expect(findByUserAndOrganization).not.toHaveBeenCalled()
+      expect(findAuditLogPage).not.toHaveBeenCalled()
+    },
+  )
+
+  test('GET /organizations/2147483647/audit-logs は上限ちょうどの組織IDならパス検証を通過して所属確認へ進む', async () => {
+    findByUserAndOrganization.mockResolvedValue(null)
+    const token = await createToken(1)
+
+    const response = await auditLogsRequest('/organizations/2147483647/audit-logs', token)
+
+    expect(response.status).toBe(404)
+    expect(findByUserAndOrganization).toHaveBeenCalledWith(1, 2147483647)
+    expect(findAuditLogPage).not.toHaveBeenCalled()
+  })
+
   test('GET /organizations/:id/audit-logs は未所属・存在しない組織なら不正queryでも404を返す', async () => {
     findByUserAndOrganization.mockResolvedValue(null)
     const token = await createToken(1)
@@ -990,6 +1017,9 @@ describe('organizations routes', () => {
     [`cursor=${encodeCursorPayload({ ...validAuditCursorPayload, kind: 'members' })}`],
     // PostgreSQLで扱えない0年の日時
     [`cursor=${encodeCursorPayload({ ...validAuditCursorPayload, createdAt: '0000-01-01T00:00:00.000Z' })}`],
+    // PostgreSQL INTEGERの上限（2147483647）を超える境界idとカーソルの組織ID
+    [`cursor=${encodeCursorPayload({ ...validAuditCursorPayload, id: 2147483648 })}`],
+    [`cursor=${encodeCursorPayload({ ...validAuditCursorPayload, organizationId: 2147483648 })}`],
   ])('GET /organizations/:id/audit-logs?%s はOWNER/ADMINでも400を返しrepositoryを呼ばない', async (query) => {
     findByUserAndOrganization.mockResolvedValue(membershipWithRole('ADMIN'))
     const token = await createToken(1)
@@ -1000,6 +1030,18 @@ describe('organizations routes', () => {
     const body = (await response.json()) as { error?: { message?: string } }
     expect(typeof body.error?.message).toBe('string')
     expect(findAuditLogPage).not.toHaveBeenCalled()
+  })
+
+  test('GET /organizations/:id/audit-logs は境界idが上限（2147483647）ちょうどのカーソルを有効として扱う', async () => {
+    findByUserAndOrganization.mockResolvedValue(membershipWithRole('ADMIN'))
+    findAuditLogPage.mockResolvedValue([])
+    const token = await createToken(1)
+    const cursor = encodeCursorPayload({ ...validAuditCursorPayload, id: 2147483647 })
+
+    const response = await auditLogsRequest(`/organizations/1/audit-logs?cursor=${cursor}`, token)
+
+    expect(response.status).toBe(200)
+    expect(findAuditLogPage).toHaveBeenCalledWith(1, 21, { createdAt: new Date('2026-01-01T00:00:00.000Z'), id: 2147483647 })
   })
 
   // --- 招待管理ルート ---
