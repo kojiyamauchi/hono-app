@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, mock, test } from 'bun:test'
 
-import type { Membership } from '@/shared/membership/entities'
+import type { Membership, Role } from '@/shared/membership/entities'
 import type { Organization } from '@/shared/organization/entities'
+import type { AppError } from '@/utils/errors'
 
 import { encodeMemberListCursor } from '../mappers'
 
@@ -14,7 +15,6 @@ const deleteById = mock()
 const findPageByOrganization = mock()
 const membershipFindById = mock()
 const membershipCreate = mock()
-const updateRole = mock()
 const membershipDeleteById = mock()
 const findByUserAndOrganization = mock()
 
@@ -28,10 +28,20 @@ const invitationCancel = mock()
 
 const transferOwnership = mock()
 const leaveOrganization = mock()
+const changeRoleWithAuditLog = mock()
 
 await mock.module('@/features/organizations/repositories', () => ({
   organizationMembershipRepository: { leave: leaveOrganization },
   organizationOwnershipRepository: { transferOwnership },
+  organizationMemberRoleRepository: { changeRoleWithAuditLog },
+  memberRoleChangeResults: {
+    changed: 'CHANGED',
+    unchanged: 'UNCHANGED',
+    organizationNotFound: 'ORGANIZATION_NOT_FOUND',
+    targetNotFound: 'TARGET_NOT_FOUND',
+    rejected: 'REJECTED',
+    conflict: 'CONFLICT',
+  },
   leaveOrganizationResults: {
     left: 'LEFT',
     owner: 'OWNER',
@@ -55,7 +65,6 @@ await mock.module('@/shared/membership/repositories', () => ({
     findPageByOrganization,
     findById: membershipFindById,
     create: membershipCreate,
-    updateRole,
     deleteById: membershipDeleteById,
   },
 }))
@@ -447,81 +456,157 @@ describe('organizationsService.addMember', () => {
 })
 
 describe('organizationsService.updateMemberRole', () => {
+  type LockedState = { operatorRole: Role; targetRole: Role }
+
   beforeEach(() => {
-    membershipFindById.mockReset()
-    updateRole.mockReset()
+    changeRoleWithAuditLog.mockReset()
   })
 
+  /**
+   * repositoryがロック後に読み直したロールで認可コールバックを呼ぶ動きを再現する。
+   * 拒否ならREJECTED、同一ロールならUNCHANGED、それ以外はCHANGEDを返す。
+   */
+  const simulateRepository = (locked: LockedState): void => {
+    changeRoleWithAuditLog.mockImplementation(async (input: { newRole: Role }, authorize: (state: LockedState) => AppError | null) => {
+      const rejection = authorize(locked)
+      if (rejection !== null) {
+        return { status: 'REJECTED', rejection }
+      }
+      if (locked.targetRole === input.newRole) {
+        return { status: 'UNCHANGED', membership: { ...membership, role: locked.targetRole } }
+      }
+      return { status: 'CHANGED', membership: { ...membership, role: input.newRole } }
+    })
+  }
+
   test('変更先ロールにOWNERを指定すると422エラーを投げる', async () => {
-    await expect(organizationsService.updateMemberRole(1, 10, 'OWNER', { role: 'OWNER' })).rejects.toThrow('OWNERへの変更はできません')
-    expect(updateRole).not.toHaveBeenCalled()
+    await expect(organizationsService.updateMemberRole(1, 10, 1, 'OWNER', { role: 'OWNER' })).rejects.toMatchObject({
+      statusCode: 422,
+      message: 'OWNERへの変更はできません',
+    })
+    expect(changeRoleWithAuditLog).not.toHaveBeenCalled()
+  })
+
+  test('MEMBERは操作できず403エラーを投げる', async () => {
+    await expect(organizationsService.updateMemberRole(1, 10, 1, 'MEMBER', { role: 'MEMBER' })).rejects.toMatchObject({ statusCode: 403 })
+    expect(changeRoleWithAuditLog).not.toHaveBeenCalled()
+  })
+
+  test('OWNERロール指定のエラー（422）はMEMBERの権限不足（403）より先に返る', async () => {
+    await expect(organizationsService.updateMemberRole(1, 10, 1, 'MEMBER', { role: 'OWNER' })).rejects.toMatchObject({ statusCode: 422 })
+  })
+
+  test('組織ID・対象メンバーシップID・操作者ID・変更後ロールをrepositoryへ渡す', async () => {
+    simulateRepository({ operatorRole: 'OWNER', targetRole: 'MEMBER' })
+
+    await organizationsService.updateMemberRole(1, 10, 5, 'OWNER', { role: 'ADMIN' })
+
+    expect(changeRoleWithAuditLog).toHaveBeenCalledWith({ organizationId: 1, targetMembershipId: 10, actorUserId: 5, newRole: 'ADMIN' }, expect.any(Function))
   })
 
   test('OWNERはMEMBERをADMINに昇格できる', async () => {
-    membershipFindById.mockResolvedValue(membership)
-    updateRole.mockResolvedValue({ ...membership, role: 'ADMIN' })
+    simulateRepository({ operatorRole: 'OWNER', targetRole: 'MEMBER' })
 
-    const result = await organizationsService.updateMemberRole(1, 10, 'OWNER', { role: 'ADMIN' })
+    const result = await organizationsService.updateMemberRole(1, 10, 1, 'OWNER', { role: 'ADMIN' })
 
     expect(result.role).toBe('ADMIN')
   })
 
   test('OWNERはADMINをMEMBERに降格できる', async () => {
-    membershipFindById.mockResolvedValue({ ...membership, role: 'ADMIN' })
-    updateRole.mockResolvedValue(membership)
+    simulateRepository({ operatorRole: 'OWNER', targetRole: 'ADMIN' })
 
-    const result = await organizationsService.updateMemberRole(1, 10, 'OWNER', { role: 'MEMBER' })
-
-    expect(result.role).toBe('MEMBER')
-  })
-
-  test('ADMINはMEMBERのロールをMEMBERのままにできる', async () => {
-    membershipFindById.mockResolvedValue(membership)
-    updateRole.mockResolvedValue(membership)
-
-    const result = await organizationsService.updateMemberRole(1, 10, 'ADMIN', { role: 'MEMBER' })
+    const result = await organizationsService.updateMemberRole(1, 10, 1, 'OWNER', { role: 'MEMBER' })
 
     expect(result.role).toBe('MEMBER')
   })
 
-  test('ADMINがADMINを操作しようとすると403エラーを投げる', async () => {
-    membershipFindById.mockResolvedValue({ ...membership, role: 'ADMIN' })
+  test('ADMINはMEMBERをMEMBERのまま指定でき、同一ロールならUNCHANGEDの結果をそのまま返す', async () => {
+    simulateRepository({ operatorRole: 'ADMIN', targetRole: 'MEMBER' })
 
-    await expect(organizationsService.updateMemberRole(1, 10, 'ADMIN', { role: 'MEMBER' })).rejects.toThrow('ADMINは他のADMINを操作')
-    expect(updateRole).not.toHaveBeenCalled()
+    const result = await organizationsService.updateMemberRole(1, 10, 2, 'ADMIN', { role: 'MEMBER' })
+
+    expect(result.role).toBe('MEMBER')
   })
 
-  test('ADMINがMEMBERをADMINに昇格しようとすると403エラーを投げる', async () => {
-    membershipFindById.mockResolvedValue(membership)
+  test('ロック後にADMINがADMINを操作しようとしていれば403エラーを投げる', async () => {
+    simulateRepository({ operatorRole: 'ADMIN', targetRole: 'ADMIN' })
 
-    await expect(organizationsService.updateMemberRole(1, 10, 'ADMIN', { role: 'ADMIN' })).rejects.toThrow('ADMINはADMINへの昇格')
-    expect(updateRole).not.toHaveBeenCalled()
+    await expect(organizationsService.updateMemberRole(1, 10, 2, 'ADMIN', { role: 'MEMBER' })).rejects.toMatchObject({
+      statusCode: 403,
+      message: 'ADMINは他のADMINを操作できません',
+    })
   })
 
-  test('対象がOWNERなら409エラーを投げる', async () => {
-    membershipFindById.mockResolvedValue({ ...membership, role: 'OWNER' })
+  test('ロック後にADMINがMEMBERをADMINに昇格しようとしていれば403エラーを投げる', async () => {
+    simulateRepository({ operatorRole: 'ADMIN', targetRole: 'MEMBER' })
 
-    await expect(organizationsService.updateMemberRole(1, 10, 'OWNER', { role: 'MEMBER' })).rejects.toThrow('OWNERのロールは変更')
-    expect(updateRole).not.toHaveBeenCalled()
+    await expect(organizationsService.updateMemberRole(1, 10, 2, 'ADMIN', { role: 'ADMIN' })).rejects.toMatchObject({
+      statusCode: 403,
+      message: 'ADMINはADMINへの昇格を実行できません',
+    })
   })
 
-  test('MEMBERは操作できず403エラーを投げる', async () => {
-    await expect(organizationsService.updateMemberRole(1, 10, 'MEMBER', { role: 'MEMBER' })).rejects.toThrow('管理者以上')
-    expect(updateRole).not.toHaveBeenCalled()
+  test('ロック後に対象がOWNERなら409エラーを投げる', async () => {
+    simulateRepository({ operatorRole: 'OWNER', targetRole: 'OWNER' })
+
+    await expect(organizationsService.updateMemberRole(1, 10, 1, 'OWNER', { role: 'MEMBER' })).rejects.toMatchObject({
+      statusCode: 409,
+      message: 'OWNERのロールは変更できません',
+    })
   })
 
-  test('対象メンバーシップが存在しなければ404エラーを投げる', async () => {
-    membershipFindById.mockResolvedValue(null)
+  test('middlewareの時点ではADMINでも、ロック後に操作者がMEMBERへ降格していれば403エラーを投げる', async () => {
+    simulateRepository({ operatorRole: 'MEMBER', targetRole: 'MEMBER' })
 
-    await expect(organizationsService.updateMemberRole(1, 999, 'OWNER', { role: 'MEMBER' })).rejects.toThrow('メンバーが見つかりません')
-    expect(updateRole).not.toHaveBeenCalled()
+    await expect(organizationsService.updateMemberRole(1, 10, 2, 'ADMIN', { role: 'MEMBER' })).rejects.toMatchObject({
+      statusCode: 403,
+      message: 'この操作には管理者以上の権限が必要です',
+    })
   })
 
-  test('異なる組織のメンバーシップなら404エラーを投げる', async () => {
-    membershipFindById.mockResolvedValue({ ...membership, organizationId: 99 })
+  test('ロック後の操作者がOWNERでなくなりADMINになっていれば、ADMINの規則で判定する', async () => {
+    simulateRepository({ operatorRole: 'ADMIN', targetRole: 'ADMIN' })
 
-    await expect(organizationsService.updateMemberRole(1, 10, 'OWNER', { role: 'MEMBER' })).rejects.toThrow('メンバーが見つかりません')
-    expect(updateRole).not.toHaveBeenCalled()
+    await expect(organizationsService.updateMemberRole(1, 10, 1, 'OWNER', { role: 'MEMBER' })).rejects.toMatchObject({ statusCode: 403 })
+  })
+
+  test('操作者の所属または組織が消えていれば404エラー（組織が見つかりません）を投げる', async () => {
+    changeRoleWithAuditLog.mockResolvedValue({ status: 'ORGANIZATION_NOT_FOUND' })
+
+    await expect(organizationsService.updateMemberRole(1, 10, 1, 'OWNER', { role: 'MEMBER' })).rejects.toMatchObject({
+      statusCode: 404,
+      message: '組織が見つかりません',
+    })
+  })
+
+  test('対象が存在しない、または別組織なら404エラー（メンバーが見つかりません）を投げる', async () => {
+    changeRoleWithAuditLog.mockResolvedValue({ status: 'TARGET_NOT_FOUND' })
+
+    await expect(organizationsService.updateMemberRole(1, 999, 1, 'OWNER', { role: 'MEMBER' })).rejects.toMatchObject({
+      statusCode: 404,
+      message: 'メンバーが見つかりません',
+    })
+  })
+
+  test('条件付き更新の競合なら409エラーを投げる', async () => {
+    changeRoleWithAuditLog.mockResolvedValue({ status: 'CONFLICT' })
+
+    await expect(organizationsService.updateMemberRole(1, 10, 1, 'OWNER', { role: 'ADMIN' })).rejects.toMatchObject({
+      statusCode: 409,
+      message: '競合によりロールを変更できませんでした',
+    })
+  })
+
+  test('未知の結果は成功扱いにせずエラーを投げる', async () => {
+    changeRoleWithAuditLog.mockResolvedValue({ status: 'UNKNOWN', membership })
+
+    await expect(organizationsService.updateMemberRole(1, 10, 1, 'OWNER', { role: 'ADMIN' })).rejects.toThrow('結果が不明')
+  })
+
+  test('repositoryのエラーはそのまま伝播する', async () => {
+    changeRoleWithAuditLog.mockRejectedValue(new Error('INSERT失敗'))
+
+    await expect(organizationsService.updateMemberRole(1, 10, 1, 'OWNER', { role: 'ADMIN' })).rejects.toThrow('INSERT失敗')
   })
 })
 
