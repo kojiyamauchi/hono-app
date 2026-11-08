@@ -1,13 +1,13 @@
 ---
-name: agent-review-handoff
-description: Use when handing off a pull request Codex implemented to the other AI agent for review by launching its CLI non-interactively, including prerequisites, the fixed request prompt template, and how to confirm the posted review. Codexが自分の実装したPRを他エージェントへCLIでレビュー依頼するときの入口Skill。
+name: agent-pr-review-handoff
+description: Use when handing off a pull request Codex implemented to Claude for review through its non-interactive CLI. Codexが自分のPRのレビューをClaudeに依頼し、投稿を確認するときに使う。
 ---
 
-# Agent Review Handoff
+# Agent PR Review Handoff
 
-このSkillは、Codexが実装してPRを発行した後、レビュー担当であるClaudeのCLIを非対話起動し、レビューを実施させるときに使う。
+このSkillは、Codexが作成したPRのレビューをClaudeのCLIに非対話で依頼するときに使う。
 
-レビューを行う側の手順は `.codex/skills/pr-review/SKILL.md`、レビュー指摘へ対応する側の手順は `.codex/skills/review-response/SKILL.md` を使い、このSkillでは依頼を渡す側の作業に集中する。
+PRをレビューする側は `pr-review`、指摘に対応する側は `review-response` を使う。
 
 ## 使うタイミング
 
@@ -21,7 +21,7 @@ description: Use when handing off a pull request Codex implemented to the other 
 - `AGENTS.md` / `CLAUDE.md` の `### AIエージェント間レビュー` には、Skillを起動しなくても常に守る共通原則（レビュー担当の割り当て、依頼プロンプトに自己評価を含めない、レビュー結果はGitHubへ投稿する、など）だけが置かれている。共通原則とこのSkillの内容がずれないようにすること。
 - レビューを実施する側の手順は `.codex/skills/pr-review/SKILL.md`、レビュー指摘へ対応する側の手順は `.codex/skills/review-response/SKILL.md` を正本とする。
 - Skill化していない運用ルール（コミット粒度、PRタイトル、ブランチ命名、push方法）は、引き続き `AGENTS.md` を正本とし、必要な箇所で参照する。
-- Codex版とClaude版（`.claude/skills/agent-review-handoff/SKILL.md`）のSkillで、方針・確認項目がずれないようにする。
+- Codex版とClaude版（`.claude/skills/agent-pr-review-handoff/SKILL.md`）のSkillで、方針・確認項目がずれないようにする。
 
 ## 前提条件
 
@@ -153,9 +153,9 @@ gh api "repos/kojiyamauchi/hono-app/pulls/<PR番号>/comments?per_page=100" --pa
 
 ## 注意事項
 
-- このSkillは、自分が実装したPRのレビューを他エージェントへ依頼する場合にのみ使う。自分がレビューする側の場合は `pr-review` Skillを使う。
+- このSkillはPRのレビューを依頼する側が使う。自分がレビューする場合は `pr-review` を使う。
 - CLI委譲は非対話実行であり、レビュー担当エージェントは依頼元へ聞き返せない。判断に迷う論点はレビューコメントとして出てくる前提で、必要な文脈は依頼時に渡し切る。
 - レビューのGitHub上の投稿名義は `gh` の認証アカウントになる。どのエージェントのレビューかは、レビュー本文の見出しやApproveコメントの `Approve by エージェント名 <メールアドレス> :octocat:` の表記で区別する。
 - CLI委譲でレビューを実施した場合も、エージェント間レビューが完了したことに変わりはなく、`AGENTS.md` の共通原則どおりユーザーによる最終レビューは省略しない。
-- Claude版（`.claude/skills/agent-review-handoff/SKILL.md`）と方針・確認項目がずれないようにする。
+- Claude版（`.claude/skills/agent-pr-review-handoff/SKILL.md`）と方針・確認項目がずれないようにする。
 - コメント、ドキュメント、コミットメッセージは日本語ルールに従う。

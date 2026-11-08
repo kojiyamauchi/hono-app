@@ -1,15 +1,15 @@
 ---
-name: agent-review-handoff
-description: Use when handing off a pull request Claude implemented to the other AI agent for review by launching its CLI non-interactively, including prerequisites, the fixed request prompt template, and how to confirm the posted review. Claudeが自分の実装したPRを他エージェントへCLIでレビュー依頼するときの入口Skill。
+name: agent-pr-review-handoff
+description: Use when handing off a pull request Claude implemented to Codex for review through its non-interactive CLI. Claudeが自分のPRのレビューをCodexに依頼し、投稿を確認するときに使う。
 ---
 
-# Agent Review Handoff Skill
+# Agent PR Review Handoff
 
 ## 概要
 
-Claudeが実装してPRを発行した後、レビュー担当であるCodexのCLIを非対話起動し、レビューを実施させるスキルです。
+Claudeが作成したPRのレビューをCodexのCLIに非対話で依頼するスキルです。
 
-レビューを行う側の手順は `.claude/skills/pr-review/SKILL.md`、レビュー指摘へ対応する側の手順は `.claude/skills/review-response/SKILL.md` を使用し、このSkillでは依頼を渡す側の作業に集中します。
+PRをレビューする側は `pr-review`、指摘に対応する側は `review-response` を使う。
 
 ## 使用タイミング
 
@@ -158,9 +158,9 @@ gh api "repos/kojiyamauchi/hono-app/pulls/<PR番号>/comments?per_page=100" --pa
 
 ## 注意事項
 
-- このSkillは、自分が実装したPRのレビューを他エージェントへ依頼する場合にのみ使用する。自分がレビューする側の場合は `pr-review` Skillを使用する
+- このSkillはPRのレビューを依頼する側が使う。自分がレビューする場合は `pr-review` を使う。
 - CLI委譲は非対話実行であり、レビュー担当エージェントは依頼元へ聞き返せない。判断に迷う論点はレビューコメントとして出てくる前提で、必要な文脈は依頼時に渡し切る
 - レビューのGitHub上の投稿名義は `gh` の認証アカウントになる。どのエージェントのレビューかは、レビュー本文の `## レビュー結果（Claude）` やApproveコメントの `Approve by エージェント名 <メールアドレス> :octocat:` の表記で区別する
 - CLI委譲でレビューを実施した場合も、エージェント間レビューが完了したことに変わりはなく、[CLAUDE.md](../../../CLAUDE.md) の共通原則どおりユーザーによる最終レビューは省略しない
-- Codex版（`.codex/skills/agent-review-handoff/SKILL.md`）と方針・確認項目がずれないようにする
+- Codex版（`.codex/skills/agent-pr-review-handoff/SKILL.md`）と方針・確認項目がずれないようにする
 - コメント、ドキュメント、コミットメッセージは日本語ルールに従う

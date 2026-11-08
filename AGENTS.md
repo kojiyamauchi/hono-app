@@ -457,7 +457,7 @@ AIエージェント間レビューの共通原則を示す。レビュー実行
 - Codex が実装したPRは Claude が、Claude が実装したPRは Codex がレビューすること
 - ユーザーが作成したPRは Claude と Codex がレビューすること
 - AIエージェントが作成したPRは、他のAIエージェントに加えてユーザーもレビューすること
-- AIエージェントが実装したPRのレビュー依頼は、実装したエージェント自身がレビュー担当エージェントのCLIを非対話起動して渡してよい。手順はエージェント間レビュー委譲Skill（[`.codex/skills/agent-review-handoff/SKILL.md`](.codex/skills/agent-review-handoff/SKILL.md)）に集約する
+- AIエージェントが実装したPRのレビュー依頼は、実装したエージェント自身がレビュー担当エージェントのCLIを非対話起動して渡してよい。手順はエージェント間PRレビュー委譲Skill（[`.codex/skills/agent-pr-review-handoff/SKILL.md`](.codex/skills/agent-pr-review-handoff/SKILL.md)）に集約する
 - レビュー依頼プロンプトには、対象PR・対象Issue・レビュー対象HEAD・読むべきSkillなど客観的な前提のみを渡すこと。実装した本人が依頼文を書くため、レビューの独立性を保つために自己評価やレビュー範囲の限定を含めないこと
 - CLI委譲でレビューを実施した場合も、レビュー結果はGitHubへ投稿すること。依頼元への標準出力の報告で投稿を代替しないこと
 - CLI委譲でエージェント間レビューを完了した場合も、ユーザーによる最終レビューは省略しないこと
@@ -518,7 +518,7 @@ Skill化した運用ルールは、詳細手順を `SKILL.md` に集約するこ
 - PRレビューの詳細な手順は [`.codex/skills/pr-review/SKILL.md`](.codex/skills/pr-review/SKILL.md) を参照すること
 - Issue作成・整理・本文レビューの詳細な手順は [`.codex/skills/issue-management/SKILL.md`](.codex/skills/issue-management/SKILL.md) を参照すること
 - レビュー対応の手順は [`.codex/skills/review-response/SKILL.md`](.codex/skills/review-response/SKILL.md) を参照すること
-- 他エージェントへレビュー依頼を委譲する手順は [`.codex/skills/agent-review-handoff/SKILL.md`](.codex/skills/agent-review-handoff/SKILL.md) を参照すること
+- 他エージェントへPRレビュー依頼を委譲する手順は [`.codex/skills/agent-pr-review-handoff/SKILL.md`](.codex/skills/agent-pr-review-handoff/SKILL.md) を参照すること
 - 合意した設計をClaudeへ渡し、PR発行後にCodexがレビューする手順は [`.codex/skills/claude-implementation-handoff/SKILL.md`](.codex/skills/claude-implementation-handoff/SKILL.md) を参照すること
 - コミット粒度の確認手順は [`.codex/skills/commit-granularity/SKILL.md`](.codex/skills/commit-granularity/SKILL.md) を参照すること
 - DB性能調査（遅い/多いSQLの調査）の手順は [`.codex/skills/db-performance/SKILL.md`](.codex/skills/db-performance/SKILL.md) を参照すること
