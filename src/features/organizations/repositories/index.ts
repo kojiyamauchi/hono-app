@@ -1,5 +1,8 @@
+import { Prisma } from '@/generated/prisma/client'
 import { prisma } from '@/libs/prisma'
 import type { Membership, Role } from '@/shared/membership/entities'
+
+import type { AuditLog } from '../entities'
 
 /** 所有権移譲repositoryの処理結果。 */
 export const ownershipTransferResults = {
@@ -275,6 +278,48 @@ export const organizationMemberRoleRepository = {
       }
       throw error
     }
+  },
+}
+
+/** 監査ログ一覧のカーソル式ページ取得の境界値（この行より後ろ、つまりより古い行を取得する）。 */
+export type AuditLogPageBoundary = { createdAt: Date; id: number }
+
+/**
+ * organizations feature固有の監査ログデータアクセスを提供するリポジトリ。
+ */
+export const organizationAuditLogRepository = {
+  /**
+   * 組織IDに紐づく監査ログを、記録日時・IDの降順（新しい順）でカーソル式に1ページ分取得する。
+   * `boundary` が指定された場合は、その行より後ろ（`("createdAt", id) < (境界値)`）だけを返す。
+   * `take` はそのまま `LIMIT` に使う（次ページ判定のための `limit + 1` は呼び出し側が渡す）。
+   *
+   * メンバー一覧と同じ理由でraw SQLを採用している。行値比較にすると境界条件が
+   * `[organizationId, createdAt, id]` のindexの `Index Cond` へ入り、深いページでも読み捨てが発生しない。
+   * 降順の並びはindexの逆方向スキャンで満たす。境界行そのものが存在するかには依存しない。
+   */
+  findPageByOrganization: async (organizationId: number, take: number, boundary: AuditLogPageBoundary | null): Promise<AuditLog[]> => {
+    const boundaryCondition = boundary ? Prisma.sql`AND ("createdAt", id) < (${boundary.createdAt}, ${boundary.id})` : Prisma.empty
+
+    const rows = await prisma.$queryRaw<AuditLog[]>(Prisma.sql`
+      SELECT id, "organizationId", action, "actorUserId", "targetUserId", "targetMembershipId", "previousRole", "newRole", "createdAt"
+      FROM "AuditLog"
+      WHERE "organizationId" = ${organizationId}
+      ${boundaryCondition}
+      ORDER BY "createdAt" DESC, id DESC
+      LIMIT ${take}
+    `)
+
+    return rows.map((row) => ({
+      id: row.id,
+      organizationId: row.organizationId,
+      action: row.action,
+      actorUserId: row.actorUserId,
+      targetUserId: row.targetUserId,
+      targetMembershipId: row.targetMembershipId,
+      previousRole: row.previousRole,
+      newRole: row.newRole,
+      createdAt: row.createdAt,
+    }))
   },
 }
 
