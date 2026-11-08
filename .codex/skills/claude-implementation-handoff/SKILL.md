@@ -14,7 +14,10 @@ description: Codexで合意した設計をClaude CodeのOpusに渡し、implemen
 - Codexが作業ブランチを用意し、そのブランチをチェックアウトした作業ディレクトリをClaudeへ渡す。既存の変更と衝突する場合は作業場所を分離する。作業ディレクトリにClaude用Skillと `implementer` の定義があることを確認する。
 - `claude --version` でCLIを確認し、作業ディレクトリで `claude -p --model opus` を実行する。プロンプトはファイルから標準入力へ渡す。冒頭で [Claude側の受け取り手順](../../../.claude/skills/claude-implementation-handoff/SKILL.md) をパスで指定し、親セッションの `Agent` ツールで `implementer` を起動するよう明示する。親をOpusにするため、`--agent implementer` は指定しない。
 - Claudeの認証・API接続と `gh auth status` でGitHubの認証を確認し、`--allowed-tools` は委譲・編集・検証・コミット・push・PR作成に必要な操作へ絞る。承認やサンドボックスの制約はCodex側でも守る。
-- `--output-format stream-json --verbose` の出力を保存し、完了まで待つ。ログから `implementer` の呼び出しと結果、親の最終報告を確認する。PR URLが返った場合はGitHubで対象リポジトリ・作業ブランチ・HEAD SHA・公開状態を照合する。
+- `--output-format stream-json --verbose` の出力を保存し、`Agent` による `implementer` の起動を一度確認する。
+- 委譲開始を確認したら、Claudeの完了・異常終了・判断依頼を待つ。プロセスの終了を待てる実行方法を使い、ツールの待機上限で制御が戻っても、実行中であれば待機を続ける。Claudeが対応中のテスト失敗は、そのまま経過を待つ。
+- 実装中にログを調べるのは、作業規模と検証の所要時間を踏まえて長時間進展がない場合に限る。ログで停止や入力待ちを確認し、対応が必要な場合に介入する。ユーザーへの報告は、PR作成、対応が必要な障害、レビュー完了などの節目に行う。
+- Claudeの終了時は、`implementer` の結果と親の最終報告を確認する。PR URLが返った場合はGitHubで対象リポジトリ・作業ブランチ・HEAD SHA・公開状態を照合する。
 - 中断した場合は、ローカルのコミット、リモートのブランチ、既存PRを確認してから残作業だけを再開する。委譲を確認できない場合は完了扱いにせず、再開時も既存の変更を保全する。
 - Claudeが確認事項を返した場合、合意済みの設計で答えられるものは回答を渡して再開する。新たな仕様判断が必要な場合はユーザーの回答を得てから再開する。
 
