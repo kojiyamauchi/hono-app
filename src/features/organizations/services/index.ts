@@ -11,11 +11,21 @@ import { organizationRepository } from '@/shared/organization/repositories'
 import { userRepository } from '@/shared/user/repositories'
 import { AppError } from '@/utils/errors'
 
-import type { MemberListDtoType, OrganizationListDtoType } from '../dtos'
-import { decodeMemberListCursor, encodeMemberListCursor, toMemberListResponse, toOrganizationListResponse } from '../mappers'
+import type { AuditLogListDtoType, MemberListDtoType, OrganizationListDtoType } from '../dtos'
 import {
+  decodeAuditLogCursor,
+  decodeMemberListCursor,
+  encodeAuditLogCursor,
+  encodeMemberListCursor,
+  toAuditLogListResponse,
+  toMemberListResponse,
+  toOrganizationListResponse,
+} from '../mappers'
+import {
+  type AuditLogPageBoundary,
   leaveOrganizationResults,
   memberRoleChangeResults,
+  organizationAuditLogRepository,
   organizationMemberRoleRepository,
   organizationMembershipRepository,
   organizationOwnershipRepository,
@@ -173,6 +183,31 @@ export const organizationsService = {
       memberships.length > limit && last !== undefined ? encodeMemberListCursor({ organizationId, createdAt: last.createdAt, id: last.id }) : null
 
     return toMemberListResponse(items, nextCursor)
+  },
+
+  /**
+   * 組織の監査ログを新しい順にカーソル式で1ページ分返す。OWNER/ADMINのみ閲覧可（ミドルウェアで確認済み）。
+   * カーソルは境界値としてのみ使い、基準行が削除されても続きが取得できる（行の存在に依存しない）。
+   * 次ページの有無は `limit + 1` 件の取得で判定し、レスポンスのitemsは `limit` 件以下にする。
+   * 形式が不正なカーソル、別APIで発行されたカーソル（kind不一致）、別組織で発行されたカーソルはいずれも400とする。
+   */
+  listAuditLogs: async (organizationId: number, limit: number, cursor?: string): Promise<AuditLogListDtoType> => {
+    let boundary: AuditLogPageBoundary | null = null
+    if (cursor !== undefined) {
+      const decoded = decodeAuditLogCursor(cursor)
+      if (decoded === null || decoded.organizationId !== organizationId) {
+        throw new AppError(400, 'カーソルが不正です')
+      }
+      boundary = { createdAt: decoded.createdAt, id: decoded.id }
+    }
+
+    // 認可はカーソル内の組織情報ではなく、引数で渡された認可済みのorganizationIdで毎回適用する
+    const auditLogs = await organizationAuditLogRepository.findPageByOrganization(organizationId, limit + 1, boundary)
+    const items = auditLogs.slice(0, limit)
+    const last = items.at(-1)
+    const nextCursor = auditLogs.length > limit && last !== undefined ? encodeAuditLogCursor({ organizationId, createdAt: last.createdAt, id: last.id }) : null
+
+    return toAuditLogListResponse(items, nextCursor)
   },
 
   /**
