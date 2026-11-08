@@ -1,21 +1,26 @@
 import { beforeEach, describe, expect, mock, test } from 'bun:test'
 
+import type { Prisma } from '@/generated/prisma/client'
 import type { Role } from '@/shared/membership/entities'
+
+import type { AuditLog } from '../entities'
 
 const queryRaw = mock()
 const updateMany = mock()
 const auditLogCreate = mock()
+const pageQueryRaw = mock()
 const transaction = mock()
 const deleteMany = mock()
 const findUnique = mock()
 
 await mock.module('@/libs/prisma', () => ({
-  prisma: { $transaction: transaction, membership: { deleteMany, findUnique } },
+  prisma: { $transaction: transaction, $queryRaw: pageQueryRaw, membership: { deleteMany, findUnique } },
 }))
 
 const {
   leaveOrganizationResults,
   memberRoleChangeResults,
+  organizationAuditLogRepository,
   organizationMemberRoleRepository,
   organizationMembershipRepository,
   organizationOwnershipRepository,
@@ -352,6 +357,64 @@ describe('organizationMemberRoleRepository.changeRoleWithAuditLog', () => {
     queryRaw.mockRejectedValueOnce(new Error('接続エラー'))
 
     await expect(organizationMemberRoleRepository.changeRoleWithAuditLog(input, allow)).rejects.toThrow('接続エラー')
+  })
+})
+
+describe('organizationAuditLogRepository.findPageByOrganization', () => {
+  const createdAt = new Date('2026-01-01T00:00:00.000Z')
+
+  beforeEach(() => {
+    pageQueryRaw.mockReset()
+  })
+
+  /** $queryRaw に渡された Prisma.Sql を取り出す。 */
+  const getIssuedSql = (): Prisma.Sql => pageQueryRaw.mock.calls[0]?.[0] as Prisma.Sql
+
+  test('境界値がない場合は組織IDとtakeだけをバインドし、境界条件を含めず新しい順で取得する', async () => {
+    pageQueryRaw.mockResolvedValue([])
+
+    await organizationAuditLogRepository.findPageByOrganization(2, 21, null)
+
+    const sql = getIssuedSql()
+    expect(sql.values).toEqual([2, 21])
+    expect(sql.sql).not.toContain('<')
+    expect(sql.sql).toContain('ORDER BY "createdAt" DESC, id DESC')
+  })
+
+  test('境界値がある場合は行値比較で絞り込み、組織ID・境界値・takeをこの順でバインドする', async () => {
+    pageQueryRaw.mockResolvedValue([])
+
+    await organizationAuditLogRepository.findPageByOrganization(2, 21, { createdAt, id: 5 })
+
+    const sql = getIssuedSql()
+    expect(sql.values).toEqual([2, createdAt, 5, 21])
+    expect(sql.sql).toContain('("createdAt", id) < (')
+    expect(sql.sql).toContain('"organizationId" = ')
+  })
+
+  test('取得した行をAuditLogエンティティへ変換する', async () => {
+    const row: AuditLog = {
+      id: 1,
+      organizationId: 2,
+      action: 'MEMBER_ROLE_CHANGED',
+      actorUserId: 10,
+      targetUserId: 11,
+      targetMembershipId: 12,
+      previousRole: 'MEMBER',
+      newRole: 'ADMIN',
+      createdAt,
+    }
+    pageQueryRaw.mockResolvedValue([row])
+
+    const result = await organizationAuditLogRepository.findPageByOrganization(2, 21, null)
+
+    expect(result).toEqual([row])
+  })
+
+  test('予期しないDBエラーはそのままthrowする', async () => {
+    pageQueryRaw.mockRejectedValue(new Error('接続エラー'))
+
+    await expect(organizationAuditLogRepository.findPageByOrganization(2, 21, null)).rejects.toThrow('接続エラー')
   })
 })
 
