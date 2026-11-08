@@ -35,6 +35,28 @@ export const organizationIdParamSchema = z.object({
 })
 
 /**
+ * PostgreSQLのINTEGER（int4）の上限値。
+ * IDカラムはINTEGERのため、これを超える値をDBへ渡すと整数変換に失敗して500になる。
+ * 外部入力のIDをDBへ渡す前に、この値以下へ制限して400にするために使う。
+ */
+export const POSTGRES_INT_MAX = 2147483647
+
+/**
+ * 監査ログ一覧専用の組織IDパスパラメータのバリデーションスキーマ。
+ * 形式は `organizationIdParamSchema` と同じだが、PostgreSQL INTEGERの上限（2147483647）も検証する。
+ * 上限を超える組織IDが所属確認のDBクエリへ渡って500になることを防ぐ。
+ * OpenAPI上でpath parameterとして表示するため、`.openapi()` でparamメタデータを付与する。
+ */
+export const auditLogsRouteParamSchema = z.object({
+  id: z.coerce
+    .number()
+    .int('組織IDは整数で指定してください')
+    .positive('組織IDは1以上で指定してください')
+    .max(POSTGRES_INT_MAX, `組織IDは${POSTGRES_INT_MAX}以下で指定してください`)
+    .openapi({ param: { name: 'id', in: 'path' }, example: 1 }),
+})
+
+/**
  * メンバー追加ボディのバリデーションスキーマ。
  * 形式チェックはここで行い、OWNERの意味的バリデーション（422）はservice層で行う。
  * OpenAPI request bodyとして参照するため、`.openapi()` でcomponent名を付与する。
@@ -221,18 +243,20 @@ export const AUDIT_LOG_CURSOR_KIND = 'auditLogs'
  * 監査ログカーソルのデコード後ペイロードのスキーマ。
  * `kind` を必須にするため、`kind` を持たないメンバー一覧のカーソルは監査ログAPIで不正になる。
  * 受信値は信用せず、種別・バージョン・対象組織・境界値の形式をここで検証する。
+ * `organizationId` と `id` はDBへバインドされるため、PostgreSQL INTEGERの上限も検証する（超過は500になるため）。
  */
 export const auditLogCursorPayloadSchema = z.object({
   kind: z.literal(AUDIT_LOG_CURSOR_KIND),
   version: z.literal(AUDIT_LOG_CURSOR_VERSION),
-  organizationId: z.number().int().positive(),
+  organizationId: z.number().int().positive().max(POSTGRES_INT_MAX),
   createdAt: cursorCreatedAtSchema,
-  id: z.number().int().positive(),
+  id: z.number().int().positive().max(POSTGRES_INT_MAX),
 })
 
 export type CreateOrganizationSchemaType = z.infer<typeof createOrganizationSchema>
 export type UpdateOrganizationSchemaType = z.infer<typeof updateOrganizationSchema>
 export type OrganizationIdParamSchemaType = z.infer<typeof organizationIdParamSchema>
+export type AuditLogsRouteParamSchemaType = z.infer<typeof auditLogsRouteParamSchema>
 export type AddMemberBodySchemaType = z.infer<typeof addMemberBodySchema>
 export type UpdateMemberRoleBodySchemaType = z.infer<typeof updateMemberRoleBodySchema>
 export type TransferOwnershipBodySchemaType = z.infer<typeof transferOwnershipBodySchema>
