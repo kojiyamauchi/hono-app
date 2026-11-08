@@ -74,8 +74,24 @@ GCPのdev環境では、以下を含む全エンドポイントへのアクセ�
 | GET    | `/organizations/:id/members`               | 必要 | 所属している組織のメンバー一覧をカーソル式ページネーションで取得する（`limit` / `cursor`、詳細は [pagination.md](pagination.md)） |
 | POST   | `/organizations/:id/members`               | 必要 | OWNERまたはADMINがメンバーを追加する                                                                                              |
 | DELETE | `/organizations/:id/members/me`            | 必要 | ADMINまたはMEMBERが自分自身を組織から脱退させる                                                                                   |
-| PATCH  | `/organizations/:id/members/:membershipId` | 必要 | OWNERまたはADMINがメンバーのロールを更新する                                                                                      |
+| PATCH  | `/organizations/:id/members/:membershipId` | 必要 | OWNERまたはADMINがメンバーのロールを更新する（実際にロールが変わったときは監査ログを記録する）                                    |
 | DELETE | `/organizations/:id/members/:membershipId` | 必要 | OWNERまたはADMINがメンバーを削除する                                                                                              |
+
+## Organization Audit Logs
+
+| Method | Path                            | 認証 | 概要                                                                                                                                          |
+| ------ | ------------------------------- | ---- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/organizations/:id/audit-logs` | 必要 | OWNERまたはADMINが組織の監査ログを新しい順にカーソル式ページネーションで取得する（`limit` / `cursor`、詳細は [pagination.md](pagination.md)） |
+
+監査ログの記録対象と閲覧の仕様は次のとおりです。
+
+- 記録するのは、`PATCH /organizations/:id/members/:membershipId` で**実際にロールが変わったとき**だけです（イベント種別は `MEMBER_ROLE_CHANGED`）。
+  - 同じロールを指定した場合（200）や、権限不足・OWNER対象などで拒否された場合は記録しません。
+  - 所有権移譲（`POST /organizations/:id/transfer-ownership`）によるロール変化、メンバーの追加・削除・脱退、招待は今回の記録対象外です。
+- ロールの更新と記録は同じトランザクションで確定します。記録に失敗した場合はロールの更新も取り消され、500を返します。
+- レスポンスは `{ items, nextCursor }` です。各itemは `id`・`organizationId`・`action`・`actorUserId`・`targetUserId`・`targetMembershipId`・`previousRole`・`newRole`・`createdAt`（ISO 8601）を持ちます。氏名・メールアドレス・認証情報は保存せず、ユーザーとメンバーシップのIDは記録時点の値です。
+- 対象メンバーの削除・脱退や、操作者・対象のアカウント削除後も、組織が残る間は記録を閲覧できます。組織を削除すると記録も削除されます。
+- ステータスは、未認証401、不正な組織ID・不正なquery（未対応の `offset`、不正なlimit・cursorを含む）400、未所属または存在しない組織404、所属MEMBER403です。確認の順序は 認証 → パス検証 → 所属確認 → ロール確認 → query検証 です。
 
 ## Organization Invitations
 
