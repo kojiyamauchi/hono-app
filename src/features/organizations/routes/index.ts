@@ -15,6 +15,7 @@ import { organizationsAuditLogsController, organizationsController, organization
 import { auditLogListDto, memberListDto, organizationListDto } from '../dtos'
 import {
   addMemberBodySchema,
+  auditLogsRouteParamSchema,
   createInvitationBodySchema,
   createOrganizationSchema,
   invitationRouteParamSchema,
@@ -329,16 +330,17 @@ const removeMemberRoute = createRoute({
 /**
  * GET /organizations/{id}/audit-logs: 組織の監査ログを新しい順に返す。OWNER / ADMINのみ。
  * 認証 → パス検証 → 所属確認 → ロール確認 → query検証の順に実行する（MEMBERは不正queryでも403）。
+ * パス検証は、PostgreSQL INTEGERの上限（2147483647）も検証する監査ログ専用schemaを使う。
  */
 const listAuditLogsRoute = createRoute({
   method: 'get',
   path: '/{id}/audit-logs',
   tags: ['Organization Audit Logs'],
   summary: '指定した組織の監査ログ一覧を取得する',
-  middleware: [authMiddleware, paramValidationMiddleware(organizationIdParamSchema), organizationMembershipMiddleware, organizationAdminMiddleware],
+  middleware: [authMiddleware, paramValidationMiddleware(auditLogsRouteParamSchema), organizationMembershipMiddleware, organizationAdminMiddleware],
   security: bearerSecurity,
   request: {
-    params: organizationIdParamSchema,
+    params: auditLogsRouteParamSchema,
     query: listAuditLogsQuerySchema,
   },
   responses: {
