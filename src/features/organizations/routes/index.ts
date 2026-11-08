@@ -2,6 +2,7 @@ import { createRoute, OpenAPIHono } from '@hono/zod-openapi'
 
 import { authMiddleware } from '@/middlewares/auth'
 import { organizationMembershipMiddleware } from '@/middlewares/organizationMembership'
+import { organizationAdminMiddleware } from '@/middlewares/organizationRole'
 import { paramValidationMiddleware } from '@/middlewares/paramValidation'
 import { invitationDto } from '@/shared/invitation/dtos'
 import { memberDto } from '@/shared/membership/dtos'
@@ -10,13 +11,14 @@ import { SECURITY_SCHEME } from '@/shared/openApi/schemes'
 import { organizationDto } from '@/shared/organization/dtos'
 import { openApiDefaultHook } from '@/utils/validation'
 
-import { organizationsController, organizationsInvitationsController, organizationsMembersController } from '../controllers'
-import { memberListDto, organizationListDto } from '../dtos'
+import { organizationsAuditLogsController, organizationsController, organizationsInvitationsController, organizationsMembersController } from '../controllers'
+import { auditLogListDto, memberListDto, organizationListDto } from '../dtos'
 import {
   addMemberBodySchema,
   createInvitationBodySchema,
   createOrganizationSchema,
   invitationRouteParamSchema,
+  listAuditLogsQuerySchema,
   listMembersQuerySchema,
   listMineQuerySchema,
   memberRouteParamSchema,
@@ -324,6 +326,34 @@ const removeMemberRoute = createRoute({
   },
 })
 
+/**
+ * GET /organizations/{id}/audit-logs: 組織の監査ログを新しい順に返す。OWNER / ADMINのみ。
+ * 認証 → パス検証 → 所属確認 → ロール確認 → query検証の順に実行する（MEMBERは不正queryでも403）。
+ */
+const listAuditLogsRoute = createRoute({
+  method: 'get',
+  path: '/{id}/audit-logs',
+  tags: ['Organization Audit Logs'],
+  summary: '指定した組織の監査ログ一覧を取得する',
+  middleware: [authMiddleware, paramValidationMiddleware(organizationIdParamSchema), organizationMembershipMiddleware, organizationAdminMiddleware],
+  security: bearerSecurity,
+  request: {
+    params: organizationIdParamSchema,
+    query: listAuditLogsQuerySchema,
+  },
+  responses: {
+    200: {
+      content: { 'application/json': { schema: auditLogListDto } },
+      description: '組織の監査ログ一覧（新しい順、カーソル式ページネーション）',
+    },
+    400: errorResponse('組織IDまたはqueryが不正'),
+    401: errorResponse('認証が必要、またはトークンが無効'),
+    403: errorResponse('権限が不足（OWNER / ADMIN のみ閲覧可）'),
+    404: errorResponse('組織が見つからない'),
+    500: errorResponse('サーバーエラー'),
+  },
+})
+
 /** GET /organizations/{id}/invitations: 招待一覧を返す。 */
 const listInvitationsRoute = createRoute({
   method: 'get',
@@ -408,7 +438,7 @@ const cancelInvitationRoute = createRoute({
  * 組織関連のルート（/organizations配下）。
  * すべて認証が必要。`/:id` 系は組織メンバーシップの確認も行う。
  * バリデーションエラー時は defaultHook で既存と同じ `{ error: { message } }`（400）を返す。
- * 静的パス（`/`）→ `/{id}` → `/{id}/members` 系 → `/{id}/invitations` 系の順で登録する。
+ * 静的パス（`/`）→ `/{id}` → `/{id}/members` 系 → `/{id}/audit-logs` → `/{id}/invitations` 系の順で登録する。
  */
 export const organizationsRoutes = new OpenAPIHono({ defaultHook: openApiDefaultHook })
   .openapi(createRouteDef, (c) => organizationsController.create(c, c.get('userId'), c.req.valid('json')))
@@ -435,6 +465,7 @@ export const organizationsRoutes = new OpenAPIHono({ defaultHook: openApiDefault
   .openapi(removeMemberRoute, (c) =>
     organizationsMembersController.removeMember(c, c.req.valid('param').id, c.req.valid('param').membershipId, c.get('membership').role),
   )
+  .openapi(listAuditLogsRoute, (c) => organizationsAuditLogsController.listAuditLogs(c, c.req.valid('param').id, c.req.valid('query')))
   .openapi(listInvitationsRoute, (c) => organizationsInvitationsController.listInvitations(c, c.req.valid('param').id, c.get('membership').role))
   .openapi(createInvitationRoute, (c) =>
     organizationsInvitationsController.createInvitation(c, c.req.valid('param').id, c.get('membership').role, c.req.valid('json')),
