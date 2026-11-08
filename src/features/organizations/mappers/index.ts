@@ -83,12 +83,19 @@ export const encodeAuditLogCursor = (boundary: AuditLogCursorBoundary): string =
 /**
  * 監査ログ一覧用のカーソル文字列を境界値へ戻す。
  * 形式・値が不正、または `kind` が一致しない（メンバー一覧など別APIのカーソル）なら `null` を返し、呼び出し側で400へ変換する。
+ * 発行時と同じ正規のbase64url文字列だけを受け付ける（不正な文字の付加や `=` パディングは不正として扱う）。
  * 対象組織の一致はservice層が認可済みのorganizationIdと突き合わせて確認する。
  */
 export const decodeAuditLogCursor = (raw: string): AuditLogCursorBoundary | null => {
   let parsed: unknown
   try {
-    parsed = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8'))
+    const decoded = Buffer.from(raw, 'base64url')
+    // `Buffer.from(raw, 'base64url')` は不正な文字を黙って無視するため、末尾に `!` などを足した文字列も復元できてしまう。
+    // 再エンコードした結果が入力と一致しなければ、発行時と異なる形式（改変されたカーソル）として不正にする。
+    if (decoded.toString('base64url') !== raw) {
+      return null
+    }
+    parsed = JSON.parse(decoded.toString('utf8'))
   } catch {
     return null
   }
