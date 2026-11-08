@@ -3,6 +3,7 @@ import { describe, expect, test } from 'bun:test'
 import {
   addMemberBodySchema,
   auditLogCursorPayloadSchema,
+  auditLogsRouteParamSchema,
   createInvitationBodySchema,
   createOrganizationSchema,
   invitationRouteParamSchema,
@@ -11,6 +12,7 @@ import {
   listMineQuerySchema,
   memberRouteParamSchema,
   organizationIdParamSchema,
+  POSTGRES_INT_MAX,
   transferOwnershipBodySchema,
   updateMemberRoleBodySchema,
   updateOrganizationSchema,
@@ -52,6 +54,41 @@ describe('organizationIdParamSchema', () => {
 
   test('数値ではないIDを拒否する', () => {
     expect(organizationIdParamSchema.safeParse({ id: 'abc' }).success).toBe(false)
+  })
+})
+
+describe('auditLogsRouteParamSchema', () => {
+  test('数値文字列のIDをnumberへ変換する', () => {
+    const result = auditLogsRouteParamSchema.safeParse({ id: '1' })
+
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.id).toBe(1)
+    }
+  })
+
+  test('PostgreSQL INTEGERの上限（2147483647）ちょうどのIDを受け付ける', () => {
+    const result = auditLogsRouteParamSchema.safeParse({ id: String(POSTGRES_INT_MAX) })
+
+    expect(POSTGRES_INT_MAX).toBe(2147483647)
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.id).toBe(2147483647)
+    }
+  })
+
+  test('上限を超えるIDを拒否する', () => {
+    expect(auditLogsRouteParamSchema.safeParse({ id: '2147483648' }).success).toBe(false)
+    expect(auditLogsRouteParamSchema.safeParse({ id: '9007199254740991' }).success).toBe(false)
+  })
+
+  test('1未満のIDと数値ではないIDを拒否する', () => {
+    expect(auditLogsRouteParamSchema.safeParse({ id: '0' }).success).toBe(false)
+    expect(auditLogsRouteParamSchema.safeParse({ id: 'abc' }).success).toBe(false)
+  })
+
+  test('既存のorganizationIdParamSchemaは上限を超えるIDを従来どおり受け付ける（他の組織ルートの仕様を変えない）', () => {
+    expect(organizationIdParamSchema.safeParse({ id: '2147483648' }).success).toBe(true)
   })
 })
 
@@ -281,6 +318,16 @@ describe('auditLogCursorPayloadSchema', () => {
     expect(auditLogCursorPayloadSchema.safeParse({ ...validPayload, organizationId: 0 }).success).toBe(false)
     expect(auditLogCursorPayloadSchema.safeParse({ ...validPayload, id: 0 }).success).toBe(false)
     expect(auditLogCursorPayloadSchema.safeParse({ ...validPayload, id: 1.5 }).success).toBe(false)
+  })
+
+  test('organizationIdとidはPostgreSQL INTEGERの上限（2147483647）ちょうどまで受け付ける', () => {
+    expect(auditLogCursorPayloadSchema.safeParse({ ...validPayload, organizationId: 2147483647 }).success).toBe(true)
+    expect(auditLogCursorPayloadSchema.safeParse({ ...validPayload, id: 2147483647 }).success).toBe(true)
+  })
+
+  test('organizationIdとidが上限を超えていれば拒否する（DBの整数変換で500になるのを防ぐ）', () => {
+    expect(auditLogCursorPayloadSchema.safeParse({ ...validPayload, organizationId: 2147483648 }).success).toBe(false)
+    expect(auditLogCursorPayloadSchema.safeParse({ ...validPayload, id: 2147483648 }).success).toBe(false)
   })
 
   test('日時の形式が不正、またはPostgreSQLで扱えない0年なら拒否する', () => {
