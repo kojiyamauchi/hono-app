@@ -38,7 +38,10 @@ gh issue view <Issue URL> --json title,body,state,updatedAt,comments で対象Is
 Issueが閉じているか、取得時のupdatedAtが依頼時点と異なる場合は、投稿せず依頼元に報告してください。
 投稿直前にIssueを再取得し、タイトル・本文・状態・updatedAtが変わっていた場合も同様に扱ってください。
 レビュー結果は、見出しに Claude と明記して対象Issueへ1件コメントしてください。本文や既存コメントは編集しないでください。
-投稿には gh issue comment <Issue URL> --body <コメント本文> を使い、最後に投稿したコメントのURLを返してください。
+投稿は次のように標準入力で本文を渡し、最後に投稿したコメントのURLを返してください。
+gh issue comment <Issue URL> --body-file - <<'ISSUE_REVIEW'
+<コメント本文>
+ISSUE_REVIEW
 投稿に失敗した場合は、失敗の内容を返してください。
 ```
 
@@ -50,7 +53,7 @@ Claudeを起動するときは、ネットワークに接続できる状態で�
 
 ```bash
 claude -p "$review_prompt" \
-  --allowedTools 'Read' 'Grep' 'Glob' \
+  --allowed-tools 'Read' 'Grep' 'Glob' \
   "Bash(gh issue view ${issue_url} *)" \
   "Bash(gh issue comment ${issue_url} *)"
 ```
