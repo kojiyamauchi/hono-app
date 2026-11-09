@@ -338,7 +338,7 @@ const listAuditLogsRoute = createRoute({
   tags: ['Organization Audit Logs'],
   summary: '指定した組織の監査ログ一覧を取得する',
   description:
-    'MEMBER_ROLE_CHANGED（ロール変更）とOWNERSHIP_TRANSFERRED（所有権移譲）を同じ一覧に新しい順（createdAt DESC, id DESC）で返す。項目の意味はイベント種別ごとに異なる（AuditLogスキーマの各項目を参照）。',
+    'MEMBER_ROLE_CHANGED（ロール変更）、OWNERSHIP_TRANSFERRED（所有権移譲）、MEMBER_REMOVED（管理者によるメンバー削除）を同じ一覧に新しい順（createdAt DESC, id DESC）で返す。項目の意味はイベント種別ごとに異なる（AuditLogスキーマの各項目を参照）。',
   middleware: [authMiddleware, paramValidationMiddleware(auditLogsRouteParamSchema), organizationMembershipMiddleware, organizationAdminMiddleware],
   security: bearerSecurity,
   request: {
