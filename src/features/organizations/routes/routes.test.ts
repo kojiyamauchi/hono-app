@@ -380,6 +380,20 @@ describe('organizations routes', () => {
     expect(response.status).toBe(409)
   })
 
+  test('POST /organizations/:id/transfer-ownership は監査ログの書き込みに失敗したら409へ変換せず500を返す', async () => {
+    findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))
+    transferOwnership.mockRejectedValue(new Error('INSERT失敗'))
+    const token = await createToken(1)
+
+    const response = await app.request('/organizations/1/transfer-ownership', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ membershipId: 10 }),
+    })
+
+    expect(response.status).toBe(500)
+  })
+
   test('POST /organizations/:id/transfer-ownership は不正bodyなら400を返す', async () => {
     findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))
     const token = await createToken(1)
@@ -996,6 +1010,34 @@ describe('organizations routes', () => {
     expect(second.status).toBe(200)
     expect(findAuditLogPage).toHaveBeenLastCalledWith(1, 3, { createdAt: new Date(sameCreatedAt), id: 11 })
     expect(secondBody.items.map((item) => item.id)).toEqual([10])
+    expect(secondBody.nextCursor).toBeNull()
+  })
+
+  test('GET /organizations/:id/audit-logs はMEMBER_ROLE_CHANGEDとOWNERSHIP_TRANSFERREDが混在しても同じ順序規則でページをまたいで取得できる', async () => {
+    findByUserAndOrganization.mockResolvedValue(membershipWithRole('ADMIN'))
+    const sameCreatedAt = '2026-01-01T00:00:00.000Z'
+    const transferred = (id: number): AuditLog => ({ ...auditLog(id, sameCreatedAt), action: 'OWNERSHIP_TRANSFERRED', previousRole: 'ADMIN', newRole: 'OWNER' })
+    const token = await createToken(1)
+
+    findAuditLogPage.mockResolvedValueOnce([transferred(3), auditLog(2, sameCreatedAt), auditLog(1, sameCreatedAt)])
+    const first = await auditLogsRequest('/organizations/1/audit-logs?limit=2', token)
+    const firstBody = (await first.json()) as { items: { id: number; action: string; newRole: string }[]; nextCursor: string | null }
+
+    expect(first.status).toBe(200)
+    expect(firstBody.items.map((item) => [item.id, item.action])).toEqual([
+      [3, 'OWNERSHIP_TRANSFERRED'],
+      [2, 'MEMBER_ROLE_CHANGED'],
+    ])
+    expect(firstBody.items[0].newRole).toBe('OWNER')
+    expect(firstBody.nextCursor).not.toBeNull()
+
+    findAuditLogPage.mockResolvedValueOnce([auditLog(1, sameCreatedAt)])
+    const second = await auditLogsRequest(`/organizations/1/audit-logs?limit=2&cursor=${firstBody.nextCursor}`, token)
+    const secondBody = (await second.json()) as { items: { id: number; action: string }[]; nextCursor: string | null }
+
+    expect(second.status).toBe(200)
+    expect(findAuditLogPage).toHaveBeenLastCalledWith(1, 3, { createdAt: new Date(sameCreatedAt), id: 2 })
+    expect(secondBody.items.map((item) => [item.id, item.action])).toEqual([[1, 'MEMBER_ROLE_CHANGED']])
     expect(secondBody.nextCursor).toBeNull()
   })
 
