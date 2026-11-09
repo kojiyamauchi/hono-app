@@ -31,8 +31,16 @@ const transferOwnership = mock()
 const leaveOrganization = mock()
 const changeRoleWithAuditLog = mock()
 const findAuditLogPage = mock()
+const removeWithAuditLog = mock()
 
 await mock.module('@/features/organizations/repositories', () => ({
+  organizationMemberRemovalRepository: { removeWithAuditLog },
+  memberRemovalResults: {
+    removed: 'REMOVED',
+    organizationNotFound: 'ORGANIZATION_NOT_FOUND',
+    targetNotFound: 'TARGET_NOT_FOUND',
+    rejected: 'REJECTED',
+  },
   organizationMembershipRepository: { leave: leaveOrganization },
   organizationOwnershipRepository: { transferOwnership },
   organizationMemberRoleRepository: { changeRoleWithAuditLog },
@@ -702,76 +710,80 @@ describe('organizationsService.updateMemberRole', () => {
 })
 
 describe('organizationsService.removeMember', () => {
+  type LockedState = { operatorRole: Role; targetRole: Role | null }
+
   beforeEach(() => {
-    membershipFindById.mockReset()
-    membershipDeleteById.mockReset()
+    removeWithAuditLog.mockReset()
   })
 
-  test('OWNERはADMINを削除できる', async () => {
-    membershipFindById.mockResolvedValue({ ...membership, role: 'ADMIN' })
-    membershipDeleteById.mockResolvedValue(true)
+  /**
+   * repositoryがロック後に読み直したロールで認可コールバックを呼ぶ動きを再現する。
+   * 対象なしならTARGET_NOT_FOUND、拒否ならREJECTED、それ以外はREMOVEDを返す。
+   */
+  const simulateRepository = (locked: LockedState): void => {
+    removeWithAuditLog.mockImplementation(async (_input: unknown, authorize: (state: LockedState) => AppError | null) => {
+      const rejection = authorize(locked)
+      if (rejection !== null) {
+        return { status: 'REJECTED', rejection }
+      }
+      if (locked.targetRole === null) {
+        return { status: 'TARGET_NOT_FOUND' }
+      }
+      return { status: 'REMOVED' }
+    })
+  }
 
-    await organizationsService.removeMember(1, 10, 'OWNER')
+  test('操作者のユーザーIDをrepositoryへ渡す（middlewareのロールは使わない）', async () => {
+    simulateRepository({ operatorRole: 'OWNER', targetRole: 'MEMBER' })
 
-    expect(membershipDeleteById).toHaveBeenCalledWith(10)
+    await organizationsService.removeMember(1, 10, 5)
+
+    expect(removeWithAuditLog).toHaveBeenCalledWith({ organizationId: 1, targetMembershipId: 10, actorUserId: 5 }, expect.any(Function))
   })
 
-  test('OWNERはMEMBERを削除できる', async () => {
-    membershipFindById.mockResolvedValue(membership)
-    membershipDeleteById.mockResolvedValue(true)
+  test.each([
+    { name: 'OWNERはADMINを削除できる', operatorRole: 'OWNER', targetRole: 'ADMIN' },
+    { name: 'OWNERはMEMBERを削除できる', operatorRole: 'OWNER', targetRole: 'MEMBER' },
+    { name: 'ADMINはMEMBERを削除できる', operatorRole: 'ADMIN', targetRole: 'MEMBER' },
+  ] as const)('$name', async ({ operatorRole, targetRole }) => {
+    simulateRepository({ operatorRole, targetRole })
 
-    await organizationsService.removeMember(1, 10, 'OWNER')
-
-    expect(membershipDeleteById).toHaveBeenCalledWith(10)
+    await expect(organizationsService.removeMember(1, 10, 5)).resolves.toBeUndefined()
   })
 
-  test('ADMINはMEMBERを削除できる', async () => {
-    membershipFindById.mockResolvedValue(membership)
-    membershipDeleteById.mockResolvedValue(true)
+  test.each([
+    { name: 'ADMINがADMINを削除', locked: { operatorRole: 'ADMIN', targetRole: 'ADMIN' }, statusCode: 403, message: 'ADMINは他のADMINを削除' },
+    { name: '対象がOWNER', locked: { operatorRole: 'OWNER', targetRole: 'OWNER' }, statusCode: 409, message: 'OWNERは削除' },
+    { name: 'MEMBERが操作', locked: { operatorRole: 'MEMBER', targetRole: 'MEMBER' }, statusCode: 403, message: '管理者以上' },
+    { name: 'MEMBERが存在しない対象を操作', locked: { operatorRole: 'MEMBER', targetRole: null }, statusCode: 403, message: '管理者以上' },
+  ] as const)('$name: 認可コールバックが拒否し$statusCode', async ({ locked, statusCode, message }) => {
+    simulateRepository(locked)
 
-    await organizationsService.removeMember(1, 10, 'ADMIN')
-
-    expect(membershipDeleteById).toHaveBeenCalledWith(10)
+    await expect(organizationsService.removeMember(1, 10, 5)).rejects.toMatchObject({ statusCode, message: expect.stringContaining(message) })
   })
 
-  test('ADMINがADMINを削除しようとすると403エラーを投げる', async () => {
-    membershipFindById.mockResolvedValue({ ...membership, role: 'ADMIN' })
+  test('対象が存在しなければ404エラーを投げる', async () => {
+    simulateRepository({ operatorRole: 'OWNER', targetRole: null })
 
-    await expect(organizationsService.removeMember(1, 10, 'ADMIN')).rejects.toThrow('ADMINは他のADMINを削除')
-    expect(membershipDeleteById).not.toHaveBeenCalled()
+    await expect(organizationsService.removeMember(1, 999, 5)).rejects.toMatchObject({ statusCode: 404, message: 'メンバーが見つかりません' })
   })
 
-  test('対象がOWNERなら409エラーを投げる', async () => {
-    membershipFindById.mockResolvedValue({ ...membership, role: 'OWNER' })
+  test('操作者の所属が確認できなければ404エラーを投げる', async () => {
+    removeWithAuditLog.mockResolvedValue({ status: 'ORGANIZATION_NOT_FOUND' })
 
-    await expect(organizationsService.removeMember(1, 10, 'OWNER')).rejects.toThrow('OWNERは削除')
-    expect(membershipDeleteById).not.toHaveBeenCalled()
+    await expect(organizationsService.removeMember(1, 10, 5)).rejects.toMatchObject({ statusCode: 404, message: '組織が見つかりません' })
   })
 
-  test('MEMBERは操作できず403エラーを投げる', async () => {
-    await expect(organizationsService.removeMember(1, 10, 'MEMBER')).rejects.toThrow('管理者以上')
-    expect(membershipDeleteById).not.toHaveBeenCalled()
+  test('未知の結果は成功扱いせずエラーを投げる', async () => {
+    removeWithAuditLog.mockResolvedValue({ status: 'UNKNOWN' })
+
+    await expect(organizationsService.removeMember(1, 10, 5)).rejects.toThrow('メンバー削除の結果が不明です')
   })
 
-  test('対象メンバーシップが存在しなければ404エラーを投げる', async () => {
-    membershipFindById.mockResolvedValue(null)
+  test('監査ログの記録失敗はそのまま伝播する', async () => {
+    removeWithAuditLog.mockRejectedValue(new Error('INSERT失敗'))
 
-    await expect(organizationsService.removeMember(1, 999, 'OWNER')).rejects.toThrow('メンバーが見つかりません')
-    expect(membershipDeleteById).not.toHaveBeenCalled()
-  })
-
-  test('異なる組織のメンバーシップなら404エラーを投げる', async () => {
-    membershipFindById.mockResolvedValue({ ...membership, organizationId: 99 })
-
-    await expect(organizationsService.removeMember(1, 10, 'OWNER')).rejects.toThrow('メンバーが見つかりません')
-    expect(membershipDeleteById).not.toHaveBeenCalled()
-  })
-
-  test('deleteById がfalseを返した場合は404エラーを投げる', async () => {
-    membershipFindById.mockResolvedValue(membership)
-    membershipDeleteById.mockResolvedValue(false)
-
-    await expect(organizationsService.removeMember(1, 10, 'OWNER')).rejects.toThrow('メンバーが見つかりません')
+    await expect(organizationsService.removeMember(1, 10, 5)).rejects.toThrow('INSERT失敗')
   })
 })
 
