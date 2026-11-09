@@ -3,11 +3,13 @@ import { prisma } from '@/libs/prisma'
 
 import { invitationEmailLimits } from '../entities/emailDelivery'
 
-export type InvitationEmailClaim = Pick<InvitationEmailDelivery, 'id' | 'leaseToken' | 'attemptCount' | 'hasUnknownOutcome' | 'deadline'> & {
+/** 確保した処理権と、次の試行を判断する配信情報。 */
+export type InvitationEmailClaim = Pick<InvitationEmailDelivery, 'id' | 'attemptCount' | 'hasUnknownOutcome' | 'deadline'> & {
   leaseToken: string
   previousAttemptCount: number
 }
 
+/** 処理権の有効期間と、送信直前に取得した招待・配信情報。 */
 export type ClaimedInvitationEmail = Pick<InvitationEmailDelivery, 'fromEmail' | 'scalarUrl' | 'organizationName' | 'templateVersion'> & {
   leaseUntil: Date | null
   invitation: { email: string; token: string; expiresAt: Date; status: InvitationStatus }

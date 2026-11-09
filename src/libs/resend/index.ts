@@ -22,8 +22,10 @@ export const sendResendEmail = (options: CreateEmailOptions): Promise<CreateEmai
   return resend.emails.send(options)
 }
 
+/** 招待メール送信で、HTTP応答の読み取りまでに許容する時間。 */
 export const resendDeliveryTimeoutMs = 10_000
 
+/** Resendの応答や通信エラーを安全に扱うための分類済み結果。 */
 export type ResendDeliveryResult =
   | { kind: 'accepted'; emailId: string }
   | { kind: 'retry'; reason: 'transport' | 'server' | 'rate_limited' | 'concurrent'; unknown: boolean }
