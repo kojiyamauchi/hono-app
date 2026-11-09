@@ -136,22 +136,28 @@ describe('organizations routes OpenAPI定義', () => {
     }
   })
 
-  test('AuditLogのactionに両イベント種別が含まれ、イベント種別ごとの項目の意味がdescriptionに出る', async () => {
+  test('AuditLogのactionに3種のイベント種別が含まれ、イベント種別ごとの項目の意味がdescriptionに出る', async () => {
     const doc = await fetchOpenApiDoc()
 
-    type Property = { enum?: string[]; description?: string }
-    const auditLog = doc.components?.schemas?.AuditLog as { properties: Record<string, Property> }
+    type Property = { enum?: string[]; type?: string | string[]; anyOf?: unknown[]; nullable?: boolean; description?: string }
+    const auditLog = doc.components?.schemas?.AuditLog as { properties: Record<string, Property>; required?: string[] }
 
-    expect(auditLog.properties.action.enum).toEqual(['MEMBER_ROLE_CHANGED', 'OWNERSHIP_TRANSFERRED'])
+    expect(auditLog.properties.action.enum).toEqual(['MEMBER_ROLE_CHANGED', 'OWNERSHIP_TRANSFERRED', 'MEMBER_REMOVED'])
     for (const name of ['actorUserId', 'previousRole', 'newRole']) {
       expect(auditLog.properties[name].description).toContain('MEMBER_ROLE_CHANGED')
       expect(auditLog.properties[name].description).toContain('OWNERSHIP_TRANSFERRED')
+      expect(auditLog.properties[name].description).toContain('MEMBER_REMOVED')
     }
     expect(auditLog.properties.actorUserId.description).toContain('移譲元')
     expect(auditLog.properties.newRole.description).toContain('OWNER')
 
+    // newRoleは常にキーを返し、MEMBER_REMOVEDではnullになるためrequiredのままnullableで公開する
+    expect(auditLog.required).toContain('newRole')
+    expect(JSON.stringify(auditLog.properties.newRole)).toContain('null')
+
     const auditLogsGet = doc.paths?.['/organizations/{id}/audit-logs']?.get as { description?: string }
     expect(auditLogsGet.description).toContain('OWNERSHIP_TRANSFERRED')
+    expect(auditLogsGet.description).toContain('MEMBER_REMOVED')
   })
 
   test('組織IDの上限（maximum）は監査ログ一覧のpath parameterだけに出て、他の組織ルートには出ない', async () => {
