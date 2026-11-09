@@ -146,7 +146,23 @@ curl -H "Authorization: Bearer $ACCESS_TOKEN" \
 }
 ```
 
-上の例のように、`MEMBER_ROLE_CHANGED`（id 11）と `OWNERSHIP_TRANSFERRED`（id 12）は同じ一覧に混在し、イベント種別に関係なく同じ並び順とカーソルで取得します。項目の意味はイベント種別ごとに異なります（[endpoints.md](endpoints.md#organization-audit-logs) を参照）。この例の `OWNERSHIP_TRANSFERRED` は、ユーザー1（移譲元のOWNER、移譲後はADMIN）が、メンバーシップ40のユーザー5（移譲前はADMIN）へ所有権を移譲したことを表します。
+上の例のように、`MEMBER_ROLE_CHANGED`（id 11）と `OWNERSHIP_TRANSFERRED`（id 12）は同じ一覧に混在し、イベント種別に関係なく同じ並び順とカーソルで取得します。`MEMBER_REMOVED`（管理者によるメンバー削除）も同じ一覧に混在します。項目の意味はイベント種別ごとに異なります（[endpoints.md](endpoints.md#organization-audit-logs) を参照）。この例の `OWNERSHIP_TRANSFERRED` は、ユーザー1（移譲元のOWNER、移譲後はADMIN）が、メンバーシップ40のユーザー5（移譲前はADMIN）へ所有権を移譲したことを表します。
+
+`MEMBER_REMOVED` のitemは、`newRole` が常に `null` になります（キーは省略されません）。次の例は、ユーザー1がメンバーシップ41のユーザー6（削除前はMEMBER）を削除した記録です。
+
+```json
+{
+  "id": 13,
+  "organizationId": 1,
+  "action": "MEMBER_REMOVED",
+  "actorUserId": 1,
+  "targetUserId": 6,
+  "targetMembershipId": 41,
+  "previousRole": "MEMBER",
+  "newRole": null,
+  "createdAt": "2026-02-03T09:00:00.000Z"
+}
+```
 
 最終ページと0件の場合は `nextCursor: null` です。DBからは最大 `limit + 1` 件を取得し、`limit` 件を超えた場合だけ、返した最後のitemの境界から次のカーソルを生成します。
 
