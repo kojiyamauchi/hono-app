@@ -135,10 +135,10 @@ export const organizationsMembersController = {
   },
 
   /**
-   * メンバーを削除する。204を返す。
+   * メンバーを削除する。204を返す。操作者は認証済みユーザーIDで渡し、認可はserviceがロック後のロールで判定する。
    */
-  removeMember: async (c: Context, organizationId: number, membershipId: number, operatorRole: Role): Promise<Response> => {
-    await organizationsService.removeMember(organizationId, membershipId, operatorRole)
+  removeMember: async (c: Context, organizationId: number, membershipId: number, actorUserId: number): Promise<Response> => {
+    await organizationsService.removeMember(organizationId, membershipId, actorUserId)
     return c.body(null, 204)
   },
 }
