@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 
+import { roleValues } from '@/shared/membership/entities'
+
 // registerOpenApiRoutes は登録時に ENABLE_API_DOCS を評価するため、app import より前に有効化する。
 process.env.ENABLE_API_DOCS = 'true'
 
@@ -139,7 +141,7 @@ describe('organizations routes OpenAPI定義', () => {
   test('AuditLogのactionに3種のイベント種別が含まれ、イベント種別ごとの項目の意味がdescriptionに出る', async () => {
     const doc = await fetchOpenApiDoc()
 
-    type Property = { enum?: string[]; type?: string | string[]; anyOf?: unknown[]; nullable?: boolean; description?: string }
+    type Property = { enum?: (string | null)[]; type?: string | string[]; anyOf?: unknown[]; nullable?: boolean; description?: string }
     const auditLog = doc.components?.schemas?.AuditLog as { properties: Record<string, Property>; required?: string[] }
 
     expect(auditLog.properties.action.enum).toEqual(['MEMBER_ROLE_CHANGED', 'OWNERSHIP_TRANSFERRED', 'MEMBER_REMOVED'])
@@ -151,9 +153,11 @@ describe('organizations routes OpenAPI定義', () => {
     expect(auditLog.properties.actorUserId.description).toContain('移譲元')
     expect(auditLog.properties.newRole.description).toContain('OWNER')
 
-    // newRoleは常にキーを返し、MEMBER_REMOVEDではnullになるためrequiredのままnullableで公開する
+    // newRoleは常にキーを返し、MEMBER_REMOVEDではnullになるためrequiredのまま、OpenAPI 3.1のJSON Schemaとしてnullを許容する型で公開する
+    // 説明文中の「null」で通らないよう、生成されたtypeとenumを個別に検証する
     expect(auditLog.required).toContain('newRole')
-    expect(JSON.stringify(auditLog.properties.newRole)).toContain('null')
+    expect(auditLog.properties.newRole.type).toEqual(['string', 'null'])
+    expect(auditLog.properties.newRole.enum).toEqual([...roleValues, null])
 
     const auditLogsGet = doc.paths?.['/organizations/{id}/audit-logs']?.get as { description?: string }
     expect(auditLogsGet.description).toContain('OWNERSHIP_TRANSFERRED')

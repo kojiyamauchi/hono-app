@@ -42,20 +42,23 @@ export const auditLogDto = z
         'イベントを実行したユーザーのID。MEMBER_ROLE_CHANGEDとMEMBER_REMOVEDでは操作者。OWNERSHIP_TRANSFERREDでは移譲元のOWNER（移譲後はADMINになる）。',
     }),
     targetUserId: z.number().int().openapi({ description: '対象ユーザーのID。OWNERSHIP_TRANSFERREDでは移譲先、MEMBER_REMOVEDでは削除されたユーザー。' }),
-    targetMembershipId: z
-      .number()
-      .int()
-      .openapi({
-        description: '対象メンバーシップのID。OWNERSHIP_TRANSFERREDでは移譲先のメンバーシップ、MEMBER_REMOVEDでは削除されたメンバーシップ（記録時点の値）。',
-      }),
+    targetMembershipId: z.number().int().openapi({
+      description: '対象メンバーシップのID。OWNERSHIP_TRANSFERREDでは移譲先のメンバーシップ、MEMBER_REMOVEDでは削除されたメンバーシップ（記録時点の値）。',
+    }),
     previousRole: z.enum(roleValues).openapi({
       description:
         '対象の変更前ロール。MEMBER_ROLE_CHANGEDでは対象メンバーの変更前、OWNERSHIP_TRANSFERREDでは移譲先の変更前（ADMINまたはMEMBER）、MEMBER_REMOVEDでは削除前のロール（ADMINまたはMEMBER）。',
     }),
-    newRole: z.enum(roleValues).nullable().openapi({
-      description:
-        '対象の変更後ロール。MEMBER_ROLE_CHANGEDでは対象メンバーの変更後、OWNERSHIP_TRANSFERREDでは常にOWNER（移譲元がOWNERからADMINになったことも表す）。変更後が存在しないMEMBER_REMOVEDでは常にnull。',
-    }),
+    newRole: z
+      .enum(roleValues)
+      .nullable()
+      .openapi({
+        // OpenAPI 3.1ではnullableが無効なため、JSON Schemaの書き方でnull許容を明示する（Zod定義と実行時挙動は変えない）
+        type: ['string', 'null'],
+        enum: [...roleValues, null],
+        description:
+          '対象の変更後ロール。MEMBER_ROLE_CHANGEDでは対象メンバーの変更後、OWNERSHIP_TRANSFERREDでは常にOWNER（移譲元がOWNERからADMINになったことも表す）。変更後が存在しないMEMBER_REMOVEDでは常にnull。',
+      }),
     createdAt: z.iso.datetime(),
   })
   .openapi('AuditLog')
