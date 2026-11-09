@@ -33,12 +33,21 @@ export const auditLogDto = z
   .object({
     id: z.number().int(),
     organizationId: z.number().int(),
-    action: z.enum(auditActionValues),
-    actorUserId: z.number().int(),
-    targetUserId: z.number().int(),
-    targetMembershipId: z.number().int(),
-    previousRole: z.enum(roleValues),
-    newRole: z.enum(roleValues),
+    action: z.enum(auditActionValues).openapi({
+      description: 'イベント種別。MEMBER_ROLE_CHANGED（メンバーのロール変更）またはOWNERSHIP_TRANSFERRED（組織の所有権移譲）。',
+    }),
+    actorUserId: z.number().int().openapi({
+      description: 'イベントを実行したユーザーのID。MEMBER_ROLE_CHANGEDでは操作者。OWNERSHIP_TRANSFERREDでは移譲元のOWNER（移譲後はADMINになる）。',
+    }),
+    targetUserId: z.number().int().openapi({ description: '対象ユーザーのID。OWNERSHIP_TRANSFERREDでは移譲先。' }),
+    targetMembershipId: z.number().int().openapi({ description: '対象メンバーシップのID。OWNERSHIP_TRANSFERREDでは移譲先のメンバーシップ。' }),
+    previousRole: z.enum(roleValues).openapi({
+      description: '対象の変更前ロール。MEMBER_ROLE_CHANGEDでは対象メンバーの変更前、OWNERSHIP_TRANSFERREDでは移譲先の変更前（ADMINまたはMEMBER）。',
+    }),
+    newRole: z.enum(roleValues).openapi({
+      description:
+        '対象の変更後ロール。MEMBER_ROLE_CHANGEDでは対象メンバーの変更後、OWNERSHIP_TRANSFERREDでは常にOWNER（移譲元がOWNERからADMINになったことも表す）。',
+    }),
     createdAt: z.iso.datetime(),
   })
   .openapi('AuditLog')
