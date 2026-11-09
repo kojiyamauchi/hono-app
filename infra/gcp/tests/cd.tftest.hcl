@@ -81,6 +81,10 @@ run "cd_scoped_to_main_and_dev" {
         "run.services.get", "run.services.update", "run.services.getIamPolicy", "run.revisions.get",
       ]) &&
       contains(google_project_iam_custom_role.cd_read[0].permissions, "run.operations.get") &&
+      contains(google_project_iam_custom_role.cd_read[0].permissions, "run.jobs.get") &&
+      contains(google_project_iam_custom_role.cd_read[0].permissions, "run.jobs.getIamPolicy") &&
+      contains(google_project_iam_custom_role.cd_read[0].permissions, "cloudscheduler.jobs.get") &&
+      !contains(google_project_iam_custom_role.cd_read[0].permissions, "run.jobs.run") &&
       contains(google_project_iam_custom_role.cd_read[0].permissions, "iam.workloadIdentityPools.getAttestationRules") &&
       contains(google_project_iam_custom_role.cd_read[0].permissions, "monitoring.alertPolicies.get") &&
       !contains(google_project_iam_custom_role.cd_read[0].permissions, "monitoring.alertPolicies.create") &&
