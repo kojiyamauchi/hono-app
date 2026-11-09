@@ -69,7 +69,8 @@ model AuditLog {
   targetUserId       Int
   targetMembershipId Int
   previousRole       Role
-  newRole            Role
+  // MEMBER_REMOVEDのときだけnull（変更後ロールが存在しない）。DBのCHECK制約（AuditLog_newRole_matches_action_check）で担保する。
+  newRole            Role?
   createdAt          DateTime     @default(now())
   // 組織が削除されたときは、同じトランザクション内で記録も削除する。
   organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
