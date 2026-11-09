@@ -3,8 +3,11 @@ import { cors } from 'hono/cors'
 
 import { createHttpRequestTracingMiddleware } from '@/libs/telemetry/hono'
 import { getAllowedOrigins } from '@/middlewares/origin'
+import { getInvitationEmailConfig } from '@/shared/invitation/services/emailConfig'
 
 import { registerRoutes } from './routes'
+
+getInvitationEmailConfig()
 
 // OpenAPI仕様を全featureのroute定義から集約するため、root appはOpenAPIHonoにする。
 export const app = new OpenAPIHono()
