@@ -857,7 +857,7 @@ describe('organizationsService.createInvitation', () => {
   test('PENDING招待が既に存在する場合は409エラーを投げる', async () => {
     invitationFindPendingByOrgAndEmail.mockResolvedValue(invitation)
 
-    await expect(organizationsService.createInvitation(1, 'OWNER', { email: 'invite@example.com', role: 'MEMBER' })).rejects.toThrow('既に送信済み')
+    await expect(organizationsService.createInvitation(1, 'OWNER', { email: 'invite@example.com', role: 'MEMBER' })).rejects.toThrow('既に作成済み')
     expect(invitationCreate).not.toHaveBeenCalled()
   })
 
@@ -886,7 +886,7 @@ describe('organizationsService.createInvitation', () => {
     findByEmail.mockResolvedValue(null)
     invitationCreate.mockResolvedValue(null)
 
-    await expect(organizationsService.createInvitation(1, 'OWNER', { email: 'invite@example.com', role: 'MEMBER' })).rejects.toThrow('既に送信済み')
+    await expect(organizationsService.createInvitation(1, 'OWNER', { email: 'invite@example.com', role: 'MEMBER' })).rejects.toThrow('既に作成済み')
   })
 })
 
