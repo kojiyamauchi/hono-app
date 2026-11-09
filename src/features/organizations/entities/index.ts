@@ -5,7 +5,7 @@ import type { Role } from '@/shared/membership/entities'
  * AuditAction型・DTOのZod schema（`z.enum`）双方の正本として使い、列挙値の二重管理を防ぐ。
  * Prismaの `AuditAction` enumと同じ値を保つこと。
  */
-export const auditActionValues = ['MEMBER_ROLE_CHANGED', 'OWNERSHIP_TRANSFERRED'] as const
+export const auditActionValues = ['MEMBER_ROLE_CHANGED', 'OWNERSHIP_TRANSFERRED', 'MEMBER_REMOVED'] as const
 
 /**
  * 監査ログに記録するイベント種別。
@@ -25,6 +25,7 @@ export type AuditLog = {
   targetUserId: number
   targetMembershipId: number
   previousRole: Role
-  newRole: Role
+  /** 変更後ロール。変更後が存在しないMEMBER_REMOVEDのときだけnull（DBのCHECK制約で担保）。 */
+  newRole: Role | null
   createdAt: Date
 }
