@@ -154,6 +154,19 @@ describe('招待メールワーカー', () => {
     expect(finish).toHaveBeenCalledWith(currentClaim, { status: 'SKIPPED', attemptCount: 0, lastError: 'expired' })
   })
 
+  test('429のみの試行後に招待が無効になった配信は対象外にする', async () => {
+    fetchSpy.mockResolvedValueOnce(new Response(null, { status: 429 }))
+    await deliverInvitationEmails()
+    expect(finish).toHaveBeenLastCalledWith(currentClaim, expect.objectContaining({ hasUnknownOutcome: false, lastError: 'rate_limited' }))
+
+    email.invitation.status = 'CANCELED'
+    const nextClaim = { ...currentClaim, attemptCount: 2, previousAttemptCount: 1 }
+    claim.mockResolvedValueOnce(nextClaim)
+    await deliverInvitationEmails()
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(finish).toHaveBeenLastCalledWith(nextClaim, { status: 'SKIPPED', attemptCount: 1, lastError: 'inactive' })
+  })
+
   test('最後の試行の処理権が期限切れになった配信を回収する', async () => {
     currentClaim.attemptCount = 5
     currentClaim.previousAttemptCount = 5

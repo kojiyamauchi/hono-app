@@ -37,7 +37,7 @@ const processClaim = async (claim: InvitationEmailClaim): Promise<void> => {
   const exhausted = claim.previousAttemptCount >= invitationEmailLimits.maxAttempts
   if (delivery.invitation.status !== 'PENDING' || now >= deadline || exhausted) {
     await invitationEmailDeliveryRepository.finish(claim, {
-      status: claim.hasUnknownOutcome ? 'UNKNOWN' : claim.previousAttemptCount > 0 ? 'REJECTED' : 'SKIPPED',
+      status: claim.hasUnknownOutcome ? 'UNKNOWN' : 'SKIPPED',
       attemptCount: claim.previousAttemptCount,
       lastError: delivery.invitation.status !== 'PENDING' ? 'inactive' : now >= deadline ? 'expired' : 'attempt_limit',
     })

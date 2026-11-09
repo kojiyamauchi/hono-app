@@ -47,13 +47,13 @@ Jobを更新する場合は新しいdigestを保持タグで保護し、tfvars�
 
 障害時はCloud Run Jobの実行履歴と、`InvitationEmailDelivery` の `status`、`attemptCount`、`lastError`、`nextAttemptAt`、`leaseUntil` を確認します。配信IDと分類済みのエラーを照合に使います。宛先、トークン、メール本文、APIキーはログやトレースに出力しません。
 
-| 状態       | 意味                                                     |
-| ---------- | -------------------------------------------------------- |
-| `PENDING`  | 実行・再試行待ち、または処理権の取得中                   |
-| `ACCEPTED` | Resendが受付済み。実配達はResendのイベントや受信者で確認 |
-| `REJECTED` | 明示的な拒否で終了。分類済みの `lastError` を確認        |
-| `UNKNOWN`  | 受付結果が不明な試行が残ったまま終了                     |
-| `SKIPPED`  | 送信前に招待が無効化されたか、配信期限切れ               |
+| 状態       | 意味                                                                                     |
+| ---------- | ---------------------------------------------------------------------------------------- |
+| `PENDING`  | 実行・再試行待ち、または処理権の取得中                                                   |
+| `ACCEPTED` | Resendが受付済み。実配達はResendのイベントや受信者で確認                                 |
+| `REJECTED` | 恒久エラー、または明示的な拒否のまま再試行上限に到達。分類済みの `lastError` を確認      |
+| `UNKNOWN`  | 受付結果が不明な試行が残ったまま終了                                                     |
+| `SKIPPED`  | 受付結果が不明な試行がなく、招待の無効化・期限切れ・未対応テンプレートで送信を打ち切った |
 
 通信障害・タイムアウト・5xx・429・`concurrent_idempotent_requests` は15分、30分、60分、120分の順に待って再試行します。`invalid_idempotent_request` 等の恒久エラーは終了します。初回を含め最大5回で、招待の有効期限と配信作成から6時間の早い方で打ち切ります。6時間はResendの冪等キー保持期間24時間より短く、同じ配信IDで同じ内容を再送します。[Resendの冪等キー仕様](https://resend.com/docs/dashboard/emails/idempotency-keys)
 
