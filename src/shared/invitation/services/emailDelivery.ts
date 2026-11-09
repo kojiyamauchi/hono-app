@@ -8,8 +8,6 @@ const batchSize = 30
 
 /** 既存配信が参照する版の本文を固定し、変更時は新しい版を追加する。 */
 const renderEmail = (delivery: ClaimedInvitationEmail): Parameters<typeof deliverResendEmail>[0] => {
-  if (delivery.templateVersion !== 1) throw new Error('未対応の招待メールテンプレートです')
-
   return {
     from: delivery.fromEmail,
     to: delivery.invitation.email,
@@ -46,7 +44,11 @@ const processClaim = async (claim: InvitationEmailClaim): Promise<void> => {
     return
   }
 
-  const result = await deliverResendEmail(renderEmail(delivery), claim.id)
+  // 旧Jobが未対応の版を読んだ場合も、送信せず次回時刻を更新して後続の配信に進む。
+  const result =
+    delivery.templateVersion === 1
+      ? await deliverResendEmail(renderEmail(delivery), claim.id)
+      : ({ kind: 'retry', reason: 'template_version', unknown: false } as const)
   if (result.kind === 'accepted') {
     await invitationEmailDeliveryRepository.finish(claim, { status: 'ACCEPTED', resendEmailId: result.emailId, lastError: null, hasUnknownOutcome: false })
     return
@@ -65,7 +67,7 @@ const processClaim = async (claim: InvitationEmailClaim): Promise<void> => {
   }
 
   await invitationEmailDeliveryRepository.finish(claim, {
-    status: hasUnknownOutcome ? 'UNKNOWN' : 'REJECTED',
+    status: hasUnknownOutcome ? 'UNKNOWN' : result.reason === 'template_version' ? 'SKIPPED' : 'REJECTED',
     hasUnknownOutcome,
     lastError: result.reason,
   })
@@ -74,6 +76,7 @@ const processClaim = async (claim: InvitationEmailClaim): Promise<void> => {
 /** 期限の来た配信を1回の起動につき最大30件処理する。 */
 export const deliverInvitationEmails = async (): Promise<number> => {
   let processed = 0
+  let failed = false
   for (; processed < batchSize; processed++) {
     const claim = await invitationEmailDeliveryRepository.claim()
     if (!claim) break
@@ -82,8 +85,9 @@ export const deliverInvitationEmails = async (): Promise<number> => {
     } catch {
       // DBや外部APIの例外には機密情報が含まれうるため、識別子と回数だけを記録する。
       console.error('招待メールの配信処理に失敗しました', { deliveryId: claim.id, attemptCount: claim.attemptCount })
-      throw new Error('招待メールの配信処理に失敗しました')
+      failed = true
     }
   }
+  if (failed) throw new Error('招待メールの配信処理に失敗しました')
   return processed
 }

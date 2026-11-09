@@ -170,6 +170,34 @@ describe('招待メールワーカー', () => {
     expect(finish).not.toHaveBeenCalled()
   })
 
+  test('未対応のテンプレートは送信せず受付結果不明にもせず再試行を待つ', async () => {
+    email.templateVersion = 2
+    await deliverInvitationEmails()
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(finish).toHaveBeenCalledWith(currentClaim, {
+      nextAttemptAt: expect.any(Date),
+      hasUnknownOutcome: false,
+      lastError: 'template_version',
+    })
+  })
+
+  test('1件のDBエラー後も次の配信を処理し、例外詳細をログに含めない', async () => {
+    const nextClaim = { ...currentClaim, id: 'next-delivery' }
+    claim.mockResolvedValueOnce(nextClaim)
+    readClaim.mockRejectedValueOnce(new Error('機密情報を含みうるDBエラー'))
+    fetchSpy.mockResolvedValueOnce(Response.json({ id: 'email-id' }))
+    const log = spyOn(console, 'error').mockImplementation(() => undefined)
+    try {
+      await expect(deliverInvitationEmails()).rejects.toThrow('招待メールの配信処理に失敗しました')
+      expect(finish).toHaveBeenCalledTimes(1)
+      expect(finish).toHaveBeenCalledWith(nextClaim, expect.objectContaining({ status: 'ACCEPTED' }))
+      expect(log).toHaveBeenCalledTimes(1)
+      expect(log).toHaveBeenCalledWith('招待メールの配信処理に失敗しました', { deliveryId: currentClaim.id, attemptCount: 1 })
+    } finally {
+      log.mockRestore()
+    }
+  })
+
   test('実行ごとに最大30件で停止する', async () => {
     claim.mockResolvedValue(currentClaim)
     readClaim.mockResolvedValue(null)
