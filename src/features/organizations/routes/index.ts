@@ -308,7 +308,7 @@ const removeMemberRoute = createRoute({
   method: 'delete',
   path: '/{id}/members/{membershipId}',
   tags: ['Organization Members'],
-  summary: '指定したメンバーを削除する',
+  summary: '指定したメンバーを削除し、監査ログ（MEMBER_REMOVED）に記録する',
   middleware: [authMiddleware, paramValidationMiddleware(memberRouteParamSchema), organizationMembershipMiddleware],
   security: bearerSecurity,
   request: {
@@ -323,7 +323,7 @@ const removeMemberRoute = createRoute({
     403: errorResponse('権限が不足'),
     404: errorResponse('組織またはメンバーが見つからない'),
     409: errorResponse('対象がOWNERなど削除不可'),
-    500: errorResponse('サーバーエラー'),
+    500: errorResponse('サーバーエラー（監査ログの記録に失敗した場合を含む。その場合は削除もロールバックされる）'),
   },
 })
 
@@ -467,7 +467,7 @@ export const organizationsRoutes = new OpenAPIHono({ defaultHook: openApiDefault
     ),
   )
   .openapi(removeMemberRoute, (c) =>
-    organizationsMembersController.removeMember(c, c.req.valid('param').id, c.req.valid('param').membershipId, c.get('membership').role),
+    organizationsMembersController.removeMember(c, c.req.valid('param').id, c.req.valid('param').membershipId, c.get('userId')),
   )
   .openapi(listAuditLogsRoute, (c) => organizationsAuditLogsController.listAuditLogs(c, c.req.valid('param').id, c.req.valid('query')))
   .openapi(listInvitationsRoute, (c) => organizationsInvitationsController.listInvitations(c, c.req.valid('param').id, c.get('membership').role))
