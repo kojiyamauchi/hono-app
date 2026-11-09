@@ -347,7 +347,8 @@ export const organizationMemberRemovalRepository = {
    *
    * ロック順・ロック強度はロール変更（`changeRoleWithAuditLog`）と同じにし、ロール変更・所有権移譲・自主脱退と直列化する。
    * 認可は呼び出し側のミドルウェアの値ではなく、ロック後に読み直したロールで `authorize` が判定する。
-   * 判定順は、組織／操作者の所属なし → 対象なし（別組織を含む） → 認可コールバック。
+   * 判定順は、組織／操作者の所属なし → 認可コールバック（対象なしでも操作者がMEMBERなら拒否）
+   * → 対象なし（別組織を含む） → 削除0件（対象なしとして扱う）。
    * 操作者がMEMBERの場合に対象の有無で結果が変わらないよう、操作者の認可は対象の存在確認より先に行う。
    */
   removeWithAuditLog: async <TRejection>(input: RemoveMemberInput, authorize: AuthorizeMemberRemoval<TRejection>): Promise<MemberRemovalResult<TRejection>> => {
