@@ -34,8 +34,16 @@ const transferOwnership = mock()
 const leaveOrganization = mock()
 const changeRoleWithAuditLog = mock()
 const findAuditLogPage = mock()
+const removeWithAuditLog = mock()
 
 await mock.module('@/features/organizations/repositories', () => ({
+  organizationMemberRemovalRepository: { removeWithAuditLog },
+  memberRemovalResults: {
+    removed: 'REMOVED',
+    organizationNotFound: 'ORGANIZATION_NOT_FOUND',
+    targetNotFound: 'TARGET_NOT_FOUND',
+    rejected: 'REJECTED',
+  },
   organizationMembershipRepository: { leave: leaveOrganization },
   organizationOwnershipRepository: { transferOwnership },
   organizationMemberRoleRepository: { changeRoleWithAuditLog },
@@ -140,6 +148,7 @@ describe('organizations routes', () => {
     membershipFindById.mockReset()
     membershipCreate.mockReset()
     changeRoleWithAuditLog.mockReset()
+    removeWithAuditLog.mockReset()
     findAuditLogPage.mockReset()
     membershipDeleteById.mockReset()
     findByEmail.mockReset()
@@ -480,7 +489,7 @@ describe('organizations routes', () => {
 
     expect(response.status).toBe(400)
     expect(findByUserAndOrganization).not.toHaveBeenCalled()
-    expect(membershipDeleteById).not.toHaveBeenCalled()
+    expect(removeWithAuditLog).not.toHaveBeenCalled()
   })
 
   test('DELETE /organizations/:id/invitations/:invitationId は不正なinvitationIdなら（非メンバーでも）400を返す', async () => {
@@ -750,47 +759,81 @@ describe('organizations routes', () => {
     expect(changeRoleWithAuditLog).not.toHaveBeenCalled()
   })
 
-  test('DELETE /organizations/:id/members/:membershipId はOWNERならMEMBERを削除できる', async () => {
+  /** repositoryがロック後に読み直したロールで認可コールバックを呼ぶ動きを再現する。 */
+  const simulateRemovalRepository = (locked: { operatorRole: Role; targetRole: Role | null }): void => {
+    removeWithAuditLog.mockImplementation(async (_input: unknown, authorize: (state: typeof locked) => unknown) => {
+      const rejection = authorize(locked)
+      if (rejection !== null) {
+        return { status: 'REJECTED', rejection }
+      }
+      return locked.targetRole === null ? { status: 'TARGET_NOT_FOUND' } : { status: 'REMOVED' }
+    })
+  }
+
+  const deleteMemberRequest = async (token: string, membershipId = 10): Promise<Response> =>
+    app.request(`/organizations/1/members/${membershipId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
+
+  test.each([
+    { name: 'OWNERがADMINを削除', operatorRole: 'OWNER', targetRole: 'ADMIN' },
+    { name: 'OWNERがMEMBERを削除', operatorRole: 'OWNER', targetRole: 'MEMBER' },
+    { name: 'ADMINがMEMBERを削除', operatorRole: 'ADMIN', targetRole: 'MEMBER' },
+  ] as const)(
+    'DELETE /organizations/:id/members/:membershipId は$name: 204を返し認証済みユーザーIDを操作者として渡す',
+    async ({ operatorRole, targetRole }) => {
+      findByUserAndOrganization.mockResolvedValue(membershipWithRole(operatorRole))
+      simulateRemovalRepository({ operatorRole, targetRole })
+      const token = await createToken(1)
+
+      const response = await deleteMemberRequest(token)
+
+      expect(response.status).toBe(204)
+      expect(removeWithAuditLog).toHaveBeenCalledWith({ organizationId: 1, targetMembershipId: 10, actorUserId: 1 }, expect.any(Function))
+    },
+  )
+
+  test.each([
+    { name: '対象がOWNERなら409', locked: { operatorRole: 'OWNER', targetRole: 'OWNER' }, status: 409 },
+    { name: 'ADMINがADMINを削除しようとすると403', locked: { operatorRole: 'ADMIN', targetRole: 'ADMIN' }, status: 403 },
+    { name: '対象が存在しなければ404', locked: { operatorRole: 'OWNER', targetRole: null }, status: 404 },
+  ] as const)('DELETE /organizations/:id/members/:membershipId は$name', async ({ locked, status }) => {
     findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))
-    membershipFindById.mockResolvedValue(targetMembership('MEMBER'))
-    membershipDeleteById.mockResolvedValue(true)
+    simulateRemovalRepository(locked)
     const token = await createToken(1)
 
-    const response = await app.request('/organizations/1/members/10', {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    const response = await deleteMemberRequest(token)
 
-    expect(response.status).toBe(204)
-    expect(membershipDeleteById).toHaveBeenCalledWith(10)
+    expect(response.status).toBe(status)
   })
 
-  test('DELETE /organizations/:id/members/:membershipId は対象がOWNERなら409を返す', async () => {
+  test('DELETE /organizations/:id/members/:membershipId はmiddlewareのロールが古くても、ロック後のロールで403にする', async () => {
+    // middlewareはOWNERと読んだが、ロック時点では既にMEMBERへ降格されている
     findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))
-    membershipFindById.mockResolvedValue(targetMembership('OWNER'))
+    simulateRemovalRepository({ operatorRole: 'MEMBER', targetRole: 'MEMBER' })
     const token = await createToken(1)
 
-    const response = await app.request('/organizations/1/members/10', {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` },
-    })
-
-    expect(response.status).toBe(409)
-    expect(membershipDeleteById).not.toHaveBeenCalled()
-  })
-
-  test('DELETE /organizations/:id/members/:membershipId はADMINがADMINを削除しようとすると403を返す', async () => {
-    findByUserAndOrganization.mockResolvedValue(membershipWithRole('ADMIN'))
-    membershipFindById.mockResolvedValue(targetMembership('ADMIN'))
-    const token = await createToken(1)
-
-    const response = await app.request('/organizations/1/members/10', {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    const response = await deleteMemberRequest(token)
 
     expect(response.status).toBe(403)
-    expect(membershipDeleteById).not.toHaveBeenCalled()
+  })
+
+  test('DELETE /organizations/:id/members/:membershipId は監査ログの書き込みに失敗したら500を返す', async () => {
+    findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))
+    removeWithAuditLog.mockRejectedValue(new Error('INSERT失敗'))
+    const token = await createToken(1)
+
+    const response = await deleteMemberRequest(token)
+
+    expect(response.status).toBe(500)
+  })
+
+  test('DELETE /organizations/:id/members/:membershipId は未所属なら404を返しrepositoryを呼ばない', async () => {
+    findByUserAndOrganization.mockResolvedValue(null)
+    const token = await createToken(1)
+
+    const response = await deleteMemberRequest(token)
+
+    expect(response.status).toBe(404)
+    expect(removeWithAuditLog).not.toHaveBeenCalled()
   })
 
   test('DELETE /organizations/:id/members/me はMEMBERなら204を返す', async () => {
@@ -1013,31 +1056,37 @@ describe('organizations routes', () => {
     expect(secondBody.nextCursor).toBeNull()
   })
 
-  test('GET /organizations/:id/audit-logs はMEMBER_ROLE_CHANGEDとOWNERSHIP_TRANSFERREDが混在しても同じ順序規則でページをまたいで取得できる', async () => {
+  test('GET /organizations/:id/audit-logs は3種のイベントが混在しても同じ順序規則でページをまたいで取得でき、MEMBER_REMOVEDのnewRoleはnullで返る', async () => {
     findByUserAndOrganization.mockResolvedValue(membershipWithRole('ADMIN'))
     const sameCreatedAt = '2026-01-01T00:00:00.000Z'
+    const removed = (id: number): AuditLog => ({ ...auditLog(id, sameCreatedAt), action: 'MEMBER_REMOVED', previousRole: 'ADMIN', newRole: null })
     const transferred = (id: number): AuditLog => ({ ...auditLog(id, sameCreatedAt), action: 'OWNERSHIP_TRANSFERRED', previousRole: 'ADMIN', newRole: 'OWNER' })
     const token = await createToken(1)
 
-    findAuditLogPage.mockResolvedValueOnce([transferred(3), auditLog(2, sameCreatedAt), auditLog(1, sameCreatedAt)])
+    findAuditLogPage.mockResolvedValueOnce([removed(4), transferred(3), auditLog(2, sameCreatedAt)])
     const first = await auditLogsRequest('/organizations/1/audit-logs?limit=2', token)
-    const firstBody = (await first.json()) as { items: { id: number; action: string; newRole: string }[]; nextCursor: string | null }
+    const firstBody = (await first.json()) as { items: { id: number; action: string; newRole: string | null }[]; nextCursor: string | null }
 
     expect(first.status).toBe(200)
     expect(firstBody.items.map((item) => [item.id, item.action])).toEqual([
+      [4, 'MEMBER_REMOVED'],
       [3, 'OWNERSHIP_TRANSFERRED'],
-      [2, 'MEMBER_ROLE_CHANGED'],
     ])
-    expect(firstBody.items[0].newRole).toBe('OWNER')
+    // newRoleは常にキーを返し、削除イベントはnull、既存2種はロール値
+    expect(firstBody.items[0]).toHaveProperty('newRole', null)
+    expect(firstBody.items[1].newRole).toBe('OWNER')
     expect(firstBody.nextCursor).not.toBeNull()
 
-    findAuditLogPage.mockResolvedValueOnce([auditLog(1, sameCreatedAt)])
+    findAuditLogPage.mockResolvedValueOnce([auditLog(2, sameCreatedAt), auditLog(1, sameCreatedAt)])
     const second = await auditLogsRequest(`/organizations/1/audit-logs?limit=2&cursor=${firstBody.nextCursor}`, token)
-    const secondBody = (await second.json()) as { items: { id: number; action: string }[]; nextCursor: string | null }
+    const secondBody = (await second.json()) as { items: { id: number; action: string; newRole: string | null }[]; nextCursor: string | null }
 
     expect(second.status).toBe(200)
-    expect(findAuditLogPage).toHaveBeenLastCalledWith(1, 3, { createdAt: new Date(sameCreatedAt), id: 2 })
-    expect(secondBody.items.map((item) => [item.id, item.action])).toEqual([[1, 'MEMBER_ROLE_CHANGED']])
+    expect(findAuditLogPage).toHaveBeenLastCalledWith(1, 3, { createdAt: new Date(sameCreatedAt), id: 3 })
+    expect(secondBody.items.map((item) => [item.id, item.action, item.newRole])).toEqual([
+      [2, 'MEMBER_ROLE_CHANGED', 'ADMIN'],
+      [1, 'MEMBER_ROLE_CHANGED', 'ADMIN'],
+    ])
     expect(secondBody.nextCursor).toBeNull()
   })
 

@@ -195,6 +195,16 @@ describe('toAuditLogResponse / toAuditLogListResponse', () => {
     expect(auditLogDto.safeParse(result).success).toBe(true)
   })
 
+  test('MEMBER_REMOVEDの監査ログはnewRoleがnullのままキーを残し、auditLogDto schemaに通る', () => {
+    const removed: AuditLog = { ...auditLog, id: 3, action: 'MEMBER_REMOVED', previousRole: 'ADMIN', newRole: null }
+
+    const result = toAuditLogResponse(removed)
+
+    expect(result).toEqual({ ...removed, createdAt: '2026-01-01T00:00:00.000Z' })
+    expect(result).toHaveProperty('newRole', null)
+    expect(auditLogDto.safeParse(result).success).toBe(true)
+  })
+
   test('監査ログとnextCursorをレスポンス用に変換し、auditLogListDto schemaに通る', () => {
     const result = toAuditLogListResponse([auditLog], 'cursor')
 

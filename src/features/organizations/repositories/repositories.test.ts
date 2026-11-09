@@ -19,8 +19,10 @@ await mock.module('@/libs/prisma', () => ({
 
 const {
   leaveOrganizationResults,
+  memberRemovalResults,
   memberRoleChangeResults,
   organizationAuditLogRepository,
+  organizationMemberRemovalRepository,
   organizationMemberRoleRepository,
   organizationMembershipRepository,
   organizationOwnershipRepository,
@@ -40,7 +42,7 @@ const target: MembershipRow = { id: 2, userId: 2, organizationId: 1, role: 'MEMB
 /** transactionモックへロックと更新を行うclientを設定する。 */
 const prepareTransaction = (): void => {
   transaction.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) =>
-    callback({ $queryRaw: queryRaw, membership: { updateMany }, auditLog: { create: auditLogCreate } }),
+    callback({ $queryRaw: queryRaw, membership: { updateMany, deleteMany }, auditLog: { create: auditLogCreate } }),
   )
 }
 
@@ -410,6 +412,190 @@ describe('organizationMemberRoleRepository.changeRoleWithAuditLog', () => {
     queryRaw.mockRejectedValueOnce(new Error('接続エラー'))
 
     await expect(organizationMemberRoleRepository.changeRoleWithAuditLog(input, allow)).rejects.toThrow('接続エラー')
+  })
+})
+
+describe('organizationMemberRemovalRepository.removeWithAuditLog', () => {
+  type LockedRow = MembershipRow & { createdAt: Date }
+
+  const createdAt = new Date('2026-01-01T00:00:00.000Z')
+  const operatorRow: LockedRow = { id: 1, userId: 1, organizationId: 1, role: 'OWNER', createdAt }
+  const targetRow: LockedRow = { id: 10, userId: 2, organizationId: 1, role: 'MEMBER', createdAt }
+  const input = { organizationId: 1, targetMembershipId: 10, actorUserId: 1 } as const
+
+  /** 常に許可するコールバック。 */
+  const allow = mock((): string | null => null)
+
+  beforeEach(() => {
+    queryRaw.mockReset()
+    deleteMany.mockReset()
+    auditLogCreate.mockReset()
+    transaction.mockReset()
+    allow.mockClear()
+    prepareTransaction()
+  })
+
+  /** Organization行のロック結果とMembership行のロック結果を順番に設定する。 */
+  const prepareRemovalLocks = (rows: LockedRow[] = [operatorRow, targetRow]): void => {
+    queryRaw.mockResolvedValueOnce([{ id: 1 }]).mockResolvedValueOnce(rows)
+  }
+
+  /** tagged templateで呼ばれた$queryRawのSQL文字列と埋め込み値を取り出す。 */
+  const queryOf = (callIndex: number): { sql: string; values: unknown[] } => {
+    const [strings, ...values] = queryRaw.mock.calls[callIndex] as [string[], ...unknown[]]
+    return { sql: strings.join('?').replace(/\s+/g, ' ').trim(), values }
+  }
+
+  test('Organization(FOR NO KEY UPDATE)、Membership(FOR UPDATE)の順でロックし、削除後に監査ログを追加する', async () => {
+    const callOrder: string[] = []
+    queryRaw
+      .mockImplementationOnce(async () => {
+        callOrder.push('organization-lock')
+        return [{ id: 1 }]
+      })
+      .mockImplementationOnce(async () => {
+        callOrder.push('membership-lock')
+        return [operatorRow, targetRow]
+      })
+    deleteMany.mockImplementationOnce(async () => {
+      callOrder.push('membership-delete')
+      return { count: 1 }
+    })
+    auditLogCreate.mockImplementationOnce(async () => {
+      callOrder.push('audit-log-create')
+      return undefined
+    })
+
+    const result = await organizationMemberRemovalRepository.removeWithAuditLog(input, allow)
+
+    expect(result).toEqual({ status: memberRemovalResults.removed })
+    expect(callOrder).toEqual(['organization-lock', 'membership-lock', 'membership-delete', 'audit-log-create'])
+    expect(queryOf(0).sql).toContain('FROM "Organization"')
+    expect(queryOf(0).sql).toContain('FOR NO KEY UPDATE')
+    expect(queryOf(0).values).toEqual([1])
+    expect(queryOf(1).sql).toContain('ORDER BY id ASC FOR UPDATE')
+    // 組織で絞り込み、別組織のMembership行をロックしない
+    expect(queryOf(1).sql).toContain('"organizationId" =')
+    expect(queryOf(1).values).toEqual([1, 1, 10])
+    expect(allow).toHaveBeenCalledWith({ operatorRole: 'OWNER', targetRole: 'MEMBER' })
+    expect(deleteMany).toHaveBeenCalledWith({ where: { id: 10, organizationId: 1, role: 'MEMBER' } })
+    expect(auditLogCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: 1,
+        action: 'MEMBER_REMOVED',
+        actorUserId: 1,
+        targetUserId: 2,
+        targetMembershipId: 10,
+        previousRole: 'MEMBER',
+        newRole: null,
+      },
+    })
+  })
+
+  test.each([
+    { name: 'OWNERがADMINを削除', operatorRole: 'OWNER', targetRole: 'ADMIN' },
+    { name: 'OWNERがMEMBERを削除', operatorRole: 'OWNER', targetRole: 'MEMBER' },
+    { name: 'ADMINがMEMBERを削除', operatorRole: 'ADMIN', targetRole: 'MEMBER' },
+  ] as const)('$name: ロック後のロールをpreviousRoleとして記録する', async ({ operatorRole, targetRole }) => {
+    prepareRemovalLocks([
+      { ...operatorRow, role: operatorRole },
+      { ...targetRow, userId: 7, role: targetRole },
+    ])
+    deleteMany.mockResolvedValueOnce({ count: 1 })
+
+    const result = await organizationMemberRemovalRepository.removeWithAuditLog(input, allow)
+
+    expect(result.status).toBe(memberRemovalResults.removed)
+    expect(allow).toHaveBeenCalledWith({ operatorRole, targetRole })
+    expect(auditLogCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ action: 'MEMBER_REMOVED', targetUserId: 7, previousRole: targetRole, newRole: null }),
+    })
+  })
+
+  test('Organization行が取得できなければORGANIZATION_NOT_FOUNDを返し、以降のロックも書き込みもしない', async () => {
+    queryRaw.mockResolvedValueOnce([])
+
+    const result = await organizationMemberRemovalRepository.removeWithAuditLog(input, allow)
+
+    expect(result).toEqual({ status: memberRemovalResults.organizationNotFound })
+    expect(queryRaw).toHaveBeenCalledTimes(1)
+    expect(allow).not.toHaveBeenCalled()
+    expect(deleteMany).not.toHaveBeenCalled()
+    expect(auditLogCreate).not.toHaveBeenCalled()
+  })
+
+  test('操作者のMembershipが存在しなければORGANIZATION_NOT_FOUNDを返す', async () => {
+    prepareRemovalLocks([targetRow])
+
+    const result = await organizationMemberRemovalRepository.removeWithAuditLog(input, allow)
+
+    expect(result).toEqual({ status: memberRemovalResults.organizationNotFound })
+    expect(allow).not.toHaveBeenCalled()
+    expect(deleteMany).not.toHaveBeenCalled()
+    expect(auditLogCreate).not.toHaveBeenCalled()
+  })
+
+  test('対象が存在しない、または別組織でロック対象に入らなければ、認可後にTARGET_NOT_FOUNDを返す', async () => {
+    // 別組織の対象はWHERE句の組織条件で除外されるため、操作者の行だけが返る
+    prepareRemovalLocks([operatorRow])
+
+    const result = await organizationMemberRemovalRepository.removeWithAuditLog(input, allow)
+
+    expect(result).toEqual({ status: memberRemovalResults.targetNotFound })
+    expect(allow).toHaveBeenCalledWith({ operatorRole: 'OWNER', targetRole: null })
+    expect(deleteMany).not.toHaveBeenCalled()
+    expect(auditLogCreate).not.toHaveBeenCalled()
+  })
+
+  test('対象が存在しなくても、認可コールバックが拒否すれば対象の有無より先にREJECTEDを返す', async () => {
+    prepareRemovalLocks([{ ...operatorRow, role: 'MEMBER' }])
+    const deny = mock((): string | null => '拒否')
+
+    const result = await organizationMemberRemovalRepository.removeWithAuditLog(input, deny)
+
+    expect(result).toEqual({ status: memberRemovalResults.rejected, rejection: '拒否' })
+    expect(deny).toHaveBeenCalledWith({ operatorRole: 'MEMBER', targetRole: null })
+    expect(deleteMany).not.toHaveBeenCalled()
+    expect(auditLogCreate).not.toHaveBeenCalled()
+  })
+
+  test('認可コールバックが拒否値を返せば削除も記録もせずREJECTEDとその値を返す', async () => {
+    prepareRemovalLocks([
+      { ...operatorRow, role: 'ADMIN' },
+      { ...targetRow, role: 'ADMIN' },
+    ])
+    const deny = mock((): string | null => '拒否')
+
+    const result = await organizationMemberRemovalRepository.removeWithAuditLog(input, deny)
+
+    expect(result).toEqual({ status: memberRemovalResults.rejected, rejection: '拒否' })
+    expect(deny).toHaveBeenCalledWith({ operatorRole: 'ADMIN', targetRole: 'ADMIN' })
+    expect(deleteMany).not.toHaveBeenCalled()
+    expect(auditLogCreate).not.toHaveBeenCalled()
+  })
+
+  test('削除が0件ならTARGET_NOT_FOUNDを返し、記録しない', async () => {
+    prepareRemovalLocks()
+    deleteMany.mockResolvedValueOnce({ count: 0 })
+
+    const result = await organizationMemberRemovalRepository.removeWithAuditLog(input, allow)
+
+    expect(result).toEqual({ status: memberRemovalResults.targetNotFound })
+    expect(auditLogCreate).not.toHaveBeenCalled()
+  })
+
+  test('監査ログの追加に失敗したらそのままthrowし、transactionをrollbackさせる', async () => {
+    prepareRemovalLocks()
+    deleteMany.mockResolvedValueOnce({ count: 1 })
+    auditLogCreate.mockRejectedValueOnce(new Error('INSERT失敗'))
+
+    await expect(organizationMemberRemovalRepository.removeWithAuditLog(input, allow)).rejects.toThrow('INSERT失敗')
+  })
+
+  test('予期しないDBエラーはそのままthrowする', async () => {
+    queryRaw.mockRejectedValueOnce(new Error('接続エラー'))
+
+    await expect(organizationMemberRemovalRepository.removeWithAuditLog(input, allow)).rejects.toThrow('接続エラー')
   })
 })
 
