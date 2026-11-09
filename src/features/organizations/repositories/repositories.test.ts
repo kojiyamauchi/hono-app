@@ -56,6 +56,7 @@ describe('organizationOwnershipRepository.transferOwnership', () => {
   beforeEach(() => {
     queryRaw.mockReset()
     updateMany.mockReset()
+    auditLogCreate.mockReset()
     transaction.mockReset()
     prepareTransaction()
   })
@@ -84,11 +85,15 @@ describe('organizationOwnershipRepository.transferOwnership', () => {
         callOrder.push('owner-demote')
         return { count: 1 }
       })
+    auditLogCreate.mockImplementationOnce(async () => {
+      callOrder.push('audit-log')
+      return {}
+    })
 
     const result = await organizationOwnershipRepository.transferOwnership(1, 1, 2)
 
     expect(result).toBe(ownershipTransferResults.transferred)
-    expect(callOrder).toEqual(['user-lock', 'organization-lock', 'membership-lock', 'target-promote', 'owner-demote'])
+    expect(callOrder).toEqual(['user-lock', 'organization-lock', 'membership-lock', 'target-promote', 'owner-demote', 'audit-log'])
     expect(updateMany).toHaveBeenNthCalledWith(1, {
       where: { id: 2, userId: 2, organizationId: 1, role: { in: ['ADMIN', 'MEMBER'] } },
       data: { role: 'OWNER' },
@@ -99,6 +104,37 @@ describe('organizationOwnershipRepository.transferOwnership', () => {
     })
   })
 
+  test.each<Role>(['ADMIN', 'MEMBER'])('移譲先が%sのとき、OWNERSHIP_TRANSFERREDを移譲元・移譲先のIDと移譲先の変更前ロールで1件記録する', async (targetRole) => {
+    prepareLocks([owner, { ...target, role: targetRole }])
+    updateMany.mockResolvedValue({ count: 1 })
+    auditLogCreate.mockResolvedValueOnce({})
+
+    const result = await organizationOwnershipRepository.transferOwnership(1, 1, 2)
+
+    expect(result).toBe(ownershipTransferResults.transferred)
+    expect(auditLogCreate).toHaveBeenCalledTimes(1)
+    expect(auditLogCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: 1,
+        action: 'OWNERSHIP_TRANSFERRED',
+        actorUserId: 1,
+        targetUserId: 2,
+        targetMembershipId: 2,
+        previousRole: targetRole,
+        newRole: 'OWNER',
+      },
+    })
+  })
+
+  test('監査ログの保存に失敗した場合は競合へ変換せず例外を伝播し、transactionをrollbackさせる', async () => {
+    prepareLocks()
+    updateMany.mockResolvedValue({ count: 1 })
+    auditLogCreate.mockRejectedValueOnce(new Error('監査ログ保存エラー'))
+
+    await expect(organizationOwnershipRepository.transferOwnership(1, 1, 2)).rejects.toThrow('監査ログ保存エラー')
+    expect(updateMany).toHaveBeenCalledTimes(2)
+  })
+
   test('移譲先が存在しない場合はTARGET_NOT_FOUNDを返す', async () => {
     queryRaw.mockResolvedValueOnce([])
 
@@ -107,6 +143,7 @@ describe('organizationOwnershipRepository.transferOwnership', () => {
     expect(result).toBe(ownershipTransferResults.targetNotFound)
     expect(queryRaw).toHaveBeenCalledTimes(1)
     expect(updateMany).not.toHaveBeenCalled()
+    expect(auditLogCreate).not.toHaveBeenCalled()
   })
 
   test('組織が存在しない場合はCONFLICTを返す', async () => {
@@ -126,6 +163,7 @@ describe('organizationOwnershipRepository.transferOwnership', () => {
 
     expect(result).toBe(ownershipTransferResults.targetNotFound)
     expect(updateMany).not.toHaveBeenCalled()
+    expect(auditLogCreate).not.toHaveBeenCalled()
   })
 
   test('自分自身への移譲ならSELF_TRANSFERを返す', async () => {
@@ -138,6 +176,7 @@ describe('organizationOwnershipRepository.transferOwnership', () => {
 
     expect(result).toBe(ownershipTransferResults.selfTransfer)
     expect(updateMany).not.toHaveBeenCalled()
+    expect(auditLogCreate).not.toHaveBeenCalled()
   })
 
   test('ロック後に実行者がOWNERでなくなっていればCONFLICTを返す', async () => {
@@ -147,6 +186,7 @@ describe('organizationOwnershipRepository.transferOwnership', () => {
 
     expect(result).toBe(ownershipTransferResults.conflict)
     expect(updateMany).not.toHaveBeenCalled()
+    expect(auditLogCreate).not.toHaveBeenCalled()
   })
 
   test('移譲先がADMINまたはMEMBERでなければCONFLICTを返す', async () => {
@@ -156,6 +196,7 @@ describe('organizationOwnershipRepository.transferOwnership', () => {
 
     expect(result).toBe(ownershipTransferResults.conflict)
     expect(updateMany).not.toHaveBeenCalled()
+    expect(auditLogCreate).not.toHaveBeenCalled()
   })
 
   test('更新途中の競合はtransactionを失敗させてCONFLICTへ変換する', async () => {
@@ -166,6 +207,18 @@ describe('organizationOwnershipRepository.transferOwnership', () => {
 
     expect(result).toBe(ownershipTransferResults.conflict)
     expect(updateMany).toHaveBeenCalledTimes(2)
+    expect(auditLogCreate).not.toHaveBeenCalled()
+  })
+
+  test('移譲先の昇格が0件ならCONFLICTを返し、監査ログを記録しない', async () => {
+    prepareLocks()
+    updateMany.mockResolvedValueOnce({ count: 0 })
+
+    const result = await organizationOwnershipRepository.transferOwnership(1, 1, 2)
+
+    expect(result).toBe(ownershipTransferResults.conflict)
+    expect(updateMany).toHaveBeenCalledTimes(1)
+    expect(auditLogCreate).not.toHaveBeenCalled()
   })
 
   test('予期しないDBエラーはそのままthrowする', async () => {
