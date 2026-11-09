@@ -186,6 +186,15 @@ describe('toAuditLogResponse / toAuditLogListResponse', () => {
     expect(auditLogDto.safeParse(result).success).toBe(true)
   })
 
+  test('OWNERSHIP_TRANSFERREDの監査ログも同じ形でauditLogDto schemaに通る', () => {
+    const transferred: AuditLog = { ...auditLog, id: 2, action: 'OWNERSHIP_TRANSFERRED', previousRole: 'ADMIN', newRole: 'OWNER' }
+
+    const result = toAuditLogResponse(transferred)
+
+    expect(result).toEqual({ ...transferred, createdAt: '2026-01-01T00:00:00.000Z' })
+    expect(auditLogDto.safeParse(result).success).toBe(true)
+  })
+
   test('監査ログとnextCursorをレスポンス用に変換し、auditLogListDto schemaに通る', () => {
     const result = toAuditLogListResponse([auditLog], 'cursor')
 
