@@ -143,6 +143,8 @@ terraform -chdir=infra/gcp providers lock -platform=darwin_arm64 -platform=linux
 
 通常CDが自動適用するのは既存Cloud Runのイメージ差し替えだけです。監視リソース・IAM・環境変数・Secret参照などの差分を含む変更は、PRでレビューしたうえで1件ずつ手動適用します。複数のインフラ変更を同時に適用せず、1件ごとに次の手順を最後まで通します。配備ジョブの一時停止から通常CDの成功確認までを一連の作業として扱い、この適用ウィンドウ中は対象外の通常PRのマージも重ねません。再開後の最初のCDが複数コミットをまとめて配備すると、インフラ適用の検証と切り分けられなくなるためです。
 
+招待メールJobの実行回数と直近実行の参照は、配信のたびにGCPが更新する属性です。通常CDのrefreshでは、この2項目だけが変わる場合を許容します。Jobのイメージ、実行設定、Schedulerの設定、IAMの差分は手動適用の対象です。
+
 1. マージ前に配備ジョブを一時停止し（repository variable `GCP_DEV_CD_ENABLED=false`）、実行中の配備ジョブが終了したことを確認します。その後に対象の変更をmainへマージします。
 2. マージ済みmainで対象プロジェクトと、Git管理外の `infra/gcp/env/backend.local.hcl` の接続先を確認します。リポジトリルートから `bun run tf:gcp:init` でGCS backendを初期化し、`bun run tf:gcp:workspace:dev` でdev workspaceを選びます。`terraform -chdir=infra/gcp workspace show` の出力が `dev` であることを確認し、現在のReady revisionのdigestを取得します。
 3. `<現在のdigest>` を取得した `sha256:...` に、`<保存先の絶対パス>` をGit管理外のplanファイルパスへ置き換えて、リポジトリルートで全体planを作ります。`bun run tf:gcp:plan` / `tf:gcp:apply` は変数を渡さないため、そのままでは使いません。
