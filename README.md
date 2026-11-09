@@ -170,7 +170,8 @@ flowchart LR
 |   `-- migrations/                  # Prisma migration
 |-- src/
 |   |-- app.ts                       # Honoアプリインスタンス
-|   |-- server.ts                    # ローカルサーバーのエントリーポイント
+|   |-- server.ts                    # APIサーバーのエントリーポイント
+|   |-- invitationEmailWorker.ts     # 招待メールワーカーのエントリーポイント
 |   |-- routes/
 |   |   `-- index.ts                 # トップレベルroute登録
 |   |-- libs/
@@ -270,7 +271,7 @@ services/
 `src/` 配下の全層を以下の線形レイヤーとして整理し、importは図の下方向のみ許可します。
 
 ```txt
-routes / app.ts / server.ts   （配線層・最上位）
+routes / app.ts / server.ts / invitationEmailWorker.ts   （配線層・最上位）
   ↓
 features                       （機能）
   ↓
@@ -297,7 +298,7 @@ types                          （型宣言のみ・最下層）
 - `shared/`: 複数featureで使う共有ドメイン（前述の定義どおり）です。`middlewares`・`features` へのimportは禁止です（HTTP層の関心事をsharedへ持ち込まず、ミドルウェアが設定した値はcontroller/feature側で取り出して引数として渡します）。ただし、`src/shared/auth/services/` のcookieヘルパーはCookie入出力に責務を限定し、Controllerから受け取った `Context` を操作する例外とします。
 - `middlewares/`: Hono横断ミドルウェアです。`shared` のrepositoryの利用は許可します。`features` へのimportは禁止です。
 - `features/`: `shared` 以下の層に加え `middlewares` もimport可（feature内routesでのミドルウェア適用）です。feature間の相互importは前述のとおり禁止です。
-- `routes/` / `app.ts` / `server.ts`: 配線層です。全層をimport可（例: `app.ts` でのグローバルミドルウェア適用・CORS設定・telemetry初期化）です。
+- `routes/` / `app.ts` / `server.ts` / `invitationEmailWorker.ts`: 配線層です。全層をimport可（例: `app.ts` でのグローバルミドルウェア適用・CORS設定・telemetry初期化）です。
 
 ## Schema命名
 
@@ -390,6 +391,8 @@ make stop
 ## API
 
 公開エンドポイント一覧は [docs/endpoints.md](docs/endpoints.md) を参照してください。
+
+招待メールは `bun run invitations:deliver` で1回分を処理します。配線層の `src/invitationEmailWorker.ts` が共有層の `src/shared/invitation/` にある配信リポジトリとサービスを呼び出します。[招待メールの設定・GCP dev配備](docs/invitation-email.md)
 
 一覧APIのページネーション仕様、リクエスト／レスポンスの利用例、カーソル式とオフセット式の使い分けは [docs/pagination.md](docs/pagination.md) を参照してください。
 

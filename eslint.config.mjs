@@ -55,8 +55,8 @@ const eslintConfig = [
         },
       },
       // レイヤー境界の判定対象（src/ 配下の各層を要素化）
-      // 依存方向: routes/app/server（配線層・未要素化＝全層import可） → features → middlewares → shared → libs → utils → types
-      // 配線層（routes/app.ts/server.ts）は全層importを許可するため要素化しない（未要素化のファイルは default: 'allow' で素通しになる）
+      // 依存方向: routes/app/server/invitationEmailWorker（配線層・未要素化＝全層import可） → features → middlewares → shared → libs → utils → types
+      // 配線層（routes/app.ts/server.ts/invitationEmailWorker.ts）は全層importを許可するため要素化しない（未要素化のファイルは default: 'allow' で素通しになる）
       'boundaries/elements': [
         { type: 'feature', pattern: 'src/features/*', mode: 'folder', capture: ['feature'] },
         { type: 'middlewares', pattern: 'src/middlewares/**', mode: 'file' },
@@ -113,7 +113,7 @@ const eslintConfig = [
       'simple-import-sort/imports': 'error',
       'simple-import-sort/exports': 'error',
       // レイヤー依存ルール: import は下方向のみ許可（上位層へのimportを禁止）
-      // 層順: routes/app/server（配線層） → features → middlewares → shared → libs → utils → types
+      // 層順: routes/app/server/invitationEmailWorker（配線層） → features → middlewares → shared → libs → utils → types
       'boundaries/dependencies': [
         'error',
         {
