@@ -31,7 +31,7 @@ const renderEmail = (delivery: ClaimedInvitationEmail): Parameters<typeof delive
 const processClaim = async (claim: InvitationEmailClaim): Promise<void> => {
   const delivery = await invitationEmailDeliveryRepository.readClaim(claim)
   const now = Date.now()
-  if (!delivery?.leaseUntil || delivery.leaseUntil.getTime() <= now + resendDeliveryTimeoutMs) return
+  if (!delivery?.leaseUntil || delivery.leaseUntil.getTime() <= now) return
 
   const deadline = Math.min(claim.deadline.getTime(), delivery.invitation.expiresAt.getTime())
   const exhausted = claim.previousAttemptCount >= invitationEmailLimits.maxAttempts
@@ -40,6 +40,15 @@ const processClaim = async (claim: InvitationEmailClaim): Promise<void> => {
       status: claim.hasUnknownOutcome ? 'UNKNOWN' : claim.previousAttemptCount > 0 ? 'REJECTED' : 'SKIPPED',
       attemptCount: claim.previousAttemptCount,
       lastError: delivery.invitation.status !== 'PENDING' ? 'inactive' : now >= deadline ? 'expired' : 'attempt_limit',
+    })
+    return
+  }
+
+  if (delivery.leaseUntil.getTime() <= now + resendDeliveryTimeoutMs) {
+    // 送信前に処理権を解放し、次回確保時にこの試行を受付結果不明として扱わない。
+    await invitationEmailDeliveryRepository.finish(claim, {
+      attemptCount: claim.previousAttemptCount,
+      nextAttemptAt: new Date(Math.min(now + retryDelayMinutes[0] * 60_000, deadline)),
     })
     return
   }

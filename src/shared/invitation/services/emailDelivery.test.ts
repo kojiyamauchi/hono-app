@@ -170,6 +170,13 @@ describe('招待メールワーカー', () => {
     expect(finish).not.toHaveBeenCalled()
   })
 
+  test('送信に必要な残り時間がなければ、未試行のまま処理権を解放する', async () => {
+    email.leaseUntil = new Date(Date.now() + 1000)
+    await deliverInvitationEmails()
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(finish).toHaveBeenCalledWith(currentClaim, { attemptCount: 0, nextAttemptAt: expect.any(Date) })
+  })
+
   test('未対応のテンプレートは送信せず受付結果不明にもせず再試行を待つ', async () => {
     email.templateVersion = 2
     await deliverInvitationEmails()
