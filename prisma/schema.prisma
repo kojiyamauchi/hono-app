@@ -55,6 +55,7 @@ model Membership {
 
 enum AuditAction {
   MEMBER_ROLE_CHANGED
+  OWNERSHIP_TRANSFERRED
 }
 
 model AuditLog {

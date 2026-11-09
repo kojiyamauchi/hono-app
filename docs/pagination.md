@@ -122,12 +122,12 @@ curl -H "Authorization: Bearer $ACCESS_TOKEN" \
     {
       "id": 12,
       "organizationId": 1,
-      "action": "MEMBER_ROLE_CHANGED",
+      "action": "OWNERSHIP_TRANSFERRED",
       "actorUserId": 1,
       "targetUserId": 5,
       "targetMembershipId": 40,
       "previousRole": "ADMIN",
-      "newRole": "MEMBER",
+      "newRole": "OWNER",
       "createdAt": "2026-02-02T09:00:00.000Z"
     },
     {
@@ -145,6 +145,8 @@ curl -H "Authorization: Bearer $ACCESS_TOKEN" \
   "nextCursor": "eyJraW5kIjoiYXVkaXRMb2dzIiwidmVyc2lvbiI6MSwib3JnYW5pemF0aW9uSWQiOjEsImNyZWF0ZWRBdCI6IjIwMjYtMDItMDFUMDk6MzA6MDAuMDAwWiIsImlkIjoxMX0"
 }
 ```
+
+上の例のように、`MEMBER_ROLE_CHANGED`（id 11）と `OWNERSHIP_TRANSFERRED`（id 12）は同じ一覧に混在し、イベント種別に関係なく同じ並び順とカーソルで取得します。項目の意味はイベント種別ごとに異なります（[endpoints.md](endpoints.md#organization-audit-logs) を参照）。この例の `OWNERSHIP_TRANSFERRED` は、ユーザー1（移譲元のOWNER、移譲後はADMIN）が、メンバーシップ40のユーザー5（移譲前はADMIN）へ所有権を移譲したことを表します。
 
 最終ページと0件の場合は `nextCursor: null` です。DBからは最大 `limit + 1` 件を取得し、`limit` 件を超えた場合だけ、返した最後のitemの境界から次のカーソルを生成します。
 

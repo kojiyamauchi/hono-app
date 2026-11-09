@@ -65,7 +65,7 @@ GCPのdev環境では、以下を含む全エンドポイントへのアクセ�
 | GET    | `/organizations/:id`                    | 必要 | 所属している組織の詳細を取得する                                                                                            |
 | PATCH  | `/organizations/:id`                    | 必要 | OWNERまたはADMINが組織情報を更新する                                                                                        |
 | DELETE | `/organizations/:id`                    | 必要 | OWNERのみ、組織を削除する                                                                                                   |
-| POST   | `/organizations/:id/transfer-ownership` | 必要 | OWNERが既存のADMINまたはMEMBERへ組織の所有権を移譲する                                                                      |
+| POST   | `/organizations/:id/transfer-ownership` | 必要 | OWNERが既存のADMINまたはMEMBERへ組織の所有権を移譲する（成立時は監査ログ `OWNERSHIP_TRANSFERRED` を記録する）               |
 
 ## Organization Members
 
@@ -85,10 +85,22 @@ GCPのdev環境では、以下を含む全エンドポイントへのアクセ�
 
 監査ログの記録対象と閲覧の仕様は次のとおりです。
 
-- 記録するのは、`PATCH /organizations/:id/members/:membershipId` で**実際にロールが変わったとき**だけです（イベント種別は `MEMBER_ROLE_CHANGED`）。
-  - 同じロールを指定した場合（200）や、権限不足・OWNER対象などで拒否された場合は記録しません。
-  - 所有権移譲（`POST /organizations/:id/transfer-ownership`）によるロール変化、メンバーの追加・削除・脱退、招待は今回の記録対象外です。
-- ロールの更新と記録は同じトランザクションで確定します。記録に失敗した場合はロールの更新も取り消され、500を返します。
+- 記録するのは次の2種類のイベントだけです。
+  - `MEMBER_ROLE_CHANGED`: `PATCH /organizations/:id/members/:membershipId` で**実際にロールが変わったとき**。同じロールを指定した場合（200）や、権限不足・OWNER対象などで拒否された場合は記録しません。
+  - `OWNERSHIP_TRANSFERRED`: `POST /organizations/:id/transfer-ownership` で**移譲が成立したとき**（204）。移譲先の昇格と移譲元の降格をまとめて1回の操作として1件記録します。認可・入力・対象・競合のエラーでは記録しません。
+  - メンバーの追加・削除・脱退、招待は記録対象外です。過去の移譲は遡って記録しません。
+- イベント種別ごとの項目の意味は次のとおりです。
+
+  | 項目                 | `MEMBER_ROLE_CHANGED`        | `OWNERSHIP_TRANSFERRED`                                                 |
+  | -------------------- | ---------------------------- | ----------------------------------------------------------------------- |
+  | `actorUserId`        | ロールを変更した操作者       | 移譲元のOWNER（移譲後はADMINになる）                                    |
+  | `targetUserId`       | ロールが変わった対象ユーザー | 移譲先のユーザー                                                        |
+  | `targetMembershipId` | 対象のメンバーシップ         | 移譲先のメンバーシップ                                                  |
+  | `previousRole`       | 対象の変更前のロール         | ロック取得後に確認した移譲先の変更前のロール（`ADMIN` または `MEMBER`） |
+  | `newRole`            | 対象の変更後のロール         | 常に `OWNER`（移譲元がOWNERからADMINになったことも表す）                |
+
+- ロールの更新と記録は同じトランザクションで確定します。記録に失敗した場合はロールの更新（所有権移譲では移譲先と移譲元の両方の更新）も取り消され、500を返します。
+- 両イベントは同じ一覧に混在して返り、並び順（`createdAt DESC, id DESC`）・カーソル・閲覧権限はイベント種別によらず共通です。
 - レスポンスは `{ items, nextCursor }` です。各itemは `id`・`organizationId`・`action`・`actorUserId`・`targetUserId`・`targetMembershipId`・`previousRole`・`newRole`・`createdAt`（ISO 8601）を持ちます。氏名・メールアドレス・認証情報は保存せず、ユーザーとメンバーシップのIDは記録時点の値です。
 - 対象メンバーの削除・脱退や、操作者・対象のアカウント削除後も、組織が残る間は記録を閲覧できます。組織を削除すると記録も削除されます。
 - ステータスは、未認証401、不正な組織ID・不正なquery（未対応の `offset`、不正なlimit・cursorを含む）400、未所属または存在しない組織404、所属MEMBER403です。確認の順序は 認証 → パス検証 → 所属確認 → ロール確認 → query検証 です。
