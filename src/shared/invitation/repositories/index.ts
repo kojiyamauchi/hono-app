@@ -1,6 +1,7 @@
 import type { Prisma } from '@/generated/prisma/client'
 import { prisma } from '@/libs/prisma'
 import type { Invitation, InvitationStatus, InvitationWithOrganization } from '@/shared/invitation/entities'
+import { invitationEmailLimits, type InvitationEmailSnapshot } from '@/shared/invitation/entities/emailDelivery'
 import type { Membership, Role } from '@/shared/membership/entities'
 import type { User } from '@/shared/user/entities'
 import { isPrismaUniqueConstraintError } from '@/utils/prisma'
@@ -31,9 +32,40 @@ export const invitationRepository = {
   /**
    * 招待を新規作成する。PENDING重複（部分ユニーク制約違反）の場合はnullを返す。
    */
-  create: async (organizationId: number, email: string, role: Role, token: string, expiresAt: Date): Promise<Invitation | null> => {
+  create: async (
+    organizationId: number,
+    email: string,
+    role: Role,
+    token: string,
+    expiresAt: Date,
+    delivery?: InvitationEmailSnapshot,
+  ): Promise<Invitation | null> => {
+    const data = { organizationId, email, role, token, expiresAt }
+    if (delivery) {
+      return prisma.$transaction(async (tx) => {
+        // 招待側の一意制約違反だけを競合扱いにし、配信待ちの書き込み失敗はrollbackする。
+        const [created] = await tx.invitation.createManyAndReturn({
+          data,
+          skipDuplicates: true,
+          include: { organization: { select: { name: true } } },
+        })
+        if (!created) return null
+
+        const { organization, ...invitation } = created
+        await tx.invitationEmailDelivery.create({
+          data: {
+            ...delivery,
+            invitationId: invitation.id,
+            organizationName: organization.name,
+            deadline: new Date(Math.min(expiresAt.getTime(), invitation.createdAt.getTime() + invitationEmailLimits.maxAgeMs)),
+          },
+        })
+        return invitation
+      })
+    }
+
     try {
-      return await prisma.invitation.create({ data: { organizationId, email, role, token, expiresAt } })
+      return await prisma.invitation.create({ data })
     } catch (error) {
       if (isPrismaUniqueConstraintError(error)) {
         return null

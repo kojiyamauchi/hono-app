@@ -160,3 +160,39 @@ variable "alert_notification_channel" {
     error_message = "projects/<プロジェクトID>/notificationChannels/<チャネルID>の形式で、Consoleで作成済みのチャネルを指定してください。メールアドレスと差し替え前のプレースホルダは使用できません。"
   }
 }
+
+variable "invitation_email" {
+  description = "devの招待メール。Jobの固定digestと停止・配信の状態は手動適用で管理する"
+  nullable    = false
+  default     = {}
+  type = object({
+    worker_image_digest = optional(string)
+    schedule_paused     = optional(bool, true)
+    enabled             = optional(bool, false)
+    from_email          = optional(string)
+    scalar_url          = optional(string)
+  })
+
+  validation {
+    condition = var.invitation_email.worker_image_digest == null ? true : (
+      can(regex("^sha256:[0-9a-f]{64}$", var.invitation_email.worker_image_digest)) &&
+      var.invitation_email.worker_image_digest != "sha256:0000000000000000000000000000000000000000000000000000000000000000" &&
+      terraform.workspace == "dev"
+    )
+    error_message = "招待メールJobの実イメージdigestはdev workspaceで指定してください。"
+  }
+
+  validation {
+    condition = var.invitation_email.enabled ? (
+      var.invitation_email.worker_image_digest != null && var.enable_api_docs && var.app_image_digest != null &&
+      can(regex("^[^@[:space:]]+@[^@[:space:]]+$", var.invitation_email.from_email)) &&
+      can(regex("^https://[^/?#@[:space:]]+/open-api/scalar$", var.invitation_email.scalar_url))
+    ) : true
+    error_message = "配信を有効にする前にJobとScalarを有効にし、検証済み送信元と固定HTTPS Scalar URLを指定してください。"
+  }
+
+  validation {
+    condition     = var.invitation_email.schedule_paused || var.invitation_email.worker_image_digest != null
+    error_message = "スケジュールを再開する前に招待メールJobのdigestを指定してください。"
+  }
+}

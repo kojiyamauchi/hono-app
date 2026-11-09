@@ -90,15 +90,45 @@ enum InvitationStatus {
 }
 
 model Invitation {
-  id             Int              @id @default(autoincrement())
+  id             Int                      @id @default(autoincrement())
   organizationId Int
   email          String
   role           Role
-  status         InvitationStatus @default(PENDING)
-  token          String           @unique
+  status         InvitationStatus         @default(PENDING)
+  token          String                   @unique
   expiresAt      DateTime
-  createdAt      DateTime         @default(now())
-  organization   Organization     @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime                 @default(now())
+  emailDelivery  InvitationEmailDelivery?
+  organization   Organization             @relation(fields: [organizationId], references: [id])
+}
+
+enum InvitationEmailDeliveryStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  UNKNOWN
+  SKIPPED
+}
+
+model InvitationEmailDelivery {
+  id                String                        @id @default(uuid())
+  invitationId      Int                           @unique
+  invitation        Invitation                    @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  fromEmail         String
+  scalarUrl         String
+  organizationName  String
+  templateVersion   Int
+  status            InvitationEmailDeliveryStatus @default(PENDING)
+  attemptCount      Int                           @default(0)
+  hasUnknownOutcome Boolean                       @default(false)
+  nextAttemptAt     DateTime                      @default(now())
+  deadline          DateTime
+  leaseToken        String?
+  leaseUntil        DateTime?
+  resendEmailId     String?
+  lastError         String?
+
+  @@index([status, nextAttemptAt, id])
 }
 
 model RefreshToken {

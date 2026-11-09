@@ -178,6 +178,7 @@ test('現行・直前の全保護タグと未知のタグを維持する', () =>
     { tag: 'tags/release-87654321', version: `versions/${old}` },
     { tag: 'tags/release-manual-keep', version: `versions/${old}` },
     { tag: 'tags/candidate-old', version: `versions/${old}` },
+    { tag: `tags/release-invitation-worker-${'c'.repeat(64)}`, version: `versions/${old}` },
   ]
   expect(obsoleteReleaseTags(tags, newDigest, oldDigest)).toEqual([tags[2]])
   expect(() => obsoleteReleaseTags(tags, '', oldDigest)).toThrow()

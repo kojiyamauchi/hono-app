@@ -402,13 +402,13 @@ const createInvitationRoute = createRoute({
   responses: {
     201: {
       content: { 'application/json': { schema: invitationDto } },
-      description: '作成された招待',
+      description: '作成された招待。メール配信有効時は配信待ちの保存までを示す。',
     },
     400: errorResponse('入力値が不正'),
     401: errorResponse('認証が必要、またはトークンが無効'),
     403: errorResponse('権限が不足'),
     404: errorResponse('組織が見つからない'),
-    409: errorResponse('PENDING招待が既に存在'),
+    409: errorResponse('PENDING招待が作成済み、または既に組織のメンバー'),
     422: errorResponse('意味的に不正な入力（例: OWNERロール指定）'),
     500: errorResponse('サーバーエラー'),
   },

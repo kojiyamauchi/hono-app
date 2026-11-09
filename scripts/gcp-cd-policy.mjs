@@ -33,7 +33,11 @@ export function assertDeploymentPlan(plan, expectedImage, noChanges = false) {
   if (!/^1\./.test(plan.format_version ?? '') || plan.errored || plan.complete !== true || plan.deferred_changes?.length) {
     throw new DeploymentError('不完全または未対応のplanです。')
   }
-  if (plan.resource_drift?.some((drift) => !isDeepStrictEqual(drift.change.actions, ['no-op']) && !isRegistryTimestampDrift(drift))) {
+  if (
+    plan.resource_drift?.some(
+      (drift) => !isDeepStrictEqual(drift.change.actions, ['no-op']) && !isRegistryTimestampDrift(drift) && !isInvitationWorkerExecutionDrift(drift),
+    )
+  ) {
     throw new DeploymentError('実環境のdriftを検出しました。個別確認が必要です。')
   }
   const changes = plan.resource_changes
@@ -89,6 +93,30 @@ function isRegistryTimestampDrift({ address, mode, type, change }) {
     const result = structuredClone(value)
     delete result.update_time
     return result
+  })
+  return isDeepStrictEqual(...normalized)
+}
+
+/** 招待メールJobの実行履歴だけをrefreshで取り込めるようにする。 */
+function isInvitationWorkerExecutionDrift({ address, mode, type, change }) {
+  if (
+    address !== 'google_cloud_run_v2_job.invitation_email[0]' ||
+    mode !== 'managed' ||
+    type !== 'google_cloud_run_v2_job' ||
+    !isDeepStrictEqual(change?.actions, ['update']) ||
+    change.before?.name !== 'hono-app-dev-invite-worker' ||
+    change.before?.project !== 'hono-app-dev-512908-f3' ||
+    change.before?.location !== 'asia-northeast1' ||
+    !change.after ||
+    hasUnknown(change.after_unknown ?? {})
+  )
+    return false
+
+  const normalized = [change.before, change.after].map((value) => {
+    const configuration = { ...value }
+    delete configuration.execution_count
+    delete configuration.latest_created_execution
+    return configuration
   })
   return isDeepStrictEqual(...normalized)
 }

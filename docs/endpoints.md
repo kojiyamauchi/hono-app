@@ -108,11 +108,13 @@ GCPのdev環境では、以下を含む全エンドポイントへのアクセ�
 
 ## Organization Invitations
 
-| Method | Path                                           | 認証 | 概要                                                |
-| ------ | ---------------------------------------------- | ---- | --------------------------------------------------- |
-| GET    | `/organizations/:id/invitations`               | 必要 | OWNERまたはADMINがPENDING状態の招待一覧を取得する   |
-| POST   | `/organizations/:id/invitations`               | 必要 | OWNERまたはADMINが招待を作成する                    |
-| DELETE | `/organizations/:id/invitations/:invitationId` | 必要 | OWNERまたはADMINがPENDING状態の招待をキャンセルする |
+| Method | Path                                           | 認証 | 概要                                                           |
+| ------ | ---------------------------------------------- | ---- | -------------------------------------------------------------- |
+| GET    | `/organizations/:id/invitations`               | 必要 | OWNERまたはADMINがPENDING状態の招待一覧を取得する              |
+| POST   | `/organizations/:id/invitations`               | 必要 | OWNERまたはADMINが招待を作成する（配信有効時は配信待ちも保存） |
+| DELETE | `/organizations/:id/invitations/:invitationId` | 必要 | OWNERまたはADMINがPENDING状態の招待をキャンセルする            |
+
+招待作成の `201 Created` は招待の保存を示します。メール配信が有効な環境では、配信待ちも同時に保存されます。GCP devではJobを手動実行したときに配信します。将来、定期実行を有効にした場合は、通常は次の起動まで最大約15分かかり、障害時や配信待ちが多い場合はさらに遅れます。配信設定と状態の確認方法は[招待メールの運用手順](invitation-email.md)を参照してください。
 
 ## Invitations
 

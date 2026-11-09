@@ -65,7 +65,7 @@ Cloud Runのoperationはサービス配下ではないため、`run.operations.g
 
 ## 初回構築と有効化（実行前にユーザー確認）
 
-`github_cd` の既定値は `null` で、この入力を省略した構成ではCD用リソースは作成されません。`env/dev.cd.tfvars.json` は公開設定・数値Secret参照・GitHub識別情報だけを含むCD用の正本で、秘密値や固定のリリースdigestは含みません。
+`github_cd` の既定値は `null` で、この入力を省略した構成ではCD用リソースは作成されません。`env/dev.cd.tfvars.json` は公開設定・数値Secret参照・GitHub識別情報だけを含むCD用の正本で、秘密値やServiceのリリースdigestは含みません。招待メールJobの固定digestは[招待メールの配備手順](invitation-email.md#gcp-devへの手動配備)に従って管理します。
 
 1. マージ済みmainと稼働中digestを確認し、ユーザーへ初回変更のplanを提示します。実環境では必ず `gcloud --configuration=hono-app-dev` を使います。
 2. `bun run tf:gcp:init` 後にworkspaceがdevであることを確認し、次のplanを作ります。`<現在のdigest>` はReady revisionを照会した実値で置き換え、過去のtfvarsの値を流用しません。
@@ -143,6 +143,8 @@ terraform -chdir=infra/gcp providers lock -platform=darwin_arm64 -platform=linux
 
 通常CDが自動適用するのは既存Cloud Runのイメージ差し替えだけです。監視リソース・IAM・環境変数・Secret参照などの差分を含む変更は、PRでレビューしたうえで1件ずつ手動適用します。複数のインフラ変更を同時に適用せず、1件ごとに次の手順を最後まで通します。配備ジョブの一時停止から通常CDの成功確認までを一連の作業として扱い、この適用ウィンドウ中は対象外の通常PRのマージも重ねません。再開後の最初のCDが複数コミットをまとめて配備すると、インフラ適用の検証と切り分けられなくなるためです。
 
+招待メールJobの実行回数と直近実行の参照は、配信のたびにGCPが更新する属性です。通常CDのrefreshでは、この2項目だけが変わる場合を許容します。Jobのイメージ、実行設定、Schedulerの設定、IAMの差分は手動適用の対象です。
+
 1. マージ前に配備ジョブを一時停止し（repository variable `GCP_DEV_CD_ENABLED=false`）、実行中の配備ジョブが終了したことを確認します。その後に対象の変更をmainへマージします。
 2. マージ済みmainで対象プロジェクトと、Git管理外の `infra/gcp/env/backend.local.hcl` の接続先を確認します。リポジトリルートから `bun run tf:gcp:init` でGCS backendを初期化し、`bun run tf:gcp:workspace:dev` でdev workspaceを選びます。`terraform -chdir=infra/gcp workspace show` の出力が `dev` であることを確認し、現在のReady revisionのdigestを取得します。
 3. `<現在のdigest>` を取得した `sha256:...` に、`<保存先の絶対パス>` をGit管理外のplanファイルパスへ置き換えて、リポジトリルートで全体planを作ります。`bun run tf:gcp:plan` / `tf:gcp:apply` は変数を渡さないため、そのままでは使いません。
@@ -173,7 +175,7 @@ Cloud Runに注入する数値Secret参照は、OTLP無効時は既存の6件、
 
 現行と直前digestは `release-<digestの64桁>` で保護します。検証成功時だけ、それ以外の既知の保護タグを外します。既存の短いSHAのreleaseタグも、同じdigestが稼働・復旧対象なら維持します。cleanup policyによる削除には時間差があり、候補・失敗run・削除待ちイメージや共有レイヤーも含めた実容量で無料枠0.5 GBを確認します。容量の上限を保証する処理ではありません。
 
-Cloud Build・Cloud Deploy・migration用Cloud Run Job・VPC・NAT・LBは追加しません。GitHub Actionsのビルド/cache、Registry保存・通信、Secretアクセス、GCSのstate履歴、配備後検証のリクエストを費用に含めます。既存の月100円予算通知を維持します。
+通常CDではCloud Build・Cloud Deploy・migration用Cloud Run Job・VPC・NAT・LBを使いません。招待メールJobとSchedulerの費用は[招待メールの運用手順](invitation-email.md#費用)を参照してください。GitHub Actionsのビルド/cache、Registry保存・通信、Secretアクセス、GCSのstate履歴、配備後検証のリクエストを費用に含めます。既存の月100円予算通知を維持します。
 
 ## 外部環境を変更しない検証
 

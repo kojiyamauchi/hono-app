@@ -5,11 +5,11 @@ locals {
 }
 
 resource "google_project_service" "health_monitor" {
-  for_each = local.health_monitor_enabled ? toset([
-    "cloudscheduler.googleapis.com",
-    "logging.googleapis.com",
-    "workflows.googleapis.com",
-  ]) : toset([])
+  # Scheduler APIは招待メールJobでも使う。既存の監視側のアドレスを維持する。
+  for_each = setunion(
+    local.health_monitor_enabled ? toset(["logging.googleapis.com", "workflows.googleapis.com"]) : toset([]),
+    local.health_monitor_enabled || local.invitation_worker_enabled ? toset(["cloudscheduler.googleapis.com"]) : toset([]),
+  )
 
   project            = var.project_id
   service            = each.value

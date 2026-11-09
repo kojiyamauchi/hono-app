@@ -1,6 +1,7 @@
 import type { InvitationDtoType } from '@/shared/invitation/dtos'
 import { toInvitationResponse } from '@/shared/invitation/mappers'
 import { invitationRepository } from '@/shared/invitation/repositories'
+import { getInvitationEmailConfig } from '@/shared/invitation/services/emailConfig'
 import type { MemberDtoType } from '@/shared/membership/dtos'
 import type { Role } from '@/shared/membership/entities'
 import { toMemberResponse } from '@/shared/membership/mappers'
@@ -357,7 +358,7 @@ export const organizationsService = {
     }
     const existingInvitation = await invitationRepository.findPendingByOrgAndEmail(organizationId, input.email)
     if (existingInvitation) {
-      throw new AppError(409, 'このメールアドレスへの招待は既に送信済みです')
+      throw new AppError(409, 'このメールアドレスへの招待は既に作成済みです')
     }
     const existingUser = await userRepository.findByEmail(input.email)
     if (existingUser) {
@@ -368,9 +369,14 @@ export const organizationsService = {
     }
     const token = crypto.randomUUID()
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-    const invitation = await invitationRepository.create(organizationId, input.email, input.role, token, expiresAt)
+    const delivery = getInvitationEmailConfig()
+    const invitation = await invitationRepository.create(organizationId, input.email, input.role, token, expiresAt, delivery).catch((error: unknown) => {
+      if (!delivery) throw error
+      console.error('招待と配信待ちの保存に失敗しました', { organizationId })
+      throw new AppError(500, 'サーバーエラーが発生しました')
+    })
     if (!invitation) {
-      throw new AppError(409, 'このメールアドレスへの招待は既に送信済みです')
+      throw new AppError(409, 'このメールアドレスへの招待は既に作成済みです')
     }
     return toInvitationResponse(invitation)
   },

@@ -8,6 +8,7 @@
     "prepare": "husky",
     "dev": "bun --hot src/server.ts",
     "start": "bun src/server.ts",
+    "invitations:deliver": "bun src/invitationEmailWorker.ts",
     "build": "tsc --noEmit",
     "lint": "eslint --fix --max-warnings 0",
     "lint:check": "eslint --max-warnings 0",
