@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, mock, test } from 'bun:test'
+import { beforeEach, describe, expect, mock, spyOn, test } from 'bun:test'
 
 import type { Membership, Role } from '@/shared/membership/entities'
 import type { Organization } from '@/shared/organization/entities'
@@ -26,6 +26,7 @@ const invitationCreate = mock()
 const invitationFindAllByOrganization = mock()
 const invitationFindById = mock()
 const invitationCancel = mock()
+const getInvitationEmailConfig = mock()
 
 const transferOwnership = mock()
 const leaveOrganization = mock()
@@ -82,6 +83,7 @@ await mock.module('@/shared/membership/repositories', () => ({
 await mock.module('@/shared/user/repositories', () => ({
   userRepository: { findByEmail },
 }))
+await mock.module('@/shared/invitation/services/emailConfig', () => ({ getInvitationEmailConfig }))
 await mock.module('@/shared/invitation/repositories', () => ({
   invitationRepository: {
     findPendingByOrgAndEmail: invitationFindPendingByOrgAndEmail,
@@ -804,6 +806,7 @@ describe('organizationsService.createInvitation', () => {
   beforeEach(() => {
     invitationFindPendingByOrgAndEmail.mockReset()
     invitationCreate.mockReset()
+    getInvitationEmailConfig.mockReset()
     findByEmail.mockReset()
     findByUserAndOrganization.mockReset()
   })
@@ -816,7 +819,37 @@ describe('organizationsService.createInvitation', () => {
     const result = await organizationsService.createInvitation(1, 'OWNER', { email: 'invite@example.com', role: 'MEMBER' })
 
     expect(result.invitationToken).toBe('uuid-token')
-    expect(invitationCreate).toHaveBeenCalledTimes(1)
+    expect(invitationCreate).toHaveBeenCalledWith(1, 'invite@example.com', 'MEMBER', expect.any(String), expect.any(Date), undefined)
+  })
+
+  test('配信有効時は作成時の送信設定をrepositoryに渡す', async () => {
+    const delivery = { fromEmail: 'sender@example.com', scalarUrl: 'https://example.com/open-api/scalar', templateVersion: 1 }
+    getInvitationEmailConfig.mockReturnValue(delivery)
+    invitationFindPendingByOrgAndEmail.mockResolvedValue(null)
+    findByEmail.mockResolvedValue(null)
+    invitationCreate.mockResolvedValue(invitation)
+
+    await organizationsService.createInvitation(1, 'OWNER', { email: 'invite@example.com', role: 'MEMBER' })
+
+    expect(invitationCreate).toHaveBeenCalledWith(1, 'invite@example.com', 'MEMBER', expect.any(String), expect.any(Date), delivery)
+  })
+
+  test('配信待ちの保存失敗は機密情報をログに出さず500を返す', async () => {
+    getInvitationEmailConfig.mockReturnValue({ fromEmail: 'sender@example.com', scalarUrl: 'https://example.com/open-api/scalar', templateVersion: 1 })
+    invitationFindPendingByOrgAndEmail.mockResolvedValue(null)
+    findByEmail.mockResolvedValue(null)
+    invitationCreate.mockRejectedValue(new Error('invite@example.com private-token'))
+    const log = spyOn(console, 'error').mockImplementation(() => undefined)
+    try {
+      await expect(organizationsService.createInvitation(1, 'OWNER', { email: 'invite@example.com', role: 'MEMBER' })).rejects.toMatchObject({
+        statusCode: 500,
+        message: 'サーバーエラーが発生しました',
+      })
+      expect(log).toHaveBeenCalledTimes(1)
+      expect(log).toHaveBeenCalledWith('招待と配信待ちの保存に失敗しました', { organizationId: 1 })
+    } finally {
+      log.mockRestore()
+    }
   })
 
   test('OWNERはADMIN招待を作成できる', async () => {
