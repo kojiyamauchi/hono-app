@@ -116,6 +116,20 @@ export const organizationOwnershipRepository = {
           throw new OwnershipTransferConflictError()
         }
 
+        // 移譲先の昇格と移譲元の降格を1回の操作として記録する。previousRoleはロック取得後に確認した移譲先のロール。
+        // INSERTに失敗した場合はそのままthrowし（conflictへ変換しない）、上の両ロール更新もrollbackする。
+        await tx.auditLog.create({
+          data: {
+            organizationId,
+            action: 'OWNERSHIP_TRANSFERRED',
+            actorUserId: currentOwnerUserId,
+            targetUserId,
+            targetMembershipId: target.id,
+            previousRole: target.role,
+            newRole: 'OWNER',
+          },
+        })
+
         return ownershipTransferResults.transferred
       })
     } catch (error) {
