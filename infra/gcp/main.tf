@@ -47,6 +47,10 @@ locals {
     OTEL_SERVICE_NAME                  = local.service_name
     OTEL_TRACES_SAMPLER_RATIO          = tostring(var.otel_traces_sampler_ratio)
     OTEL_EXPORTER_OTLP_TRACES_ENDPOINT = "https://otlp.nr-data.net:4318/v1/traces"
+    } : {}, var.invitation_email.enabled ? {
+    ENABLE_INVITATION_EMAIL     = "true"
+    INVITATION_EMAIL_FROM       = var.invitation_email.from_email
+    INVITATION_EMAIL_SCALAR_URL = var.invitation_email.scalar_url
   } : {})
 }
 

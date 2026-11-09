@@ -11,6 +11,7 @@ locals {
     "secretmanager.secrets.get", "secretmanager.secrets.getIamPolicy",
     "serviceusage.services.get", "serviceusage.services.list", "storage.buckets.getIamPolicy",
     "run.operations.get",
+    "run.jobs.get", "run.jobs.getIamPolicy",
     # 配備用SAが全体planをrefreshできるよう、監視リソースの参照だけを許可する。
     "monitoring.alertPolicies.get", "cloudscheduler.jobs.get", "workflows.workflows.get",
   ]
