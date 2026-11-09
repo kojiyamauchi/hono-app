@@ -24,8 +24,10 @@ import {
 import {
   type AuditLogPageBoundary,
   leaveOrganizationResults,
+  memberRemovalResults,
   memberRoleChangeResults,
   organizationAuditLogRepository,
+  organizationMemberRemovalRepository,
   organizationMemberRoleRepository,
   organizationMembershipRepository,
   organizationOwnershipRepository,
@@ -56,6 +58,28 @@ const authorizeMemberRoleChange = (operatorRole: Role, targetRole: Role, newRole
   }
   if (operatorRole === 'ADMIN' && newRole === 'ADMIN') {
     return new AppError(403, 'ADMINはADMINへの昇格を実行できません')
+  }
+  return null
+}
+
+/**
+ * ロック後に確定した操作者・対象のロールに対して、メンバー削除の認可規則を適用する。
+ * 許可なら `null`、拒否ならステータス付きの `AppError` を返す。
+ * 判定順は操作者の権限 → 対象の存在 → 対象OWNER → ADMINの制限。操作者がMEMBERなら対象が存在しなくても403にする。
+ * 対象が存在しない（`targetRole` が `null`）場合は、操作者の権限だけ確認して `null` を返し、404への変換はrepositoryの結果に任せる。
+ */
+const authorizeMemberRemoval = (operatorRole: Role, targetRole: Role | null): AppError | null => {
+  if (operatorRole === 'MEMBER') {
+    return new AppError(403, 'この操作には管理者以上の権限が必要です')
+  }
+  if (targetRole === null) {
+    return null
+  }
+  if (targetRole === 'OWNER') {
+    return new AppError(409, 'OWNERは削除できません')
+  }
+  if (operatorRole === 'ADMIN' && targetRole === 'ADMIN') {
+    return new AppError(403, 'ADMINは他のADMINを削除できません')
   }
   return null
 }
@@ -287,28 +311,33 @@ export const organizationsService = {
   },
 
   /**
-   * メンバーを削除する。
+   * メンバーを削除し、監査ログ（MEMBER_REMOVED）を同じtransactionで記録する。
    * OWNERはADMIN/MEMBERを削除可。ADMINはMEMBERのみ削除可。MEMBERは操作不可。
    * 対象がOWNERの場合は操作不可（OWNERは自身に対しても含む）。
+   *
+   * 認可はmiddlewareが読んだロールではなく、repositoryがロックした後の最新ロールに対して判定する。
+   * そのため操作者のロールは引数で受け取らず、認証済みユーザーIDだけを受け取る。
    */
-  removeMember: async (organizationId: number, membershipId: number, operatorRole: Role): Promise<void> => {
-    if (operatorRole === 'MEMBER') {
-      throw new AppError(403, 'この操作には管理者以上の権限が必要です')
+  removeMember: async (organizationId: number, membershipId: number, actorUserId: number): Promise<void> => {
+    const result = await organizationMemberRemovalRepository.removeWithAuditLog<AppError>(
+      { organizationId, targetMembershipId: membershipId, actorUserId },
+      (locked) => authorizeMemberRemoval(locked.operatorRole, locked.targetRole),
+    )
+
+    // 成功値を明示的に判定し、未知の結果を暗黙の成功として扱わない。
+    if (result.status === memberRemovalResults.removed) {
+      return
     }
-    const target = await membershipRepository.findById(membershipId)
-    if (!target || target.organizationId !== organizationId) {
+    if (result.status === memberRemovalResults.organizationNotFound) {
+      throw new AppError(404, '組織が見つかりません')
+    }
+    if (result.status === memberRemovalResults.targetNotFound) {
       throw new AppError(404, 'メンバーが見つかりません')
     }
-    if (target.role === 'OWNER') {
-      throw new AppError(409, 'OWNERは削除できません')
+    if (result.status === memberRemovalResults.rejected) {
+      throw result.rejection
     }
-    if (operatorRole === 'ADMIN' && target.role === 'ADMIN') {
-      throw new AppError(403, 'ADMINは他のADMINを削除できません')
-    }
-    const deleted = await membershipRepository.deleteById(membershipId)
-    if (!deleted) {
-      throw new AppError(404, 'メンバーが見つかりません')
-    }
+    throw new Error('メンバー削除の結果が不明です')
   },
 
   /**
