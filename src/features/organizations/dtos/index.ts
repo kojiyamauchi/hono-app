@@ -34,19 +34,27 @@ export const auditLogDto = z
     id: z.number().int(),
     organizationId: z.number().int(),
     action: z.enum(auditActionValues).openapi({
-      description: 'イベント種別。MEMBER_ROLE_CHANGED（メンバーのロール変更）またはOWNERSHIP_TRANSFERRED（組織の所有権移譲）。',
+      description:
+        'イベント種別。MEMBER_ROLE_CHANGED（メンバーのロール変更）、OWNERSHIP_TRANSFERRED（組織の所有権移譲）、MEMBER_REMOVED（管理者によるメンバー削除）。',
     }),
     actorUserId: z.number().int().openapi({
-      description: 'イベントを実行したユーザーのID。MEMBER_ROLE_CHANGEDでは操作者。OWNERSHIP_TRANSFERREDでは移譲元のOWNER（移譲後はADMINになる）。',
-    }),
-    targetUserId: z.number().int().openapi({ description: '対象ユーザーのID。OWNERSHIP_TRANSFERREDでは移譲先。' }),
-    targetMembershipId: z.number().int().openapi({ description: '対象メンバーシップのID。OWNERSHIP_TRANSFERREDでは移譲先のメンバーシップ。' }),
-    previousRole: z.enum(roleValues).openapi({
-      description: '対象の変更前ロール。MEMBER_ROLE_CHANGEDでは対象メンバーの変更前、OWNERSHIP_TRANSFERREDでは移譲先の変更前（ADMINまたはMEMBER）。',
-    }),
-    newRole: z.enum(roleValues).openapi({
       description:
-        '対象の変更後ロール。MEMBER_ROLE_CHANGEDでは対象メンバーの変更後、OWNERSHIP_TRANSFERREDでは常にOWNER（移譲元がOWNERからADMINになったことも表す）。',
+        'イベントを実行したユーザーのID。MEMBER_ROLE_CHANGEDとMEMBER_REMOVEDでは操作者。OWNERSHIP_TRANSFERREDでは移譲元のOWNER（移譲後はADMINになる）。',
+    }),
+    targetUserId: z.number().int().openapi({ description: '対象ユーザーのID。OWNERSHIP_TRANSFERREDでは移譲先、MEMBER_REMOVEDでは削除されたユーザー。' }),
+    targetMembershipId: z
+      .number()
+      .int()
+      .openapi({
+        description: '対象メンバーシップのID。OWNERSHIP_TRANSFERREDでは移譲先のメンバーシップ、MEMBER_REMOVEDでは削除されたメンバーシップ（記録時点の値）。',
+      }),
+    previousRole: z.enum(roleValues).openapi({
+      description:
+        '対象の変更前ロール。MEMBER_ROLE_CHANGEDでは対象メンバーの変更前、OWNERSHIP_TRANSFERREDでは移譲先の変更前（ADMINまたはMEMBER）、MEMBER_REMOVEDでは削除前のロール（ADMINまたはMEMBER）。',
+    }),
+    newRole: z.enum(roleValues).nullable().openapi({
+      description:
+        '対象の変更後ロール。MEMBER_ROLE_CHANGEDでは対象メンバーの変更後、OWNERSHIP_TRANSFERREDでは常にOWNER（移譲元がOWNERからADMINになったことも表す）。変更後が存在しないMEMBER_REMOVEDでは常にnull。',
     }),
     createdAt: z.iso.datetime(),
   })
