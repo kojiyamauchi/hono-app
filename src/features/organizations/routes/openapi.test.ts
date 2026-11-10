@@ -303,4 +303,22 @@ describe('organizations routes OpenAPI定義', () => {
       expect(resendPost.responses[status].content?.['application/json'].schema?.$ref).toBe('#/components/schemas/ErrorResponse')
     }
   })
+
+  test('再送のdescriptionに配信設定・招待状態と期限・手動Job・権限表・再呼び出しの案内が含まれる', async () => {
+    const doc = await fetchOpenApiDoc()
+
+    const resendPost = doc.paths?.['/organizations/{id}/invitations/{invitationId}/resend-email']?.post as { description?: string }
+    const description = resendPost.description ?? ''
+    expect(description).toContain('ENABLE_INVITATION_EMAIL=true')
+    expect(description).toContain('PENDING')
+    expect(description).toContain('同時刻は期限切れ')
+    expect(description).toContain('REJECTED')
+    expect(description).toContain('client または rate_limited')
+    expect(description).toContain('OWNER が ADMIN／MEMBER 宛て')
+    expect(description).toContain('ADMIN が MEMBER 宛て')
+    expect(description).toContain('MEMBER は不可')
+    expect(description).toContain('手動Job')
+    expect(description).toContain('emailDeliveryStatus')
+    expect(description).toContain('既に受け付けています')
+  })
 })
