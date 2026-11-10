@@ -29,6 +29,7 @@ const invitationCreate = mock()
 const invitationFindAllByOrganization = mock()
 const invitationFindById = mock()
 const invitationCancel = mock()
+const requestResend = mock()
 
 const transferOwnership = mock()
 const leaveOrganization = mock()
@@ -95,6 +96,11 @@ await mock.module('@/shared/invitation/repositories', () => ({
   },
 }))
 
+await mock.module('@/shared/invitation/repositories/emailResend', () => ({
+  invitationEmailResendRepository: { requestResend },
+  invitationEmailResendResults: { requested: 'REQUESTED', organizationNotFound: 'ORGANIZATION_NOT_FOUND', rejected: 'REJECTED' },
+}))
+
 const { app } = await import('@/app')
 
 const organization: Organization = {
@@ -157,6 +163,7 @@ describe('organizations routes', () => {
     invitationFindAllByOrganization.mockReset()
     invitationFindById.mockReset()
     invitationCancel.mockReset()
+    requestResend.mockReset()
     transferOwnership.mockReset()
     leaveOrganization.mockReset()
   })
@@ -1375,5 +1382,183 @@ describe('organizations routes', () => {
 
     expect(response.status).toBe(403)
     expect(invitationCancel).not.toHaveBeenCalled()
+  })
+
+  // --- 招待メール再送 ---
+
+  const resendEnv = {
+    ENABLE_INVITATION_EMAIL: 'true',
+    ENABLE_API_DOCS: 'true',
+    RESEND_API_KEY: 're_test_key',
+    INVITATION_EMAIL_FROM: 'noreply@example.com',
+    INVITATION_EMAIL_SCALAR_URL: 'https://example.com/open-api/scalar',
+  }
+
+  /** 再送用の配信設定を環境変数へ設定して処理を実行し、終了後に元へ戻す。 */
+  const withResendEnv = async (run: () => Promise<void>, overrides: Record<string, string | undefined> = {}): Promise<void> => {
+    const merged: Record<string, string | undefined> = { ...resendEnv, ...overrides }
+    const previous = Object.fromEntries(Object.keys(merged).map((key) => [key, process.env[key]]))
+    for (const [key, value] of Object.entries(merged)) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+    try {
+      await run()
+    } finally {
+      for (const [key, value] of Object.entries(previous)) {
+        if (value === undefined) delete process.env[key]
+        else process.env[key] = value
+      }
+    }
+  }
+
+  type ResendCallbacks = Record<'authorizeOperator' | 'authorizeTarget' | 'evaluate', (s: unknown) => unknown>
+
+  /** repositoryがロック後の状態で段階ごとのコールバックを呼び、拒否で止まる動きを再現する。 */
+  const mockLockedState = (state: Record<string, unknown> = {}): void => {
+    requestResend.mockImplementation(async (_input: unknown, callbacks: ResendCallbacks) => {
+      const locked = {
+        operatorRole: 'OWNER',
+        invitation: { role: 'MEMBER', status: 'PENDING', expiresAt: new Date(Date.now() + 60_000) } as unknown,
+        delivery: { status: 'REJECTED', hasUnknownOutcome: false, lastError: 'client', manualResendRequestedAt: null },
+        now: new Date(),
+        ...state,
+      }
+      const rejected = (rejection: unknown): { status: string; rejection: unknown } => ({ status: 'REJECTED', rejection })
+      const operator = callbacks.authorizeOperator({ operatorRole: locked.operatorRole })
+      if (operator !== null) return rejected(operator)
+      const target = callbacks.authorizeTarget({ operatorRole: locked.operatorRole, invitation: locked.invitation })
+      if (target !== null) return rejected(target)
+      const evaluation = callbacks.evaluate({ invitation: locked.invitation, delivery: locked.delivery, now: locked.now })
+      return evaluation === null ? { status: 'REQUESTED' } : rejected(evaluation)
+    })
+  }
+
+  const postResend = async (path = '/organizations/1/invitations/20/resend-email', userId = 1): Promise<Response> => {
+    const token = await createToken(userId)
+    return app.request(path, { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
+  }
+
+  test('POST /organizations/:id/invitations/:invitationId/resend-email はOWNERなら本文なしの202を返す', async () => {
+    mockLockedState()
+
+    await withResendEnv(async () => {
+      const response = await postResend()
+
+      expect(response.status).toBe(202)
+      expect(await response.text()).toBe('')
+      expect(requestResend.mock.calls[0]?.[0]).toMatchObject({ organizationId: 1, invitationId: 20, actorUserId: 1 })
+    })
+  })
+
+  test('POST resend-email は未認証なら401を返す', async () => {
+    const response = await app.request('/organizations/1/invitations/20/resend-email', { method: 'POST' })
+
+    expect(response.status).toBe(401)
+    expect(requestResend).not.toHaveBeenCalled()
+  })
+
+  test('POST resend-email は不正なinvitationIdなら400を返す', async () => {
+    const response = await postResend('/organizations/1/invitations/not-number/resend-email')
+
+    expect(response.status).toBe(400)
+    expect(requestResend).not.toHaveBeenCalled()
+  })
+
+  test('POST resend-email は非メンバー（repositoryが組織なしを返す）なら404を返し、membership middlewareを経由しない', async () => {
+    requestResend.mockResolvedValue({ status: 'ORGANIZATION_NOT_FOUND' })
+
+    const response = await postResend()
+
+    expect(response.status).toBe(404)
+    expect(await response.json()).toEqual({ error: { message: '組織が見つかりません' } })
+    expect(findByUserAndOrganization).not.toHaveBeenCalled()
+  })
+
+  test('POST resend-email はロック後のロールがMEMBERなら403を返す', async () => {
+    mockLockedState({ operatorRole: 'MEMBER' })
+
+    const response = await postResend()
+
+    expect(response.status).toBe(403)
+    expect(findByUserAndOrganization).not.toHaveBeenCalled()
+  })
+
+  test('POST resend-email はOWNER宛ての招待ならOWNERでも403を返す', async () => {
+    mockLockedState({ invitation: { role: 'OWNER', status: 'PENDING', expiresAt: new Date(Date.now() + 60_000) } })
+
+    await withResendEnv(async () => {
+      const response = await postResend()
+
+      expect(response.status).toBe(403)
+    })
+  })
+
+  test('POST resend-email は招待が存在しなければ404を返す', async () => {
+    mockLockedState({ invitation: null, delivery: null })
+
+    await withResendEnv(async () => {
+      const response = await postResend()
+
+      expect(response.status).toBe(404)
+    })
+  })
+
+  test('POST resend-email はADMINがADMIN宛てを再送しようとすると403を返す', async () => {
+    mockLockedState({ operatorRole: 'ADMIN', invitation: { role: 'ADMIN', status: 'PENDING', expiresAt: new Date(Date.now() + 60_000) } })
+
+    await withResendEnv(async () => {
+      const response = await postResend()
+
+      expect(response.status).toBe(403)
+    })
+  })
+
+  test('POST resend-email は再送受付済みなら専用メッセージの409を返す', async () => {
+    mockLockedState({ delivery: { status: 'REJECTED', hasUnknownOutcome: false, lastError: 'client', manualResendRequestedAt: new Date() } })
+
+    await withResendEnv(async () => {
+      const response = await postResend()
+
+      expect(response.status).toBe(409)
+      expect(await response.json()).toEqual({ error: { message: 'この招待メールの再送は既に受け付けています' } })
+    })
+  })
+
+  test('POST resend-email は配信設定が無効なら409を返す', async () => {
+    mockLockedState()
+
+    await withResendEnv(
+      async () => {
+        const response = await postResend()
+
+        expect(response.status).toBe(409)
+      },
+      { ENABLE_INVITATION_EMAIL: undefined },
+    )
+  })
+
+  test('POST resend-email は配信設定の不備なら内部情報を含まない500を返す', async () => {
+    mockLockedState()
+
+    await withResendEnv(
+      async () => {
+        const response = await postResend()
+
+        expect(response.status).toBe(500)
+        expect(JSON.stringify(await response.json())).not.toContain('RESEND')
+      },
+      { RESEND_API_KEY: undefined },
+    )
+  })
+
+  test('POST resend-email は再送対象外の配信なら409を返す', async () => {
+    mockLockedState({ delivery: { status: 'REJECTED', hasUnknownOutcome: false, lastError: 'invalid_idempotency', manualResendRequestedAt: null } })
+
+    await withResendEnv(async () => {
+      const response = await postResend()
+
+      expect(response.status).toBe(409)
+    })
   })
 })

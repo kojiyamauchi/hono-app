@@ -111,22 +111,24 @@ enum InvitationEmailDeliveryStatus {
 }
 
 model InvitationEmailDelivery {
-  id                String                        @id @default(uuid())
-  invitationId      Int                           @unique
-  invitation        Invitation                    @relation(fields: [invitationId], references: [id], onDelete: Cascade)
-  fromEmail         String
-  scalarUrl         String
-  organizationName  String
-  templateVersion   Int
-  status            InvitationEmailDeliveryStatus @default(PENDING)
-  attemptCount      Int                           @default(0)
-  hasUnknownOutcome Boolean                       @default(false)
-  nextAttemptAt     DateTime                      @default(now())
-  deadline          DateTime
-  leaseToken        String?
-  leaseUntil        DateTime?
-  resendEmailId     String?
-  lastError         String?
+  id                      String                        @id @default(uuid())
+  invitationId            Int                           @unique
+  invitation              Invitation                    @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  fromEmail               String
+  scalarUrl               String
+  organizationName        String
+  templateVersion         Int
+  status                  InvitationEmailDeliveryStatus @default(PENDING)
+  attemptCount            Int                           @default(0)
+  hasUnknownOutcome       Boolean                       @default(false)
+  nextAttemptAt           DateTime                      @default(now())
+  deadline                DateTime
+  leaseToken              String?
+  leaseUntil              DateTime?
+  resendEmailId           String?
+  lastError               String?
+  // 管理者による手動再送を受け付けた時刻。置き換え後の配信行に記録し、ワーカーは更新しない。既存行はnull。
+  manualResendRequestedAt DateTime?
 
   @@index([status, nextAttemptAt, id])
 }

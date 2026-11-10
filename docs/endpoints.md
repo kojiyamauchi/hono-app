@@ -108,15 +108,26 @@ GCPのdev環境では、以下を含む全エンドポイントへのアクセ�
 
 ## Organization Invitations
 
-| Method | Path                                           | 認証 | 概要                                                            |
-| ------ | ---------------------------------------------- | ---- | --------------------------------------------------------------- |
-| GET    | `/organizations/:id/invitations`               | 必要 | OWNERまたはADMINがPENDING状態の招待一覧を配信状態付きで取得する |
-| POST   | `/organizations/:id/invitations`               | 必要 | OWNERまたはADMINが招待を作成する（配信有効時は配信待ちも保存）  |
-| DELETE | `/organizations/:id/invitations/:invitationId` | 必要 | OWNERまたはADMINがPENDING状態の招待をキャンセルする             |
+| Method | Path                                                        | 認証 | 概要                                                                         |
+| ------ | ----------------------------------------------------------- | ---- | ---------------------------------------------------------------------------- |
+| GET    | `/organizations/:id/invitations`                            | 必要 | OWNERまたはADMINがPENDING状態の招待一覧を配信状態付きで取得する              |
+| POST   | `/organizations/:id/invitations`                            | 必要 | OWNERまたはADMINが招待を作成する（配信有効時は配信待ちも保存）               |
+| DELETE | `/organizations/:id/invitations/:invitationId`              | 必要 | OWNERまたはADMINがPENDING状態の招待をキャンセルする                          |
+| POST   | `/organizations/:id/invitations/:invitationId/resend-email` | 必要 | OWNERまたはADMINが拒否された招待メールの再送を1回受け付ける（本文なし、202） |
 
 招待一覧の各要素は、従来の招待項目（`invitationToken` を含む）に加えて、必須項目 `emailDeliveryStatus` を持ちます。値は `PENDING`・`ACCEPTED`・`REJECTED`・`UNKNOWN`・`SKIPPED` のいずれか、または配信記録がない場合の `null` で、DBに保存された招待メール配信の状態を取得時点の値で返します。招待自身の `status` とは別の項目です。配信ID・ResendメールID・エラー・試行回数などの内部情報は返しません。各状態の意味と読み方は[招待メールの運用手順](invitation-email.md#招待一覧での配信状態の確認)を参照してください。
 
 招待作成の `201 Created` は招待の保存を示します。メール配信が有効な環境では、配信待ちも同時に保存されます。GCP devではJobを手動実行したときに配信します。将来、定期実行を有効にした場合は、通常は次の起動まで最大約15分かかり、障害時や配信待ちが多い場合はさらに遅れます。配信設定と状態の確認方法は[招待メールの運用手順](invitation-email.md)を参照してください。
+
+`POST /organizations/:id/invitations/:invitationId/resend-email` は、招待メールの再送を受け付けます。Bearer認証が必要で、リクエスト本文はありません。OWNERはADMIN／MEMBER宛て、ADMINはMEMBER宛ての招待を再送できます（招待作成と同じ権限の境界）。MEMBERは再送できず、OWNER宛ての招待は誰も再送できません。所属とロールは、リクエスト中にロックを取得した後の最新の値で判定します（ロール変更やメンバー削除が先に成立していれば、その結果で判定されます）。次のすべてを満たす場合に、招待ごとに1回だけ受け付けます。
+
+- `ENABLE_INVITATION_EMAIL=true` の環境である。
+- 招待がDB上で `PENDING` で、有効期限が判定時刻より後である（有効期限と判定時刻が等しい場合は期限切れ）。
+- 初回の配信が `REJECTED` で、受付結果不明ではなく、原因がResendの明示的な拒否（`client` または `rate_limited`）である。配信記録がない招待、ほかの配信状態、`invalid_idempotency` は対象外です。
+
+`202 Accepted`（本文なし）は、新しい配信待ちを保存したことだけを示します。Resendの受付や受信者への配達ではありません。GCP devでは既存の手動Jobを実行したときに処理され、結果は招待一覧の `emailDeliveryStatus` で確認します。招待のID・トークン・宛先・ロール・有効期限は変わりません。
+
+ステータスは、202 受付、400 不正な組織IDまたは招待ID、401 未認証、403 所属MEMBERまたは対象ロールへの権限なし、404 組織・招待が存在しない／未所属／別組織の招待、409 配信設定が無効・招待が無効または期限切れ・再送対象外・再送受付済み、500 配信設定の不備や保存失敗です。確認の順序は 認証 → パス検証 → 所属 → 操作者のロール → 招待 → 対象ロール → 再送受付済み → 設定・状態・期限・対象の確認 → 保存 です。再送を受け付けた後は、再送が再び `REJECTED` になったり招待が期限切れになったりしても、同じ依頼は専用メッセージ `この招待メールの再送は既に受け付けています` の409になります。応答を受け取れなかった場合は同じ依頼をもう一度送り、202またはこの409で受付を確認してください。詳細は[招待メールの運用手順](invitation-email.md#招待メールの手動再送)を参照してください。
 
 ## Invitations
 

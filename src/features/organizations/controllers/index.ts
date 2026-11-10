@@ -188,4 +188,12 @@ export const organizationsInvitationsController = {
     await organizationsService.cancelInvitation(organizationId, invitationId, operatorRole)
     return c.body(null, 204)
   },
+
+  /**
+   * 招待メールの再送を受け付ける。配信待ちの保存までを示す本文なしの202を返す。
+   */
+  resendInvitationEmail: async (c: Context, organizationId: number, invitationId: number, actorUserId: number): Promise<Response> => {
+    await organizationsService.resendInvitationEmail(organizationId, invitationId, actorUserId)
+    return c.body(null, 202)
+  },
 }
