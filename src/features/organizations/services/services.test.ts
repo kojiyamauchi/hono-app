@@ -929,16 +929,17 @@ describe('organizationsService.listInvitations', () => {
   })
 
   test('OWNER/ADMINは招待一覧を取得できる', async () => {
-    invitationFindAllByOrganization.mockResolvedValue([invitation])
+    invitationFindAllByOrganization.mockResolvedValue([{ ...invitation, emailDelivery: null }])
 
     const result = await organizationsService.listInvitations(1, 'OWNER')
 
     expect(result).toHaveLength(1)
     expect(result[0]?.invitationToken).toBe('uuid-token')
+    expect(result[0]?.emailDeliveryStatus).toBeNull()
   })
 
   test('ADMINも招待一覧を取得できる', async () => {
-    invitationFindAllByOrganization.mockResolvedValue([invitation])
+    invitationFindAllByOrganization.mockResolvedValue([{ ...invitation, emailDelivery: null }])
 
     const result = await organizationsService.listInvitations(1, 'ADMIN')
 

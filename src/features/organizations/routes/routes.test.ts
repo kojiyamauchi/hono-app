@@ -1152,7 +1152,7 @@ describe('organizations routes', () => {
 
   test('GET /organizations/:id/invitations はOWNERなら200を返す', async () => {
     findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))
-    invitationFindAllByOrganization.mockResolvedValue([invitation])
+    invitationFindAllByOrganization.mockResolvedValue([{ ...invitation, emailDelivery: null }])
     const token = await createToken(1)
 
     const response = await app.request('/organizations/1/invitations', {
@@ -1160,8 +1160,10 @@ describe('organizations routes', () => {
     })
 
     expect(response.status).toBe(200)
-    const body = (await response.json()) as unknown[]
+    const body = (await response.json()) as Array<{ invitationToken: string; emailDeliveryStatus: string | null }>
     expect(body).toHaveLength(1)
+    expect(body[0]?.invitationToken).toBe('uuid-token')
+    expect(body[0]?.emailDeliveryStatus).toBeNull()
   })
 
   test('GET /organizations/:id/invitations は既存項目を維持しemailDeliveryStatus(保存値/null)のみを追加して返す', async () => {
