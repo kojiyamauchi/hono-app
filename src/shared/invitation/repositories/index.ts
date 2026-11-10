@@ -1,7 +1,7 @@
 import type { Prisma } from '@/generated/prisma/client'
 import { prisma } from '@/libs/prisma'
 import type { Invitation, InvitationStatus, InvitationWithEmailDeliveryStatus, InvitationWithOrganization } from '@/shared/invitation/entities'
-import { invitationEmailLimits, type InvitationEmailSnapshot } from '@/shared/invitation/entities/emailDelivery'
+import { calculateInvitationEmailDeadline, type InvitationEmailSnapshot } from '@/shared/invitation/entities/emailDelivery'
 import type { Membership, Role } from '@/shared/membership/entities'
 import type { User } from '@/shared/user/entities'
 import { isPrismaUniqueConstraintError } from '@/utils/prisma'
@@ -57,7 +57,7 @@ export const invitationRepository = {
             ...delivery,
             invitationId: invitation.id,
             organizationName: organization.name,
-            deadline: new Date(Math.min(expiresAt.getTime(), invitation.createdAt.getTime() + invitationEmailLimits.maxAgeMs)),
+            deadline: calculateInvitationEmailDeadline(invitation.createdAt, expiresAt),
           },
         })
         return invitation
