@@ -69,12 +69,12 @@ GCPのdev環境では、以下を含む全エンドポイントへのアクセ�
 
 ## Organization Members
 
-| Method | Path                                       | 認証 | 概要                                                                                                                              |
-| ------ | ------------------------------------------ | ---- | --------------------------------------------------------------------------------------------------------------------------------- |
-| GET    | `/organizations/:id/members`               | 必要 | 所属している組織のメンバー一覧をカーソル式ページネーションで取得する（`limit` / `cursor`、詳細は [pagination.md](pagination.md)） |
-| POST   | `/organizations/:id/members`               | 必要 | OWNERまたはADMINがメンバーを追加する                                                                                              |
-| DELETE | `/organizations/:id/members/me`            | 必要 | ADMINまたはMEMBERが自分自身を組織から脱退させる                                                                                   |
-| PATCH  | `/organizations/:id/members/:membershipId` | 必要 | OWNERまたはADMINがメンバーのロールを更新する（実際にロールが変わったときは監査ログを記録する）                                    |
+| Method | Path                                       | 認証 | 概要                                                                                                                                   |
+| ------ | ------------------------------------------ | ---- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/organizations/:id/members`               | 必要 | 所属している組織のメンバー一覧をカーソル式ページネーションで取得する（`limit` / `cursor`、詳細は [pagination.md](pagination.md)）      |
+| POST   | `/organizations/:id/members`               | 必要 | OWNERまたはADMINがメンバーを追加する                                                                                                   |
+| DELETE | `/organizations/:id/members/me`            | 必要 | ADMINまたはMEMBERが自分自身を組織から脱退させる                                                                                        |
+| PATCH  | `/organizations/:id/members/:membershipId` | 必要 | OWNERまたはADMINがメンバーのロールを更新する（実際にロールが変わったときは監査ログを記録する）                                         |
 | DELETE | `/organizations/:id/members/:membershipId` | 必要 | OWNERまたはADMINがメンバーを削除する（204を返したときは監査ログ `MEMBER_REMOVED` を記録する。記録に失敗した場合は削除も取り消され500） |
 
 ## Organization Audit Logs
@@ -92,13 +92,13 @@ GCPのdev環境では、以下を含む全エンドポイントへのアクセ�
   - メンバーの追加、自主脱退（`DELETE /organizations/:id/members/me`）、アカウント削除に伴うメンバーシップの消滅、招待は記録対象外です。過去の移譲・削除は遡って記録しません。
 - イベント種別ごとの項目の意味は次のとおりです。
 
-  | 項目                 | `MEMBER_ROLE_CHANGED`        | `OWNERSHIP_TRANSFERRED`                                                 | `MEMBER_REMOVED`                                   |
-  | -------------------- | ---------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------- |
-  | `actorUserId`        | ロールを変更した操作者       | 移譲元のOWNER（移譲後はADMINになる）                                    | メンバーを削除した操作者                           |
-  | `targetUserId`       | ロールが変わった対象ユーザー | 移譲先のユーザー                                                        | 削除されたユーザー                                 |
-  | `targetMembershipId` | 対象のメンバーシップ         | 移譲先のメンバーシップ                                                  | 削除されたメンバーシップ（記録時点の値）           |
+  | 項目                 | `MEMBER_ROLE_CHANGED`        | `OWNERSHIP_TRANSFERRED`                                                 | `MEMBER_REMOVED`                                                |
+  | -------------------- | ---------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------- |
+  | `actorUserId`        | ロールを変更した操作者       | 移譲元のOWNER（移譲後はADMINになる）                                    | メンバーを削除した操作者                                        |
+  | `targetUserId`       | ロールが変わった対象ユーザー | 移譲先のユーザー                                                        | 削除されたユーザー                                              |
+  | `targetMembershipId` | 対象のメンバーシップ         | 移譲先のメンバーシップ                                                  | 削除されたメンバーシップ（記録時点の値）                        |
   | `previousRole`       | 対象の変更前のロール         | ロック取得後に確認した移譲先の変更前のロール（`ADMIN` または `MEMBER`） | ロック取得後に確認した削除前のロール（`ADMIN` または `MEMBER`） |
-  | `newRole`            | 対象の変更後のロール         | 常に `OWNER`（移譲元がOWNERからADMINになったことも表す）                | 常に `null`（変更後のロールが存在しない）          |
+  | `newRole`            | 対象の変更後のロール         | 常に `OWNER`（移譲元がOWNERからADMINになったことも表す）                | 常に `null`（変更後のロールが存在しない）                       |
 
 - ロールの更新・メンバーの削除と記録は同じトランザクションで確定します。記録に失敗した場合はロールの更新（所有権移譲では移譲先と移譲元の両方の更新）やメンバーの削除も取り消され、500を返します。メンバー削除は、ロール変更・所有権移譲・自主脱退と行ロックで直列化され、確定後の最新のロールで認可と記録を行います。
 - 3種のイベントは同じ一覧に混在して返り、並び順（`createdAt DESC, id DESC`）・カーソル・閲覧権限はイベント種別によらず共通です。
@@ -108,11 +108,13 @@ GCPのdev環境では、以下を含む全エンドポイントへのアクセ�
 
 ## Organization Invitations
 
-| Method | Path                                           | 認証 | 概要                                                           |
-| ------ | ---------------------------------------------- | ---- | -------------------------------------------------------------- |
-| GET    | `/organizations/:id/invitations`               | 必要 | OWNERまたはADMINがPENDING状態の招待一覧を取得する              |
-| POST   | `/organizations/:id/invitations`               | 必要 | OWNERまたはADMINが招待を作成する（配信有効時は配信待ちも保存） |
-| DELETE | `/organizations/:id/invitations/:invitationId` | 必要 | OWNERまたはADMINがPENDING状態の招待をキャンセルする            |
+| Method | Path                                           | 認証 | 概要                                                            |
+| ------ | ---------------------------------------------- | ---- | --------------------------------------------------------------- |
+| GET    | `/organizations/:id/invitations`               | 必要 | OWNERまたはADMINがPENDING状態の招待一覧を配信状態付きで取得する |
+| POST   | `/organizations/:id/invitations`               | 必要 | OWNERまたはADMINが招待を作成する（配信有効時は配信待ちも保存）  |
+| DELETE | `/organizations/:id/invitations/:invitationId` | 必要 | OWNERまたはADMINがPENDING状態の招待をキャンセルする             |
+
+招待一覧の各要素は、従来の招待項目（`invitationToken` を含む）に加えて、必須項目 `emailDeliveryStatus` を持ちます。値は `PENDING`・`ACCEPTED`・`REJECTED`・`UNKNOWN`・`SKIPPED` のいずれか、または配信記録がない場合の `null` で、DBに保存された招待メール配信の状態を取得時点の値で返します。招待自身の `status` とは別の項目です。配信ID・ResendメールID・エラー・試行回数などの内部情報は返しません。各状態の意味と読み方は[招待メールの運用手順](invitation-email.md#招待一覧での配信状態の確認)を参照してください。
 
 招待作成の `201 Created` は招待の保存を示します。メール配信が有効な環境では、配信待ちも同時に保存されます。GCP devではJobを手動実行したときに配信します。将来、定期実行を有効にした場合は、通常は次の起動まで最大約15分かかり、障害時や配信待ちが多い場合はさらに遅れます。配信設定と状態の確認方法は[招待メールの運用手順](invitation-email.md)を参照してください。
 
