@@ -119,7 +119,7 @@ GCPのdev環境では、以下を含む全エンドポイントへのアクセ�
 
 招待作成の `201 Created` は招待の保存を示します。メール配信が有効な環境では、配信待ちも同時に保存されます。GCP devではJobを手動実行したときに配信します。将来、定期実行を有効にした場合は、通常は次の起動まで最大約15分かかり、障害時や配信待ちが多い場合はさらに遅れます。配信設定と状態の確認方法は[招待メールの運用手順](invitation-email.md)を参照してください。
 
-`POST /organizations/:id/invitations/:invitationId/resend-email` は、招待メールの再送を受け付けます。Bearer認証が必要で、リクエスト本文はありません。OWNERはADMIN／MEMBER宛て、ADMINはMEMBER宛ての招待を再送できます（招待作成と同じ権限の境界）。次のすべてを満たす場合に、招待ごとに1回だけ受け付けます。
+`POST /organizations/:id/invitations/:invitationId/resend-email` は、招待メールの再送を受け付けます。Bearer認証が必要で、リクエスト本文はありません。OWNERはADMIN／MEMBER宛て、ADMINはMEMBER宛ての招待を再送できます（招待作成と同じ権限の境界）。MEMBERは再送できず、OWNER宛ての招待は誰も再送できません。所属とロールは、リクエスト中にロックを取得した後の最新の値で判定します（ロール変更やメンバー削除が先に成立していれば、その結果で判定されます）。次のすべてを満たす場合に、招待ごとに1回だけ受け付けます。
 
 - `ENABLE_INVITATION_EMAIL=true` の環境である。
 - 招待がDB上で `PENDING` で、有効期限が判定時刻より後である（有効期限と判定時刻が等しい場合は期限切れ）。

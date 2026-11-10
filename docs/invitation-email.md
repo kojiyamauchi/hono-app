@@ -82,7 +82,7 @@ Jobを更新する場合は新しいdigestを保持タグで保護し、tfvars�
 
 ## 招待メールの手動再送
 
-Resendに明示的に拒否された招待メールは、送信元などの原因を解消した後に `POST /organizations/:id/invitations/:invitationId/resend-email`（OWNERまたはADMIN、Bearer認証、本文なし）で再送できます。OWNERはADMIN／MEMBER宛て、ADMINはMEMBER宛ての招待が対象です。
+Resendに明示的に拒否された招待メールは、送信元などの原因を解消した後に `POST /organizations/:id/invitations/:invitationId/resend-email`（OWNERまたはADMIN、Bearer認証、本文なし）で再送できます。OWNERはADMIN／MEMBER宛て、ADMINはMEMBER宛ての招待が対象です。MEMBERは再送できず、OWNER宛ての招待は誰も再送できません。所属とロールは、ロックを取得した後の最新の値で判定します。
 
 再送できる条件は次のすべてです。1つでも満たさない場合は、招待と配信を変更せず409を返します。
 
