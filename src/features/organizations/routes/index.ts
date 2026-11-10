@@ -438,6 +438,32 @@ const cancelInvitationRoute = createRoute({
   },
 })
 
+/** POST /organizations/{id}/invitations/{invitationId}/resend-email: 招待メールの再送を受け付ける。 */
+const resendInvitationEmailRoute = createRoute({
+  method: 'post',
+  path: '/{id}/invitations/{invitationId}/resend-email',
+  tags: ['Organization Invitations'],
+  summary: '指定した招待のメール再送を受け付ける',
+  description:
+    '初回の配信がResendに明示的に拒否された（REJECTED かつ受付結果不明でなく、原因が client または rate_limited の）PENDINGの招待に限り、招待ごとに1回だけ受け付ける。202は配信待ちの保存までを示し、Resendの受付や受信者への配達を保証しない。結果は招待一覧の emailDeliveryStatus で確認する。応答を受け取れなかった場合は同じ依頼を再送し、202または「再送は既に受け付けています」の409で受付を確認する。',
+  middleware: [authMiddleware, paramValidationMiddleware(invitationRouteParamSchema), organizationMembershipMiddleware],
+  security: bearerSecurity,
+  request: {
+    params: invitationRouteParamSchema,
+  },
+  responses: {
+    202: {
+      description: '再送の配信待ちを保存した（本文なし）',
+    },
+    400: errorResponse('パスパラメータが不正'),
+    401: errorResponse('認証が必要、またはトークンが無効'),
+    403: errorResponse('権限が不足（MEMBER、またはADMINによるADMIN宛て）'),
+    404: errorResponse('組織・招待が見つからない、または所属していない'),
+    409: errorResponse('配信設定が無効、招待が無効または期限切れ、配信が再送対象外、または再送済み'),
+    500: errorResponse('サーバーエラー（配信設定の不備、保存失敗など）'),
+  },
+})
+
 /**
  * 組織関連のルート（/organizations配下）。
  * すべて認証が必要。`/:id` 系は組織メンバーシップの確認も行う。
@@ -476,4 +502,13 @@ export const organizationsRoutes = new OpenAPIHono({ defaultHook: openApiDefault
   )
   .openapi(cancelInvitationRoute, (c) =>
     organizationsInvitationsController.cancelInvitation(c, c.req.valid('param').id, c.req.valid('param').invitationId, c.get('membership').role),
+  )
+  .openapi(resendInvitationEmailRoute, (c) =>
+    organizationsInvitationsController.resendInvitationEmail(
+      c,
+      c.req.valid('param').id,
+      c.req.valid('param').invitationId,
+      c.get('userId'),
+      c.get('membership').role,
+    ),
   )
