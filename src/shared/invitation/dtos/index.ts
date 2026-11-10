@@ -34,7 +34,11 @@ export type InvitationDtoType = z.infer<typeof invitationDto>
  */
 export const invitationListItemDto = invitationDto
   .extend({
-    emailDeliveryStatus: z.enum(invitationEmailDeliveryStatusValues).nullable(),
+    // OpenAPI 3.1では nullable が無効なため、型の配列と enum 内の null でnull許容を表現する
+    emailDeliveryStatus: z
+      .enum(invitationEmailDeliveryStatusValues)
+      .nullable()
+      .openapi({ type: ['string', 'null'], enum: [...invitationEmailDeliveryStatusValues, null] }),
   })
   .openapi('InvitationListItem')
 
