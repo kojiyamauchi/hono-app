@@ -1412,17 +1412,25 @@ describe('organizations routes', () => {
     }
   }
 
-  /** repositoryがロック後の状態でauthorizeを呼ぶ動きを再現する。 */
+  type ResendCallbacks = Record<'authorizeOperator' | 'authorizeTarget' | 'evaluate', (s: unknown) => unknown>
+
+  /** repositoryがロック後の状態で段階ごとのコールバックを呼び、拒否で止まる動きを再現する。 */
   const mockLockedState = (state: Record<string, unknown> = {}): void => {
-    requestResend.mockImplementation(async (_input: unknown, authorize: (s: unknown) => unknown) => {
-      const rejection = authorize({
+    requestResend.mockImplementation(async (_input: unknown, callbacks: ResendCallbacks) => {
+      const locked = {
         operatorRole: 'OWNER',
-        invitation: { role: 'MEMBER', status: 'PENDING', expiresAt: new Date(Date.now() + 60_000) },
+        invitation: { role: 'MEMBER', status: 'PENDING', expiresAt: new Date(Date.now() + 60_000) } as unknown,
         delivery: { status: 'REJECTED', hasUnknownOutcome: false, lastError: 'client', manualResendRequestedAt: null },
         now: new Date(),
         ...state,
-      })
-      return rejection === null ? { status: 'REQUESTED' } : { status: 'REJECTED', rejection }
+      }
+      const rejected = (rejection: unknown): { status: string; rejection: unknown } => ({ status: 'REJECTED', rejection })
+      const operator = callbacks.authorizeOperator({ operatorRole: locked.operatorRole })
+      if (operator !== null) return rejected(operator)
+      const target = callbacks.authorizeTarget({ operatorRole: locked.operatorRole, invitation: locked.invitation })
+      if (target !== null) return rejected(target)
+      const evaluation = callbacks.evaluate({ invitation: locked.invitation, delivery: locked.delivery, now: locked.now })
+      return evaluation === null ? { status: 'REQUESTED' } : rejected(evaluation)
     })
   }
 
@@ -1432,7 +1440,6 @@ describe('organizations routes', () => {
   }
 
   test('POST /organizations/:id/invitations/:invitationId/resend-email はOWNERなら本文なしの202を返す', async () => {
-    findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))
     mockLockedState()
 
     await withResendEnv(async () => {
@@ -1451,35 +1458,43 @@ describe('organizations routes', () => {
     expect(requestResend).not.toHaveBeenCalled()
   })
 
-  test('POST resend-email は不正なinvitationIdなら（非メンバーでも）400を返す', async () => {
-    findByUserAndOrganization.mockResolvedValue(null)
-
+  test('POST resend-email は不正なinvitationIdなら400を返す', async () => {
     const response = await postResend('/organizations/1/invitations/not-number/resend-email')
 
     expect(response.status).toBe(400)
     expect(requestResend).not.toHaveBeenCalled()
   })
 
-  test('POST resend-email は非メンバーなら404を返す', async () => {
-    findByUserAndOrganization.mockResolvedValue(null)
+  test('POST resend-email は非メンバー（repositoryが組織なしを返す）なら404を返し、membership middlewareを経由しない', async () => {
+    requestResend.mockResolvedValue({ status: 'ORGANIZATION_NOT_FOUND' })
 
     const response = await postResend()
 
     expect(response.status).toBe(404)
-    expect(requestResend).not.toHaveBeenCalled()
+    expect(await response.json()).toEqual({ error: { message: '組織が見つかりません' } })
+    expect(findByUserAndOrganization).not.toHaveBeenCalled()
   })
 
-  test('POST resend-email はMEMBERなら403を返す', async () => {
-    findByUserAndOrganization.mockResolvedValue(membershipWithRole('MEMBER'))
+  test('POST resend-email はロック後のロールがMEMBERなら403を返す', async () => {
+    mockLockedState({ operatorRole: 'MEMBER' })
 
     const response = await postResend()
 
     expect(response.status).toBe(403)
-    expect(requestResend).not.toHaveBeenCalled()
+    expect(findByUserAndOrganization).not.toHaveBeenCalled()
+  })
+
+  test('POST resend-email はOWNER宛ての招待ならOWNERでも403を返す', async () => {
+    mockLockedState({ invitation: { role: 'OWNER', status: 'PENDING', expiresAt: new Date(Date.now() + 60_000) } })
+
+    await withResendEnv(async () => {
+      const response = await postResend()
+
+      expect(response.status).toBe(403)
+    })
   })
 
   test('POST resend-email は招待が存在しなければ404を返す', async () => {
-    findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))
     mockLockedState({ invitation: null, delivery: null })
 
     await withResendEnv(async () => {
@@ -1490,7 +1505,6 @@ describe('organizations routes', () => {
   })
 
   test('POST resend-email はADMINがADMIN宛てを再送しようとすると403を返す', async () => {
-    findByUserAndOrganization.mockResolvedValue(membershipWithRole('ADMIN'))
     mockLockedState({ operatorRole: 'ADMIN', invitation: { role: 'ADMIN', status: 'PENDING', expiresAt: new Date(Date.now() + 60_000) } })
 
     await withResendEnv(async () => {
@@ -1501,7 +1515,6 @@ describe('organizations routes', () => {
   })
 
   test('POST resend-email は再送受付済みなら専用メッセージの409を返す', async () => {
-    findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))
     mockLockedState({ delivery: { status: 'REJECTED', hasUnknownOutcome: false, lastError: 'client', manualResendRequestedAt: new Date() } })
 
     await withResendEnv(async () => {
@@ -1513,7 +1526,6 @@ describe('organizations routes', () => {
   })
 
   test('POST resend-email は配信設定が無効なら409を返す', async () => {
-    findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))
     mockLockedState()
 
     await withResendEnv(
@@ -1527,7 +1539,6 @@ describe('organizations routes', () => {
   })
 
   test('POST resend-email は配信設定の不備なら内部情報を含まない500を返す', async () => {
-    findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))
     mockLockedState()
 
     await withResendEnv(
@@ -1542,7 +1553,6 @@ describe('organizations routes', () => {
   })
 
   test('POST resend-email は再送対象外の配信なら409を返す', async () => {
-    findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))
     mockLockedState({ delivery: { status: 'REJECTED', hasUnknownOutcome: false, lastError: 'invalid_idempotency', manualResendRequestedAt: null } })
 
     await withResendEnv(async () => {
