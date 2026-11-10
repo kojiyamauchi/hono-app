@@ -446,7 +446,8 @@ const resendInvitationEmailRoute = createRoute({
   summary: '指定した招待のメール再送を受け付ける',
   description:
     '初回の配信がResendに明示的に拒否された（REJECTED かつ受付結果不明でなく、原因が client または rate_limited の）PENDINGの招待に限り、招待ごとに1回だけ受け付ける。202は配信待ちの保存までを示し、Resendの受付や受信者への配達を保証しない。結果は招待一覧の emailDeliveryStatus で確認する。応答を受け取れなかった場合は同じ依頼を再送し、202または「再送は既に受け付けています」の409で受付を確認する。',
-  middleware: [authMiddleware, paramValidationMiddleware(invitationRouteParamSchema), organizationMembershipMiddleware],
+  // 所属・ロールの認可は、Serviceがrepositoryのロック後に読み直した値で行うため、organizationMembershipMiddlewareは使わない。
+  middleware: [authMiddleware, paramValidationMiddleware(invitationRouteParamSchema)],
   security: bearerSecurity,
   request: {
     params: invitationRouteParamSchema,
@@ -504,11 +505,5 @@ export const organizationsRoutes = new OpenAPIHono({ defaultHook: openApiDefault
     organizationsInvitationsController.cancelInvitation(c, c.req.valid('param').id, c.req.valid('param').invitationId, c.get('membership').role),
   )
   .openapi(resendInvitationEmailRoute, (c) =>
-    organizationsInvitationsController.resendInvitationEmail(
-      c,
-      c.req.valid('param').id,
-      c.req.valid('param').invitationId,
-      c.get('userId'),
-      c.get('membership').role,
-    ),
+    organizationsInvitationsController.resendInvitationEmail(c, c.req.valid('param').id, c.req.valid('param').invitationId, c.get('userId')),
   )
