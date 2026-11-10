@@ -1,5 +1,5 @@
-import type { InvitationDetailDtoType, InvitationDtoType } from '@/shared/invitation/dtos'
-import type { Invitation } from '@/shared/invitation/entities'
+import type { InvitationDetailDtoType, InvitationDtoType, InvitationListItemDtoType } from '@/shared/invitation/dtos'
+import type { Invitation, InvitationWithEmailDeliveryStatus } from '@/shared/invitation/entities'
 import type { Organization } from '@/shared/organization/entities'
 
 /**
@@ -17,6 +17,18 @@ export const toInvitationResponse = (invitation: Invitation): InvitationDtoType 
     invitationToken: invitation.token,
     expiresAt: invitation.expiresAt.toISOString(),
     createdAt: invitation.createdAt.toISOString(),
+  }
+}
+
+/**
+ * 配信状態付きInvitationエンティティを招待一覧用DTOへ変換する。
+ * 既存の `toInvitationResponse` の項目に、配信状態 `emailDeliveryStatus` のみを追加する。
+ * 配信レコードがない場合は `null`。配信レコードのその他の項目は公開しない。
+ */
+export const toInvitationListItemResponse = (invitation: InvitationWithEmailDeliveryStatus): InvitationListItemDtoType => {
+  return {
+    ...toInvitationResponse(invitation),
+    emailDeliveryStatus: invitation.emailDelivery?.status ?? null,
   }
 }
 
