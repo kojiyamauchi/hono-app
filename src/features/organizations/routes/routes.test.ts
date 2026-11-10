@@ -1164,6 +1164,49 @@ describe('organizations routes', () => {
     expect(body).toHaveLength(1)
   })
 
+  test('GET /organizations/:id/invitations は既存項目を維持しemailDeliveryStatus(保存値/null)のみを追加して返す', async () => {
+    findByUserAndOrganization.mockResolvedValue(membershipWithRole('ADMIN'))
+    invitationFindAllByOrganization.mockResolvedValue([
+      { ...invitation, id: 21, emailDelivery: { status: 'ACCEPTED', resendEmailId: 'resend-secret' } },
+      { ...invitation, id: 20, emailDelivery: null },
+    ])
+    const token = await createToken(1)
+
+    const response = await app.request('/organizations/1/invitations', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as Record<string, unknown>[]
+    expect(body.map((item) => item.id)).toEqual([21, 20])
+    expect(body.map((item) => item.emailDeliveryStatus)).toEqual(['ACCEPTED', null])
+    expect(Object.keys(body[0] ?? {}).sort()).toEqual(
+      ['id', 'organizationId', 'email', 'role', 'status', 'invitationToken', 'expiresAt', 'createdAt', 'emailDeliveryStatus'].sort(),
+    )
+    expect(body[0]?.invitationToken).toBe('uuid-token')
+    expect(JSON.stringify(body)).not.toContain('resend-secret')
+  })
+
+  test('GET /organizations/:id/invitations は招待が0件なら空配列を返す', async () => {
+    findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))
+    invitationFindAllByOrganization.mockResolvedValue([])
+    const token = await createToken(1)
+
+    const response = await app.request('/organizations/1/invitations', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual([])
+  })
+
+  test('GET /organizations/:id/invitations はトークンがなければ401を返す', async () => {
+    const response = await app.request('/organizations/1/invitations')
+
+    expect(response.status).toBe(401)
+    expect(invitationFindAllByOrganization).not.toHaveBeenCalled()
+  })
+
   test('GET /organizations/:id/invitations はMEMBERなら403を返す', async () => {
     findByUserAndOrganization.mockResolvedValue(membershipWithRole('MEMBER'))
     const token = await createToken(1)
