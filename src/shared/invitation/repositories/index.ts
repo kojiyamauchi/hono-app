@@ -83,7 +83,9 @@ export const invitationRepository = {
 
   /**
    * 組織IDに紐づく招待一覧を取得する。ステータスを指定しない場合はPENDINGのみ返す。
-   * 招待メール配信状態（statusのみ）を1クエリで併せて取得する。配信レコードがない招待は `emailDelivery` が `null`。
+   * 招待メール配信状態（statusのみ）を併せて取得する。配信レコードがない招待は `emailDelivery` が `null`。
+   * Prismaの `findMany` 呼び出しは1回で、関連は招待IDでまとめて取得するため、実際のSQLは
+   * 招待一覧と配信状態の2文になる。招待ごとの追加クエリ（N+1）は発行しない。
    */
   findAllByOrganization: async (organizationId: number, status: InvitationStatus = 'PENDING'): Promise<InvitationWithEmailDeliveryStatus[]> => {
     return prisma.invitation.findMany({

@@ -52,7 +52,7 @@ beforeEach(() => {
 })
 
 describe('invitationRepository.findAllByOrganization', () => {
-  test('既定ではPENDINGをcreatedAt降順で、配信状態のstatusのみを同一クエリで取得する', async () => {
+  test('既定ではPENDINGをcreatedAt降順で、配信状態のstatusのみをfindManyの1回の呼び出しで取得する', async () => {
     const rows = [
       { id: 1, emailDelivery: { status: 'ACCEPTED' } },
       { id: 2, emailDelivery: null },
