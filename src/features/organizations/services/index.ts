@@ -2,7 +2,7 @@ import type { InvitationDtoType, InvitationListItemDtoType } from '@/shared/invi
 import { isManualResendEligibleDelivery } from '@/shared/invitation/entities/emailDelivery'
 import { toInvitationListItemResponse, toInvitationResponse } from '@/shared/invitation/mappers'
 import { invitationRepository } from '@/shared/invitation/repositories'
-import { invitationEmailResendRepository, invitationEmailResendResults, type LockedResendState } from '@/shared/invitation/repositories/emailResend'
+import { invitationEmailResendRepository, invitationEmailResendResults } from '@/shared/invitation/repositories/emailResend'
 import { getInvitationEmailConfig } from '@/shared/invitation/services/emailConfig'
 import type { MemberDtoType } from '@/shared/membership/dtos'
 import type { Role } from '@/shared/membership/entities'
@@ -43,6 +43,16 @@ import type {
   UpdateMemberRoleBodySchemaType,
   UpdateOrganizationSchemaType,
 } from '../schemas'
+
+/**
+ * 招待メールを再送できる、操作者のロールごとの宛先ロール。
+ * 許可表に載っていない組み合わせ（OWNER宛て、ADMINからADMIN宛てなど）は再送できない。
+ */
+const resendTargetRoles: Record<Role, readonly Role[]> = {
+  OWNER: ['ADMIN', 'MEMBER'],
+  ADMIN: ['MEMBER'],
+  MEMBER: [],
+}
 
 /**
  * ロック後に確定した操作者・対象のロールに対して、ロール変更の認可規則を適用する。
@@ -422,18 +432,14 @@ export const organizationsService = {
 
   /**
    * 招待メールの再送を受け付け、配信待ちの保存までを行う（Resendは呼ばない）。
-   * OWNERはADMIN/MEMBER宛て、ADMINはMEMBER宛ての招待を再送できる。MEMBERは操作不可。
    * 判定順は 所属(404) → 操作者ロール(403) → 招待(404) → 対象ロール(403) → 再送受付済み(409)
    * → 配信設定・招待状態・期限・再送対象(409、設定不備は500) → 保存。
    *
-   * 認可と状態の判定はmiddlewareの値ではなく、repositoryがロックした後の最新の状態に対して行う。
+   * 認可と状態の判定はmiddlewareの値ではなく、repositoryがロックした後の最新の所属・ロール・招待・配信に対して行う。
+   * そのため操作者のロールは引数で受け取らず、認証済みユーザーIDだけを受け取る。
    * 配信設定はrepository呼び出し前に取得するが、設定不備による500は判定順の該当位置まで保留する。
    */
-  resendInvitationEmail: async (organizationId: number, invitationId: number, actorUserId: number, operatorRole: Role): Promise<void> => {
-    if (operatorRole === 'MEMBER') {
-      throw new AppError(403, 'この操作には管理者以上の権限が必要です')
-    }
-
+  resendInvitationEmail: async (organizationId: number, invitationId: number, actorUserId: number): Promise<void> => {
     let snapshot: ReturnType<typeof getInvitationEmailConfig> = undefined
     let configFailed = false
     try {
@@ -442,42 +448,48 @@ export const organizationsService = {
       configFailed = true
     }
 
-    const authorize = (state: LockedResendState): AppError | null => {
-      if (state.operatorRole === 'MEMBER') {
-        return new AppError(403, 'この操作には管理者以上の権限が必要です')
-      }
-      const { invitation, delivery } = state
-      if (!invitation) {
-        return new AppError(404, '招待が見つかりません')
-      }
-      if (state.operatorRole === 'ADMIN' && invitation.role !== 'MEMBER') {
-        return new AppError(403, 'ADMINはADMIN宛ての招待メールを再送できません')
-      }
-      if (delivery?.manualResendRequestedAt) {
-        return new AppError(409, 'この招待メールの再送は既に受け付けています')
-      }
-      if (configFailed) {
-        console.error('招待メールの配信設定が不正です', { organizationId })
-        return new AppError(500, 'サーバーエラーが発生しました')
-      }
-      if (!snapshot) {
-        return new AppError(409, '招待メールの配信が有効ではありません')
-      }
-      if (invitation.status !== 'PENDING') {
-        return new AppError(409, 'PENDING状態の招待のみメールを再送できます')
-      }
-      // ワーカーの送信前判定と同じ境界で、期限と判定時刻が等しい場合も期限切れとして扱う。
-      if (invitation.expiresAt.getTime() <= state.now.getTime()) {
-        return new AppError(409, '招待の有効期限が切れています')
-      }
-      if (!delivery || !isManualResendEligibleDelivery(delivery)) {
-        return new AppError(409, 'この招待メールは再送できません')
-      }
-      return null
-    }
-
     const result = await invitationEmailResendRepository
-      .requestResend<AppError>({ organizationId, invitationId, actorUserId, snapshot: snapshot ?? null }, authorize)
+      .requestResend<AppError>(
+        { organizationId, invitationId, actorUserId, snapshot: snapshot ?? null },
+        {
+          authorizeOperator: ({ operatorRole }) => {
+            return operatorRole === 'MEMBER' ? new AppError(403, 'この操作には管理者以上の権限が必要です') : null
+          },
+          authorizeTarget: ({ operatorRole, invitation }) => {
+            if (!invitation) {
+              return new AppError(404, '招待が見つかりません')
+            }
+            // 許可表に載っていない組み合わせ（OWNER宛て、ADMINからADMIN宛てなど）はすべて拒否する。
+            if (!resendTargetRoles[operatorRole].includes(invitation.role)) {
+              return new AppError(403, 'この宛先ロールの招待メールを再送する権限がありません')
+            }
+            return null
+          },
+          evaluate: ({ invitation, delivery, now }) => {
+            if (delivery?.manualResendRequestedAt) {
+              return new AppError(409, 'この招待メールの再送は既に受け付けています')
+            }
+            if (configFailed) {
+              console.error('招待メールの配信設定が不正です', { organizationId })
+              return new AppError(500, 'サーバーエラーが発生しました')
+            }
+            if (!snapshot) {
+              return new AppError(409, '招待メールの配信が有効ではありません')
+            }
+            if (invitation.status !== 'PENDING') {
+              return new AppError(409, 'PENDING状態の招待のみメールを再送できます')
+            }
+            // ワーカーの送信前判定と同じ境界で、期限と判定時刻が等しい場合も期限切れとして扱う。
+            if (invitation.expiresAt.getTime() <= now.getTime()) {
+              return new AppError(409, '招待の有効期限が切れています')
+            }
+            if (!delivery || !isManualResendEligibleDelivery(delivery)) {
+              return new AppError(409, 'この招待メールは再送できません')
+            }
+            return null
+          },
+        },
+      )
       .catch(() => {
         console.error('招待メールの再送待ちの保存に失敗しました', { organizationId })
         throw new AppError(500, 'サーバーエラーが発生しました')
