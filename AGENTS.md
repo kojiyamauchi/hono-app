@@ -374,6 +374,14 @@ feature配下にAPIやユースケースを追加する場合は、レイヤー�
 - `modify/ci-workflow`
 - `remove/legacy-config`
 
+### Gitの作業場所
+
+<!-- cspell:words worktree -->
+
+- ユーザーは普段の作業ディレクトリで作業ブランチを切る。
+- エージェントがGitHub Issueを起点に実装するときは、Issueごとに専用のworktreeを使う。同じIssueの作業用worktreeがあれば再利用し、作業を委譲するときもそのworktreeを引き継ぐ。
+- エージェントがIssue外の実装をするときは、原則として現在の作業ディレクトリを使う。既存の変更と衝突しそうな場合や、別の作業と並行する場合だけworktreeを作る。
+
 ### Issue運用
 
 Issueを作成・整理・本文レビューする場合は、詳細手順として [`.codex/skills/issue-management/SKILL.md`](.codex/skills/issue-management/SKILL.md) を参照すること。
