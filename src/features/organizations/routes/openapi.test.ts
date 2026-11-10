@@ -283,4 +283,24 @@ describe('organizations routes OpenAPI定義', () => {
     expect(invitationIdParam?.in).toBe('path')
     expect(invitationIdParam?.required).toBe(true)
   })
+
+  test('/organizations/{id}/invitations/{invitationId}/resend-email のPOSTが本文なしの202と共通エラー応答を定義している', async () => {
+    const doc = await fetchOpenApiDoc()
+
+    const resendPost = doc.paths?.['/organizations/{id}/invitations/{invitationId}/resend-email']?.post as {
+      security?: unknown[]
+      requestBody?: unknown
+      parameters?: { name: string; in: string; required?: boolean }[]
+      responses: Record<string, { content?: Record<string, { schema?: { $ref?: string } }> }>
+    }
+    expect(resendPost.security).toEqual([{ bearerAuth: [] }])
+    expect(resendPost.requestBody).toBeUndefined()
+    expect(resendPost.parameters?.find((p) => p.name === 'id')?.in).toBe('path')
+    expect(resendPost.parameters?.find((p) => p.name === 'invitationId')?.in).toBe('path')
+    expect(resendPost.responses['202']).toBeDefined()
+    expect(resendPost.responses['202'].content).toBeUndefined()
+    for (const status of ['400', '401', '403', '404', '409', '500']) {
+      expect(resendPost.responses[status].content?.['application/json'].schema?.$ref).toBe('#/components/schemas/ErrorResponse')
+    }
+  })
 })
