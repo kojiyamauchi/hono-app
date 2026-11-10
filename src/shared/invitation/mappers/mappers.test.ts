@@ -1,10 +1,11 @@
 import { describe, expect, test } from 'bun:test'
 
-import { invitationDetailDto, invitationDto } from '@/shared/invitation/dtos'
-import type { Invitation } from '@/shared/invitation/entities'
+import { invitationDetailDto, invitationDto, invitationListItemDto } from '@/shared/invitation/dtos'
+import type { Invitation, InvitationWithEmailDeliveryStatus } from '@/shared/invitation/entities'
+import { invitationEmailDeliveryStatusValues } from '@/shared/invitation/entities/emailDelivery'
 import type { Organization } from '@/shared/organization/entities'
 
-import { toInvitationDetailResponse, toInvitationResponse } from '.'
+import { toInvitationDetailResponse, toInvitationListItemResponse, toInvitationResponse } from '.'
 
 const invitation: Invitation = {
   id: 1,
@@ -23,6 +24,39 @@ const organization: Organization = {
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
   updatedAt: new Date('2026-01-01T00:00:00.000Z'),
 }
+
+describe('toInvitationListItemResponse', () => {
+  for (const status of invitationEmailDeliveryStatusValues) {
+    test(`配信状態${status}をemailDeliveryStatusへ写し、DTOとして妥当である`, () => {
+      const result = toInvitationListItemResponse({ ...invitation, emailDelivery: { status } })
+
+      expect(result).toEqual({ ...toInvitationResponse(invitation), emailDeliveryStatus: status })
+      expect(invitationListItemDto.safeParse(result).success).toBe(true)
+    })
+  }
+
+  test('配信レコードがない場合はemailDeliveryStatusがnullになる', () => {
+    const result = toInvitationListItemResponse({ ...invitation, emailDelivery: null })
+
+    expect(result.emailDeliveryStatus).toBeNull()
+    expect(result.invitationToken).toBe('test-token-uuid')
+    expect(invitationListItemDto.safeParse(result).success).toBe(true)
+  })
+
+  test('配信レコードの内部情報や余分なプロパティをレスポンスへ含めない', () => {
+    const entity = {
+      ...invitation,
+      emailDelivery: { status: 'ACCEPTED', id: 'delivery-id', resendEmailId: 'resend-id', lastError: 'secret', attemptCount: 3, leaseToken: 'lease' },
+    } as unknown as InvitationWithEmailDeliveryStatus
+
+    const result = toInvitationListItemResponse(entity)
+
+    expect(Object.keys(result).sort()).toEqual(
+      ['id', 'organizationId', 'email', 'role', 'status', 'invitationToken', 'expiresAt', 'createdAt', 'emailDeliveryStatus'].sort(),
+    )
+    expect(JSON.stringify(result)).not.toContain('resend-id')
+  })
+})
 
 describe('toInvitationResponse', () => {
   test('招待をレスポンス用に変換する', () => {

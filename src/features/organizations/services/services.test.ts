@@ -929,16 +929,17 @@ describe('organizationsService.listInvitations', () => {
   })
 
   test('OWNER/ADMINは招待一覧を取得できる', async () => {
-    invitationFindAllByOrganization.mockResolvedValue([invitation])
+    invitationFindAllByOrganization.mockResolvedValue([{ ...invitation, emailDelivery: null }])
 
     const result = await organizationsService.listInvitations(1, 'OWNER')
 
     expect(result).toHaveLength(1)
     expect(result[0]?.invitationToken).toBe('uuid-token')
+    expect(result[0]?.emailDeliveryStatus).toBeNull()
   })
 
   test('ADMINも招待一覧を取得できる', async () => {
-    invitationFindAllByOrganization.mockResolvedValue([invitation])
+    invitationFindAllByOrganization.mockResolvedValue([{ ...invitation, emailDelivery: null }])
 
     const result = await organizationsService.listInvitations(1, 'ADMIN')
 
@@ -948,6 +949,43 @@ describe('organizationsService.listInvitations', () => {
   test('MEMBERは取得できず403エラーを投げる', async () => {
     await expect(organizationsService.listInvitations(1, 'MEMBER')).rejects.toThrow('管理者以上')
     expect(invitationFindAllByOrganization).not.toHaveBeenCalled()
+  })
+
+  test('保存済みの配信状態5種類と配信記録なし(null)をそのままemailDeliveryStatusへ写す', async () => {
+    const statuses = ['PENDING', 'ACCEPTED', 'REJECTED', 'UNKNOWN', 'SKIPPED'] as const
+    invitationFindAllByOrganization.mockResolvedValue([
+      ...statuses.map((status, index) => ({ ...invitation, id: index + 1, emailDelivery: { status } })),
+      { ...invitation, id: 99, emailDelivery: null },
+    ])
+
+    const result = await organizationsService.listInvitations(1, 'OWNER')
+
+    expect(result.map((item) => item.emailDeliveryStatus)).toEqual([...statuses, null])
+    expect(invitationFindAllByOrganization).toHaveBeenCalledWith(1)
+  })
+
+  test('配信設定や期限切れに関わらず、保存されたPENDINGを上書きせず返し、設定を参照しない', async () => {
+    getInvitationEmailConfig.mockReset()
+    const expired = { ...invitation, expiresAt: new Date('2000-01-01T00:00:00.000Z'), emailDelivery: { status: 'PENDING' } }
+    invitationFindAllByOrganization.mockResolvedValue([expired])
+
+    const result = await organizationsService.listInvitations(1, 'ADMIN')
+
+    expect(result[0]?.status).toBe('PENDING')
+    expect(result[0]?.emailDeliveryStatus).toBe('PENDING')
+    expect(getInvitationEmailConfig).not.toHaveBeenCalled()
+  })
+
+  test('配信レコードの内部情報を含めない', async () => {
+    invitationFindAllByOrganization.mockResolvedValue([
+      { ...invitation, emailDelivery: { status: 'ACCEPTED', resendEmailId: 'resend-secret', lastError: 'err' } },
+    ])
+
+    const result = await organizationsService.listInvitations(1, 'OWNER')
+
+    expect(JSON.stringify(result)).not.toContain('resend-secret')
+    expect(Object.keys(result[0] ?? {})).toContain('emailDeliveryStatus')
+    expect(Object.keys(result[0] ?? {})).not.toContain('emailDelivery')
   })
 })
 

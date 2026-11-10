@@ -1,6 +1,6 @@
 import type { Context, TypedResponse } from 'hono'
 
-import type { InvitationDtoType } from '@/shared/invitation/dtos'
+import type { InvitationDtoType, InvitationListItemDtoType } from '@/shared/invitation/dtos'
 import type { MemberDtoType } from '@/shared/membership/dtos'
 import type { Role } from '@/shared/membership/entities'
 import type { OrganizationDtoType } from '@/shared/organization/dtos'
@@ -176,7 +176,7 @@ export const organizationsInvitationsController = {
   /**
    * 招待一覧を返す。デフォルトはPENDINGのみ。
    */
-  listInvitations: async (c: Context, organizationId: number, operatorRole: Role): Promise<TypedResponse<InvitationDtoType[], 200, 'json'>> => {
+  listInvitations: async (c: Context, organizationId: number, operatorRole: Role): Promise<TypedResponse<InvitationListItemDtoType[], 200, 'json'>> => {
     const result = await organizationsService.listInvitations(organizationId, operatorRole)
     return c.json(result, 200)
   },

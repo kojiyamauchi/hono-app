@@ -9,6 +9,7 @@ const { app } = await import('@/app')
 
 /** OpenAPI JSON（/open-api/doc）を取得してパースする。 */
 const fetchOpenApiDoc = async (): Promise<{
+  openapi?: string
   paths?: Record<string, Record<string, unknown>>
   components?: { schemas?: Record<string, unknown> }
 }> => {
@@ -18,6 +19,46 @@ const fetchOpenApiDoc = async (): Promise<{
 }
 
 describe('organizations routes OpenAPI定義', () => {
+  test('招待一覧GETの200はInvitationListItemの配列で、emailDeliveryStatusは必須かつ5値とnullを許容する', async () => {
+    const doc = await fetchOpenApiDoc()
+
+    const listGet = doc.paths?.['/organizations/{id}/invitations']?.get as {
+      responses: Record<string, { content?: Record<string, { schema?: { type?: string; items?: { $ref?: string } } }> }>
+    }
+    expect(doc.openapi).toBe('3.1.0')
+    const schema = listGet.responses['200'].content?.['application/json'].schema
+    expect(schema?.type).toBe('array')
+    expect(schema?.items?.$ref).toBe('#/components/schemas/InvitationListItem')
+
+    // 生成結果は既存InvitationへのallOfと、emailDeliveryStatusを追加するobjectで表現される
+    type Extension = { properties?: Record<string, { enum?: (string | null)[]; type?: string | string[]; nullable?: boolean }>; required?: string[] }
+    const listItem = doc.components?.schemas?.InvitationListItem as { allOf?: ({ $ref?: string } & Extension)[] }
+    expect(listItem.allOf?.some((part) => part.$ref === '#/components/schemas/Invitation')).toBe(true)
+    const extension = listItem.allOf?.find((part) => part.properties?.emailDeliveryStatus)
+    expect(extension?.required).toContain('emailDeliveryStatus')
+    const property = extension?.properties?.emailDeliveryStatus
+    expect(property?.type).toEqual(['string', 'null'])
+    expect(property?.nullable).toBeUndefined()
+    expect(property?.enum).toEqual(['PENDING', 'ACCEPTED', 'REJECTED', 'UNKNOWN', 'SKIPPED', null])
+  })
+
+  test('招待作成POSTのInvitationにはemailDeliveryStatusが追加されていない', async () => {
+    const doc = await fetchOpenApiDoc()
+
+    const createPost = doc.paths?.['/organizations/{id}/invitations']?.post as {
+      responses: Record<string, { content?: Record<string, { schema?: { $ref?: string } }> }>
+    }
+    expect(createPost.responses['201'].content?.['application/json'].schema?.$ref).toBe('#/components/schemas/Invitation')
+    const invitation = doc.components?.schemas?.Invitation as { properties?: Record<string, unknown>; required?: string[] }
+    expect(invitation.properties).not.toHaveProperty('emailDeliveryStatus')
+    expect(invitation.required).not.toContain('emailDeliveryStatus')
+
+    // トークンによる詳細取得のInvitationDetailにも追加されていない
+    const detail = doc.components?.schemas?.InvitationDetail as { properties?: Record<string, unknown>; required?: string[] }
+    expect(detail.properties).not.toHaveProperty('emailDeliveryStatus')
+    expect(detail.required).not.toContain('emailDeliveryStatus')
+  })
+
   test('15 path × method が paths へ反映されている', async () => {
     const doc = await fetchOpenApiDoc()
 

@@ -9,9 +9,10 @@ const invitationUpdateMany = mock()
 const membershipCreate = mock()
 const userCreate = mock()
 const transaction = mock()
+const invitationFindMany = mock()
 
 await mock.module('@/libs/prisma', () => ({
-  prisma: { $transaction: transaction },
+  prisma: { $transaction: transaction, invitation: { findMany: invitationFindMany } },
 }))
 
 const { invitationRepository } = await import('.')
@@ -39,6 +40,7 @@ beforeEach(() => {
   membershipCreate.mockReset()
   userCreate.mockReset()
   transaction.mockReset()
+  invitationFindMany.mockReset()
   transaction.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) =>
     callback({
       $queryRaw: queryRaw,
@@ -47,6 +49,34 @@ beforeEach(() => {
       user: { create: userCreate },
     }),
   )
+})
+
+describe('invitationRepository.findAllByOrganization', () => {
+  test('既定ではPENDINGをcreatedAt降順で、配信状態のstatusのみをfindManyの1回の呼び出しで取得する', async () => {
+    const rows = [
+      { id: 1, emailDelivery: { status: 'ACCEPTED' } },
+      { id: 2, emailDelivery: null },
+    ]
+    invitationFindMany.mockResolvedValue(rows)
+
+    const result = await invitationRepository.findAllByOrganization(1)
+
+    expect(result).toBe(rows as never)
+    expect(invitationFindMany).toHaveBeenCalledTimes(1)
+    expect(invitationFindMany).toHaveBeenCalledWith({
+      where: { organizationId: 1, status: 'PENDING' },
+      orderBy: { createdAt: 'desc' },
+      include: { emailDelivery: { select: { status: true } } },
+    })
+  })
+
+  test('ステータスを指定した場合はそのステータスで絞り込む', async () => {
+    invitationFindMany.mockResolvedValue([])
+
+    await invitationRepository.findAllByOrganization(3, 'CANCELED')
+
+    expect(invitationFindMany.mock.calls[0]?.[0]).toMatchObject({ where: { organizationId: 3, status: 'CANCELED' } })
+  })
 })
 
 describe('invitationRepository.accept', () => {

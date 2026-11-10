@@ -4,7 +4,7 @@ import { authMiddleware } from '@/middlewares/auth'
 import { organizationMembershipMiddleware } from '@/middlewares/organizationMembership'
 import { organizationAdminMiddleware } from '@/middlewares/organizationRole'
 import { paramValidationMiddleware } from '@/middlewares/paramValidation'
-import { invitationDto } from '@/shared/invitation/dtos'
+import { invitationDto, invitationListItemDto } from '@/shared/invitation/dtos'
 import { memberDto } from '@/shared/membership/dtos'
 import { errorResponseDto } from '@/shared/openApi/dtos'
 import { SECURITY_SCHEME } from '@/shared/openApi/schemes'
@@ -371,8 +371,8 @@ const listInvitationsRoute = createRoute({
   },
   responses: {
     200: {
-      content: { 'application/json': { schema: invitationDto.array() } },
-      description: '招待の一覧（デフォルトはPENDINGのみ）',
+      content: { 'application/json': { schema: invitationListItemDto.array() } },
+      description: '招待の一覧（デフォルトはPENDINGのみ）。各要素に招待メール配信状態 emailDeliveryStatus を含む（配信記録なしはnull）',
     },
     400: errorResponse('組織IDが不正'),
     401: errorResponse('認証が必要、またはトークンが無効'),

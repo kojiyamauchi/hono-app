@@ -1,5 +1,5 @@
-import type { InvitationDtoType } from '@/shared/invitation/dtos'
-import { toInvitationResponse } from '@/shared/invitation/mappers'
+import type { InvitationDtoType, InvitationListItemDtoType } from '@/shared/invitation/dtos'
+import { toInvitationListItemResponse, toInvitationResponse } from '@/shared/invitation/mappers'
 import { invitationRepository } from '@/shared/invitation/repositories'
 import { getInvitationEmailConfig } from '@/shared/invitation/services/emailConfig'
 import type { MemberDtoType } from '@/shared/membership/dtos'
@@ -383,13 +383,14 @@ export const organizationsService = {
 
   /**
    * 招待一覧を返す。OWNER/ADMINのみ閲覧可。デフォルトはPENDINGのみ。
+   * 各招待にDB保存済みの招待メール配信状態（配信記録なしはnull）を付与する。時刻や設定からの推定はしない。
    */
-  listInvitations: async (organizationId: number, operatorRole: Role): Promise<InvitationDtoType[]> => {
+  listInvitations: async (organizationId: number, operatorRole: Role): Promise<InvitationListItemDtoType[]> => {
     if (operatorRole === 'MEMBER') {
       throw new AppError(403, 'この操作には管理者以上の権限が必要です')
     }
     const invitations = await invitationRepository.findAllByOrganization(organizationId)
-    return invitations.map(toInvitationResponse)
+    return invitations.map(toInvitationListItemResponse)
   },
 
   /**

@@ -1,6 +1,7 @@
 import { z } from '@hono/zod-openapi'
 
 import { invitationStatusValues } from '@/shared/invitation/entities'
+import { invitationEmailDeliveryStatusValues } from '@/shared/invitation/entities/emailDelivery'
 import { roleValues } from '@/shared/membership/entities'
 
 /**
@@ -24,6 +25,24 @@ export const invitationDto = z
   .openapi('Invitation')
 
 export type InvitationDtoType = z.infer<typeof invitationDto>
+
+/**
+ * 組織の招待一覧エンドポイント用のレスポンスDTO。
+ * 既存のInvitation DTOに、招待メール配信状態 `emailDeliveryStatus` のみを必須項目として追加する。
+ * 配信レコードがない招待は `null`。招待自身の `status` とは別の項目として扱う。
+ * 配信ID・ResendメールID・エラー・試行回数などの内部情報は公開しない。
+ */
+export const invitationListItemDto = invitationDto
+  .extend({
+    // OpenAPI 3.1では nullable が無効なため、型の配列と enum 内の null でnull許容を表現する
+    emailDeliveryStatus: z
+      .enum(invitationEmailDeliveryStatusValues)
+      .nullable()
+      .openapi({ type: ['string', 'null'], enum: [...invitationEmailDeliveryStatusValues, null] }),
+  })
+  .openapi('InvitationListItem')
+
+export type InvitationListItemDtoType = z.infer<typeof invitationListItemDto>
 
 /**
  * 招待詳細取得エンドポイント用の公開レスポンスDTO。

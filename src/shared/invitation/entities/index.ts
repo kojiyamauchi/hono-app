@@ -1,3 +1,4 @@
+import type { InvitationEmailDeliveryStatus } from '@/shared/invitation/entities/emailDelivery'
 import type { Role } from '@/shared/membership/entities'
 import type { Organization } from '@/shared/organization/entities'
 
@@ -33,4 +34,13 @@ export type Invitation = {
  */
 export type InvitationWithOrganization = Invitation & {
   organization: Pick<Organization, 'id' | 'name'>
+}
+
+/**
+ * Invitationと招待メール配信状態を結合したエンティティ。
+ * 組織の招待一覧など、配信状態のみを公開する場合に使用する。
+ * 配信レコードが存在しない招待は `emailDelivery` が `null` になる。
+ */
+export type InvitationWithEmailDeliveryStatus = Invitation & {
+  emailDelivery: { status: InvitationEmailDeliveryStatus } | null
 }
