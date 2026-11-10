@@ -445,7 +445,7 @@ const resendInvitationEmailRoute = createRoute({
   tags: ['Organization Invitations'],
   summary: '指定した招待のメール再送を受け付ける',
   description:
-    '初回の配信がResendに明示的に拒否された（REJECTED かつ受付結果不明でなく、原因が client または rate_limited の）PENDINGの招待に限り、招待ごとに1回だけ受け付ける。202は配信待ちの保存までを示し、Resendの受付や受信者への配達を保証しない。結果は招待一覧の emailDeliveryStatus で確認する。応答を受け取れなかった場合は同じ依頼を再送し、202または「再送は既に受け付けています」の409で受付を確認する。',
+    '再送できるのは、ENABLE_INVITATION_EMAIL=true で配信設定が有効な環境で、DB上のPENDINGの招待かつ有効期限が判定時刻より後（同時刻は期限切れ）であり、初回の配信がResendに明示的に拒否された（REJECTED かつ受付結果不明でなく、原因が client または rate_limited の）場合に限る。受け付けは招待ごとに1回だけ。権限は OWNER が ADMIN／MEMBER 宛て、ADMIN が MEMBER 宛てで、MEMBER は不可（OWNER 宛ては不可）。所属・ロール・招待・配信の状態はロックを取得した後の最新の値で判定する。202は配信待ちの保存までを示し、Resendの受付や受信者への配達を保証しない。GCP devでは既存の手動Jobを実行した後に、招待一覧の emailDeliveryStatus で状態を確認する。応答を受け取れなかった場合は同じ依頼を再送し、202または「再送は既に受け付けています」の409で受付を確認する。',
   // 所属・ロールの認可は、Serviceがrepositoryのロック後に読み直した値で行うため、organizationMembershipMiddlewareは使わない。
   middleware: [authMiddleware, paramValidationMiddleware(invitationRouteParamSchema)],
   security: bearerSecurity,
@@ -458,8 +458,8 @@ const resendInvitationEmailRoute = createRoute({
     },
     400: errorResponse('パスパラメータが不正'),
     401: errorResponse('認証が必要、またはトークンが無効'),
-    403: errorResponse('権限が不足（MEMBER、またはADMINによるADMIN宛て）'),
-    404: errorResponse('組織・招待が見つからない、または所属していない'),
+    403: errorResponse('権限が不足（ロック後のロールがMEMBER、または宛先ロールへの再送権限がない。ADMINによるADMIN宛て、OWNER宛てを含む）'),
+    404: errorResponse('組織・招待が見つからない、または（ロック後に）所属していない'),
     409: errorResponse('配信設定が無効、招待が無効または期限切れ、配信が再送対象外、または再送済み'),
     500: errorResponse('サーバーエラー（配信設定の不備、保存失敗など）'),
   },
