@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 
 import { invitationDetailDto, invitationDto, invitationListItemDto } from '@/shared/invitation/dtos'
 import type { Invitation, InvitationWithEmailDeliveryStatus } from '@/shared/invitation/entities'
+import { invitationEmailDeliveryStatusValues } from '@/shared/invitation/entities/emailDelivery'
 import type { Organization } from '@/shared/organization/entities'
 
 import { toInvitationDetailResponse, toInvitationListItemResponse, toInvitationResponse } from '.'
@@ -25,14 +26,14 @@ const organization: Organization = {
 }
 
 describe('toInvitationListItemResponse', () => {
-  const statuses = ['PENDING', 'ACCEPTED', 'REJECTED', 'UNKNOWN', 'SKIPPED'] as const
+  for (const status of invitationEmailDeliveryStatusValues) {
+    test(`配信状態${status}をemailDeliveryStatusへ写し、DTOとして妥当である`, () => {
+      const result = toInvitationListItemResponse({ ...invitation, emailDelivery: { status } })
 
-  test.each(statuses)('配信状態%sをemailDeliveryStatusへ写し、DTOとして妥当である', (status) => {
-    const result = toInvitationListItemResponse({ ...invitation, emailDelivery: { status } })
-
-    expect(result).toEqual({ ...toInvitationResponse(invitation), emailDeliveryStatus: status })
-    expect(invitationListItemDto.safeParse(result).success).toBe(true)
-  })
+      expect(result).toEqual({ ...toInvitationResponse(invitation), emailDeliveryStatus: status })
+      expect(invitationListItemDto.safeParse(result).success).toBe(true)
+    })
+  }
 
   test('配信レコードがない場合はemailDeliveryStatusがnullになる', () => {
     const result = toInvitationListItemResponse({ ...invitation, emailDelivery: null })
