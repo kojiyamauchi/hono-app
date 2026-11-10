@@ -1079,15 +1079,24 @@ describe('organizationsService.resendInvitationEmail', () => {
     now,
   }
 
-  /** repositoryがロック後の状態でauthorizeを呼ぶ動きを再現する。 */
+  type Callbacks = Record<'authorizeOperator' | 'authorizeTarget' | 'evaluate', (s: unknown) => unknown>
+
+  /** repositoryがロック後の状態で段階ごとにコールバックを呼び、拒否で止まる動きを再現する。 */
   const mockLockedState = (state: Record<string, unknown>): void => {
-    requestResend.mockImplementation(async (_input: unknown, authorize: (s: unknown) => unknown) => {
-      const rejection = authorize({ ...baseState, ...state })
-      return rejection === null ? { status: 'REQUESTED' } : { status: 'REJECTED', rejection }
+    requestResend.mockImplementation(async (_input: unknown, callbacks: Callbacks) => {
+      const locked = { ...baseState, ...state } as typeof baseState & { invitation: typeof baseState.invitation | null }
+      const rejected = (rejection: unknown): { status: string; rejection: unknown } => ({ status: 'REJECTED', rejection })
+      const operator = callbacks.authorizeOperator({ operatorRole: locked.operatorRole })
+      if (operator !== null) return rejected(operator)
+      const target = callbacks.authorizeTarget({ operatorRole: locked.operatorRole, invitation: locked.invitation })
+      if (target !== null) return rejected(target)
+      const evaluation = callbacks.evaluate({ invitation: locked.invitation, delivery: locked.delivery, now: locked.now })
+      return evaluation === null ? { status: 'REQUESTED' } : rejected(evaluation)
     })
   }
 
-  const run = (role: Role = 'OWNER'): Promise<void> => organizationsService.resendInvitationEmail(1, 20, 5, role)
+  /** 操作者のロールはmiddlewareの値ではなく、ロック後の状態（mockLockedState）から決まる。 */
+  const run = (): Promise<void> => organizationsService.resendInvitationEmail(1, 20, 5)
 
   beforeEach(() => {
     requestResend.mockReset()
@@ -1097,7 +1106,7 @@ describe('organizationsService.resendInvitationEmail', () => {
   })
 
   test('OWNERの依頼を受け付け、操作者・招待と送信設定をrepositoryへ渡す', async () => {
-    await run('OWNER')
+    await run()
 
     expect(requestResend.mock.calls[0]?.[0]).toEqual({ organizationId: 1, invitationId: 20, actorUserId: 5, snapshot })
   })
@@ -1105,7 +1114,7 @@ describe('organizationsService.resendInvitationEmail', () => {
   test('ADMINはMEMBER宛てを受け付けられる', async () => {
     mockLockedState({ operatorRole: 'ADMIN' })
 
-    await run('ADMIN')
+    await run()
 
     expect(requestResend).toHaveBeenCalledTimes(1)
   })
@@ -1113,7 +1122,7 @@ describe('organizationsService.resendInvitationEmail', () => {
   test('OWNERはADMIN宛てを受け付けられる', async () => {
     mockLockedState({ invitation: { ...baseState.invitation, role: 'ADMIN' } })
 
-    await run('OWNER')
+    await run()
 
     expect(requestResend).toHaveBeenCalledTimes(1)
   })
@@ -1121,18 +1130,34 @@ describe('organizationsService.resendInvitationEmail', () => {
   test('ADMINがADMIN宛てを再送しようとすると403', async () => {
     mockLockedState({ operatorRole: 'ADMIN', invitation: { ...baseState.invitation, role: 'ADMIN' } })
 
-    await expect(run('ADMIN')).rejects.toMatchObject({ statusCode: 403 })
+    await expect(run()).rejects.toMatchObject({ statusCode: 403 })
   })
 
-  test('middlewareの値がMEMBERならrepositoryを呼ばず403', async () => {
-    await expect(run('MEMBER')).rejects.toMatchObject({ statusCode: 403 })
-    expect(requestResend).not.toHaveBeenCalled()
+  test.each(['OWNER', 'ADMIN'])('%sでもOWNER宛ての招待（DBに行があっても）は403で保存しない', async (operatorRole) => {
+    mockLockedState({ operatorRole, invitation: { ...baseState.invitation, role: 'OWNER' } })
+
+    await expect(run()).rejects.toMatchObject({ statusCode: 403 })
   })
 
-  test('ロック後の最新ロールがMEMBERなら403（降格との競合）', async () => {
-    mockLockedState({ operatorRole: 'MEMBER' })
+  test('ロール判定は引数のロールではなくロック後のDB上のロールで行い、MEMBERなら招待を見ずに403', async () => {
+    mockLockedState({ operatorRole: 'MEMBER', invitation: null })
 
-    await expect(run('OWNER')).rejects.toMatchObject({ statusCode: 403 })
+    await expect(run()).rejects.toMatchObject({ statusCode: 403, message: 'この操作には管理者以上の権限が必要です' })
+  })
+
+  test('ロック後に昇格していれば、昇格後のロールで受け付けられる', async () => {
+    mockLockedState({ operatorRole: 'ADMIN' })
+
+    await run()
+
+    expect(requestResend).toHaveBeenCalledTimes(1)
+  })
+
+  test('operatorRoleを引数に取らず、repositoryへ操作者のロールを渡さない', async () => {
+    await run()
+
+    expect(organizationsService.resendInvitationEmail.length).toBe(3)
+    expect(requestResend.mock.calls[0]?.[0]).not.toHaveProperty('operatorRole')
   })
 
   test('招待が存在しなければ404', async () => {
@@ -1173,7 +1198,7 @@ describe('organizationsService.resendInvitationEmail', () => {
       delivery: { ...eligibleDelivery, manualResendRequestedAt: now },
     })
 
-    await expect(run('ADMIN')).rejects.toMatchObject({ statusCode: 403 })
+    await expect(run()).rejects.toMatchObject({ statusCode: 403 })
   })
 
   test('配信設定が無効なら409', async () => {
