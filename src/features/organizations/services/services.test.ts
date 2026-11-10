@@ -27,6 +27,7 @@ const invitationFindAllByOrganization = mock()
 const invitationFindById = mock()
 const invitationCancel = mock()
 const getInvitationEmailConfig = mock()
+const requestResend = mock()
 
 const transferOwnership = mock()
 const leaveOrganization = mock()
@@ -84,6 +85,10 @@ await mock.module('@/shared/user/repositories', () => ({
   userRepository: { findByEmail },
 }))
 await mock.module('@/shared/invitation/services/emailConfig', () => ({ getInvitationEmailConfig }))
+await mock.module('@/shared/invitation/repositories/emailResend', () => ({
+  invitationEmailResendRepository: { requestResend },
+  invitationEmailResendResults: { requested: 'REQUESTED', organizationNotFound: 'ORGANIZATION_NOT_FOUND', rejected: 'REJECTED' },
+}))
 await mock.module('@/shared/invitation/repositories', () => ({
   invitationRepository: {
     findPendingByOrgAndEmail: invitationFindPendingByOrgAndEmail,
@@ -1060,5 +1065,198 @@ describe('organizationsService.cancelInvitation', () => {
 
     await expect(organizationsService.cancelInvitation(1, 20, 'OWNER')).rejects.toThrow('PENDING状態の招待のみ')
     expect(invitationCancel).not.toHaveBeenCalled()
+  })
+})
+
+describe('organizationsService.resendInvitationEmail', () => {
+  const now = new Date('2026-01-01T00:00:00.000Z')
+  const snapshot = { fromEmail: 'noreply@example.com', scalarUrl: 'https://example.com/open-api/scalar', templateVersion: 1 }
+  const eligibleDelivery = { status: 'REJECTED', hasUnknownOutcome: false, lastError: 'client', manualResendRequestedAt: null }
+  const baseState = {
+    operatorRole: 'OWNER',
+    invitation: { role: 'MEMBER', status: 'PENDING', expiresAt: new Date('2026-01-08T00:00:00.000Z') },
+    delivery: eligibleDelivery,
+    now,
+  }
+
+  /** repositoryがロック後の状態でauthorizeを呼ぶ動きを再現する。 */
+  const mockLockedState = (state: Record<string, unknown>): void => {
+    requestResend.mockImplementation(async (_input: unknown, authorize: (s: unknown) => unknown) => {
+      const rejection = authorize({ ...baseState, ...state })
+      return rejection === null ? { status: 'REQUESTED' } : { status: 'REJECTED', rejection }
+    })
+  }
+
+  const run = (role: Role = 'OWNER'): Promise<void> => organizationsService.resendInvitationEmail(1, 20, 5, role)
+
+  beforeEach(() => {
+    requestResend.mockReset()
+    getInvitationEmailConfig.mockReset()
+    getInvitationEmailConfig.mockReturnValue(snapshot)
+    mockLockedState({})
+  })
+
+  test('OWNERの依頼を受け付け、操作者・招待と送信設定をrepositoryへ渡す', async () => {
+    await run('OWNER')
+
+    expect(requestResend.mock.calls[0]?.[0]).toEqual({ organizationId: 1, invitationId: 20, actorUserId: 5, snapshot })
+  })
+
+  test('ADMINはMEMBER宛てを受け付けられる', async () => {
+    mockLockedState({ operatorRole: 'ADMIN' })
+
+    await run('ADMIN')
+
+    expect(requestResend).toHaveBeenCalledTimes(1)
+  })
+
+  test('OWNERはADMIN宛てを受け付けられる', async () => {
+    mockLockedState({ invitation: { ...baseState.invitation, role: 'ADMIN' } })
+
+    await run('OWNER')
+
+    expect(requestResend).toHaveBeenCalledTimes(1)
+  })
+
+  test('ADMINがADMIN宛てを再送しようとすると403', async () => {
+    mockLockedState({ operatorRole: 'ADMIN', invitation: { ...baseState.invitation, role: 'ADMIN' } })
+
+    await expect(run('ADMIN')).rejects.toMatchObject({ statusCode: 403 })
+  })
+
+  test('middlewareの値がMEMBERならrepositoryを呼ばず403', async () => {
+    await expect(run('MEMBER')).rejects.toMatchObject({ statusCode: 403 })
+    expect(requestResend).not.toHaveBeenCalled()
+  })
+
+  test('ロック後の最新ロールがMEMBERなら403（降格との競合）', async () => {
+    mockLockedState({ operatorRole: 'MEMBER' })
+
+    await expect(run('OWNER')).rejects.toMatchObject({ statusCode: 403 })
+  })
+
+  test('招待が存在しなければ404', async () => {
+    mockLockedState({ invitation: null, delivery: null })
+
+    await expect(run()).rejects.toMatchObject({ statusCode: 404, message: '招待が見つかりません' })
+  })
+
+  test('組織または所属がなければ404', async () => {
+    requestResend.mockResolvedValue({ status: 'ORGANIZATION_NOT_FOUND' })
+
+    await expect(run()).rejects.toMatchObject({ statusCode: 404, message: '組織が見つかりません' })
+  })
+
+  test('再送受付済みは専用メッセージの409で、設定無効・期限切れ・非PENDINGより優先する', async () => {
+    getInvitationEmailConfig.mockReturnValue(undefined)
+    mockLockedState({
+      invitation: { ...baseState.invitation, status: 'CANCELED', expiresAt: new Date('2025-12-31T00:00:00.000Z') },
+      delivery: { ...eligibleDelivery, manualResendRequestedAt: now },
+    })
+
+    await expect(run()).rejects.toMatchObject({ statusCode: 409, message: 'この招待メールの再送は既に受け付けています' })
+  })
+
+  test('再送受付済みは設定不備の500より優先する', async () => {
+    getInvitationEmailConfig.mockImplementation(() => {
+      throw new Error('invalid')
+    })
+    mockLockedState({ delivery: { ...eligibleDelivery, manualResendRequestedAt: now } })
+
+    await expect(run()).rejects.toMatchObject({ statusCode: 409, message: 'この招待メールの再送は既に受け付けています' })
+  })
+
+  test('対象ロールの認可は再送受付済みより優先する', async () => {
+    mockLockedState({
+      operatorRole: 'ADMIN',
+      invitation: { ...baseState.invitation, role: 'ADMIN' },
+      delivery: { ...eligibleDelivery, manualResendRequestedAt: now },
+    })
+
+    await expect(run('ADMIN')).rejects.toMatchObject({ statusCode: 403 })
+  })
+
+  test('配信設定が無効なら409', async () => {
+    getInvitationEmailConfig.mockReturnValue(undefined)
+
+    await expect(run()).rejects.toMatchObject({ statusCode: 409, message: '招待メールの配信が有効ではありません' })
+  })
+
+  test('配信設定の不備は500でトークン等を含まないメッセージを返す', async () => {
+    getInvitationEmailConfig.mockImplementation(() => {
+      throw new Error('RESEND_API_KEYが必要です')
+    })
+    const errorSpy = spyOn(console, 'error').mockImplementation(() => {})
+
+    await expect(run()).rejects.toMatchObject({ statusCode: 500, message: 'サーバーエラーが発生しました' })
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain('RESEND_API_KEY')
+    errorSpy.mockRestore()
+  })
+
+  test('設定不備でも招待が存在しなければ404を優先する', async () => {
+    getInvitationEmailConfig.mockImplementation(() => {
+      throw new Error('invalid')
+    })
+    mockLockedState({ invitation: null, delivery: null })
+
+    await expect(run()).rejects.toMatchObject({ statusCode: 404 })
+  })
+
+  test.each(['ACCEPTED', 'EXPIRED', 'CANCELED', 'DECLINED'])('招待が%sなら409', async (status) => {
+    mockLockedState({ invitation: { ...baseState.invitation, status } })
+
+    await expect(run()).rejects.toMatchObject({ statusCode: 409, message: 'PENDING状態の招待のみメールを再送できます' })
+  })
+
+  test('期限と判定時刻が等しい場合も期限切れとして409', async () => {
+    mockLockedState({ invitation: { ...baseState.invitation, expiresAt: now } })
+
+    await expect(run()).rejects.toMatchObject({ statusCode: 409, message: '招待の有効期限が切れています' })
+  })
+
+  test('期限の1ms前は受け付ける', async () => {
+    mockLockedState({ invitation: { ...baseState.invitation, expiresAt: new Date(now.getTime() + 1) } })
+
+    await run()
+
+    expect(requestResend).toHaveBeenCalledTimes(1)
+  })
+
+  test.each([
+    ['配信行なし', null],
+    ['PENDING', { ...eligibleDelivery, status: 'PENDING' }],
+    ['ACCEPTED', { ...eligibleDelivery, status: 'ACCEPTED' }],
+    ['受付結果不明', { ...eligibleDelivery, hasUnknownOutcome: true }],
+    ['invalid_idempotency', { ...eligibleDelivery, lastError: 'invalid_idempotency' }],
+    ['分類なし', { ...eligibleDelivery, lastError: null }],
+  ])('再送対象外（%s）なら内部情報を含まない409', async (_name, delivery) => {
+    mockLockedState({ delivery })
+
+    const error = await run().catch((e: unknown) => e as AppError)
+
+    expect(error).toMatchObject({ statusCode: 409, message: 'この招待メールは再送できません' })
+  })
+
+  test('rate_limitedも再送対象', async () => {
+    mockLockedState({ delivery: { ...eligibleDelivery, lastError: 'rate_limited' } })
+
+    await run()
+
+    expect(requestResend).toHaveBeenCalledTimes(1)
+  })
+
+  test('repositoryの予期しない失敗は内部情報を含まない500にする', async () => {
+    requestResend.mockRejectedValue(new Error('db secret failure'))
+    const errorSpy = spyOn(console, 'error').mockImplementation(() => {})
+
+    await expect(run()).rejects.toMatchObject({ statusCode: 500, message: 'サーバーエラーが発生しました' })
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain('secret')
+    errorSpy.mockRestore()
+  })
+
+  test('未知のrepository結果を成功として扱わない', async () => {
+    requestResend.mockResolvedValue({ status: 'UNKNOWN' })
+
+    await expect(run()).rejects.toThrow('結果が不明です')
   })
 })
