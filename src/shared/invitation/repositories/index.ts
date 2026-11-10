@@ -1,6 +1,6 @@
 import type { Prisma } from '@/generated/prisma/client'
 import { prisma } from '@/libs/prisma'
-import type { Invitation, InvitationStatus, InvitationWithOrganization } from '@/shared/invitation/entities'
+import type { Invitation, InvitationStatus, InvitationWithEmailDeliveryStatus, InvitationWithOrganization } from '@/shared/invitation/entities'
 import { invitationEmailLimits, type InvitationEmailSnapshot } from '@/shared/invitation/entities/emailDelivery'
 import type { Membership, Role } from '@/shared/membership/entities'
 import type { User } from '@/shared/user/entities'
@@ -83,9 +83,14 @@ export const invitationRepository = {
 
   /**
    * 組織IDに紐づく招待一覧を取得する。ステータスを指定しない場合はPENDINGのみ返す。
+   * 招待メール配信状態（statusのみ）を1クエリで併せて取得する。配信レコードがない招待は `emailDelivery` が `null`。
    */
-  findAllByOrganization: async (organizationId: number, status: InvitationStatus = 'PENDING'): Promise<Invitation[]> => {
-    return prisma.invitation.findMany({ where: { organizationId, status }, orderBy: { createdAt: 'desc' } })
+  findAllByOrganization: async (organizationId: number, status: InvitationStatus = 'PENDING'): Promise<InvitationWithEmailDeliveryStatus[]> => {
+    return prisma.invitation.findMany({
+      where: { organizationId, status },
+      orderBy: { createdAt: 'desc' },
+      include: { emailDelivery: { select: { status: true } } },
+    })
   },
 
   /**
