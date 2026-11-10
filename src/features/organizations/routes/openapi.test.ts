@@ -9,6 +9,7 @@ const { app } = await import('@/app')
 
 /** OpenAPI JSON（/open-api/doc）を取得してパースする。 */
 const fetchOpenApiDoc = async (): Promise<{
+  openapi?: string
   paths?: Record<string, Record<string, unknown>>
   components?: { schemas?: Record<string, unknown> }
 }> => {
@@ -24,19 +25,20 @@ describe('organizations routes OpenAPI定義', () => {
     const listGet = doc.paths?.['/organizations/{id}/invitations']?.get as {
       responses: Record<string, { content?: Record<string, { schema?: { type?: string; items?: { $ref?: string } } }> }>
     }
+    expect(doc.openapi).toBe('3.1.0')
     const schema = listGet.responses['200'].content?.['application/json'].schema
     expect(schema?.type).toBe('array')
     expect(schema?.items?.$ref).toBe('#/components/schemas/InvitationListItem')
 
-    // 生成結果は既存Invitationへのallofと、emailDeliveryStatusを追加するobjectで表現される
-    type Extension = { properties?: Record<string, { enum?: (string | null)[]; type?: string; nullable?: boolean }>; required?: string[] }
+    // 生成結果は既存InvitationへのallOfと、emailDeliveryStatusを追加するobjectで表現される
+    type Extension = { properties?: Record<string, { enum?: (string | null)[]; type?: string | string[]; nullable?: boolean }>; required?: string[] }
     const listItem = doc.components?.schemas?.InvitationListItem as { allOf?: ({ $ref?: string } & Extension)[] }
     expect(listItem.allOf?.some((part) => part.$ref === '#/components/schemas/Invitation')).toBe(true)
     const extension = listItem.allOf?.find((part) => part.properties?.emailDeliveryStatus)
     expect(extension?.required).toContain('emailDeliveryStatus')
     const property = extension?.properties?.emailDeliveryStatus
-    expect(property?.type).toBe('string')
-    expect(property?.nullable).toBe(true)
+    expect(property?.type).toEqual(['string', 'null'])
+    expect(property?.nullable).toBeUndefined()
     expect(property?.enum).toEqual(['PENDING', 'ACCEPTED', 'REJECTED', 'UNKNOWN', 'SKIPPED', null])
   })
 
