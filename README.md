@@ -147,7 +147,7 @@ flowchart LR
 |   |-- pull_request_template.md     # PRテンプレート
 |   `-- workflows/
 |       |-- ci.yml                   # GitHub Actions CI
-|       |-- cd.yml                   # ECRへのイメージ登録
+|       |-- cd-aws.yml               # ECRへのイメージ登録
 |       `-- comment-ops.yml          # PRコメント操作
 |-- .husky/
 |   `-- pre-commit                   # pre-commit hook
@@ -599,7 +599,7 @@ terraform -chdir=infra/aws plan -var-file=env/dev.tfvars -var-file=env/dev.appli
 
 CDワークフローは`main`へのpushでECRへ`main-<短縮SHA>`タグを登録します。手動実行は**ワークフローの実行ブランチをmain**にし、`build_target`でビルドするブランチまたはタグを指定します。手動登録分には`manual-*`タグが付くため、30日経過後に削除されます。現時点で選べる環境はdevのみです。事前にGitHubのSettings → Secrets and variables → ActionsでRepository secret `IAM_ARN_TO_PUSH_IMAGE`へ`github_ecr_push_role_arn`の値を設定してください。ビルド先は`linux/amd64`で、GitHub Actionsのビルドキャッシュを利用します。ビルド後のSummaryへイメージのダイジェストを記録します。短時間に連続pushした場合は同じ環境の実行を直列化し、待機中の古い実行が新しい実行に置き換わることがあります。ECSへの反映はこのワークフローには含まれません。
 
-VPC・ECS・ECR・IAM・CloudWatch Logsモジュールと環境別rootのTerraformテストは、`bun run tf:aws:test:init`でテスト用のproviderを初期化してから`bun run tf:aws:test`で実行します。`tf:aws:test:vpc`はSG、`tf:aws:test:ecs`はタスク定義・タスク用IAMロール・ECSサービス・ALBのテストも含みます。テストはAWSをモックするためAWS認証情報は不要です。VPC・ECS・ECR・CloudWatch Logsの初期化はルートの`infra/aws/.terraform/providers`をproviderの取得元に使うため、先に`bun run tf:aws:init`または`bun run tf:aws:init:no-backend`を実行しておく必要があります。`tf:aws:test`はCIの`Terraform Checks`でも実行します。
+VPC・ECS・ECR・IAM・CloudWatch Logsモジュールと環境別rootのTerraformテストは、`bun run tf:aws:test:init`でテスト用のproviderを初期化してから`bun run tf:aws:test`で実行します。`tf:aws:test:vpc`はSG、`tf:aws:test:ecs`はタスク定義・タスク用IAMロール・ECSサービス・ALBのテストも含みます。テストはAWSをモックするためAWS認証情報は不要です。VPC・ECS・ECR・CloudWatch Logsの初期化はルートの`infra/aws/.terraform/providers`をproviderの取得元に使うため、先に`bun run tf:aws:init`または`bun run tf:aws:init:no-backend`を実行しておく必要があります。`tf:aws:test`はCIの`Terraform AWS Checks`でも実行します。
 
 ローカルではAWS CLIのprofileで対象AWSアカウントを確認してから`tf:aws:init`を実行し、`bun run tf:aws:workspace:dev`で`dev` workspaceを選択してから`tf:aws:plan` / `tf:aws:apply`を実行してください。`bun run tf:aws:init`はS3 backendへ接続するため、AWS認証情報が未設定の状態では失敗します。CIの静的検証では`TF_WORKSPACE=dev`と`bun run tf:aws:init:no-backend`を使用し、remote backendへ接続しません。stg / prod環境を追加する場合は、対応するworkspaceを作成してstateを分離してください。
 
