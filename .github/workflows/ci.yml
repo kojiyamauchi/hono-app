@@ -59,8 +59,8 @@ jobs:
       - name: Do ${{ matrix.job_name }}
         run: bun run ${{ matrix.script }}
 
-  terraform:
-    name: Terraform Checks
+  terraform-aws:
+    name: Terraform AWS Checks
     runs-on: ubuntu-latest
     env:
       TF_WORKSPACE: dev
