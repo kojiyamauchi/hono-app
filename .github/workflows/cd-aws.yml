@@ -1,4 +1,4 @@
-name: build-and-push-container-image
+name: AWS Image Build and Push
 on:
   push:
     branches:
@@ -20,10 +20,12 @@ permissions:
   id-token: write
   contents: read
 concurrency:
-  group: ${{ github.workflow }}-${{ inputs.environment || 'dev' }}
+  # workflow名の変更後も既存の同時実行グループを維持するため、旧workflow名の値で固定する。
+  group: build-and-push-container-image-${{ inputs.environment || 'dev' }}
   cancel-in-progress: false
 jobs:
-  build-and-push-container-image:
+  build-and-push-aws-image:
+    name: AWS Image Build and Push
     timeout-minutes: 15
     runs-on: ubuntu-latest
     steps:
