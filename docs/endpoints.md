@@ -99,7 +99,7 @@ GCPのdev環境では、以下を含む全エンドポイントへのアクセ�
 - 一覧は `createdAt DESC, id DESC` の新しい順で、queryは `limit`（既定20、1〜100）と `cursor` のみです。`offset` などの未知のqueryや空文字・空白は400です。
 - 判定順は 401（認証）→ 400（パスパラメータ）→ 404（組織が存在しない、または未所属）→ 403（MEMBERによる書き込み。bodyの検証より先に確定する）→ 400（body / query）→ 404（対象プロジェクトなし。別組織のIDを含む。削除済みへの再削除も404）です。MEMBERの書き込みは対象の有無にかかわらず403です。
 - 作成・更新・削除は、トランザクション内でロック取得後の最新の所属・ロールで再判定します。組織または所属が消えていれば404、MEMBERへ降格していれば403、対象プロジェクトが消えていれば404です。
-- プロジェクト操作の監査ログは記録しません。
+- 作成・実変更・完全削除は、同じトランザクションで監査ログ（`PROJECT_CREATED` / `PROJECT_UPDATED` / `PROJECT_DELETED`）に記録します。記録に失敗した場合は作成・更新・削除も取り消され500です。同値のPATCH（名前・説明がすべて保存済みの値と同じ）は200で `updatedAt` を更新しますが、監査ログは作りません。詳細は[Organization Audit Logs](#organization-audit-logs)を参照してください。
 
 ## Organization Audit Logs
 
@@ -109,12 +109,15 @@ GCPのdev環境では、以下を含む全エンドポイントへのアクセ�
 
 監査ログの記録対象と閲覧の仕様は次のとおりです。
 
-- 記録するのは次の3種類のイベントだけです。
+- 記録するのは次の6種類のイベントだけです。
   - `MEMBER_ROLE_CHANGED`: `PATCH /organizations/:id/members/:membershipId` で**実際にロールが変わったとき**。同じロールを指定した場合（200）や、権限不足・OWNER対象などで拒否された場合は記録しません。
   - `OWNERSHIP_TRANSFERRED`: `POST /organizations/:id/transfer-ownership` で**移譲が成立したとき**（204）。移譲先の昇格と移譲元の降格をまとめて1回の操作として1件記録します。認可・入力・対象・競合のエラーでは記録しません。
   - `MEMBER_REMOVED`: `DELETE /organizations/:id/members/:membershipId` で**管理者による削除が成立したとき**（204）。入力・認可・対象のエラー（400・401・403・404・409）では記録しません。同時に自主脱退と競合した場合は、先に確定した側だけが成立し、管理者による削除が先に成立したときだけ1件記録します（後続の自主脱退は404）。
-  - メンバーの追加、自主脱退（`DELETE /organizations/:id/members/me`）、アカウント削除に伴うメンバーシップの消滅、招待は記録対象外です。過去の移譲・削除は遡って記録しません。
-- イベント種別ごとの項目の意味は次のとおりです。
+  - `PROJECT_CREATED`: `POST /organizations/:id/projects` で作成が成立したとき（201）。
+  - `PROJECT_UPDATED`: `PATCH /organizations/:id/projects/:projectId` で**名前または説明が実際に変化したとき**。名前と説明を同時に変えても1件です。名前は入力検証後（前後の空白除去後）の値、説明は `null` と空文字を区別して比較します。指定項目がすべて同値なら200で `updatedAt` だけ更新し、記録しません。
+  - `PROJECT_DELETED`: `DELETE /organizations/:id/projects/:projectId` で個別の完全削除が成立したとき（204）。削除済みへの再削除（404）は記録しません。組織の削除によるプロジェクトのcascade削除では、プロジェクトごとの削除イベントを作りません（組織の削除で記録も削除されます）。
+  - メンバーの追加、自主脱退（`DELETE /organizations/:id/members/me`）、アカウント削除に伴うメンバーシップの消滅、招待、プロジェクトの閲覧は記録対象外です。過去の移譲・削除・プロジェクト操作は遡って記録しません。
+- メンバー操作3種のイベントごとの項目の意味は次のとおりです。
 
   | 項目                 | `MEMBER_ROLE_CHANGED`        | `OWNERSHIP_TRANSFERRED`                                                 | `MEMBER_REMOVED`                                                |
   | -------------------- | ---------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------- |
@@ -124,10 +127,32 @@ GCPのdev環境では、以下を含む全エンドポイントへのアクセ�
   | `previousRole`       | 対象の変更前のロール         | ロック取得後に確認した移譲先の変更前のロール（`ADMIN` または `MEMBER`） | ロック取得後に確認した削除前のロール（`ADMIN` または `MEMBER`） |
   | `newRole`            | 対象の変更後のロール         | 常に `OWNER`（移譲元がOWNERからADMINになったことも表す）                | 常に `null`（変更後のロールが存在しない）                       |
 
-- ロールの更新・メンバーの削除と記録は同じトランザクションで確定します。記録に失敗した場合はロールの更新（所有権移譲では移譲先と移譲元の両方の更新）やメンバーの削除も取り消され、500を返します。メンバー削除は、ロール変更・所有権移譲・自主脱退と行ロックで直列化され、確定後の最新のロールで認可と記録を行います。
-- 3種のイベントは同じ一覧に混在して返り、並び順（`createdAt DESC, id DESC`）・カーソル・閲覧権限はイベント種別によらず共通です。
-- レスポンスは `{ items, nextCursor }` です。各itemは `id`・`organizationId`・`action`・`actorUserId`・`targetUserId`・`targetMembershipId`・`previousRole`・`newRole`・`createdAt`（ISO 8601）を持ちます。`newRole` は常にキーを返し、`MEMBER_REMOVED` では `null`、ほかの2種ではロールの値です（DBのCHECK制約で `MEMBER_REMOVED` のときだけ `null` を許可します）。氏名・メールアドレス・認証情報は保存せず、ユーザーとメンバーシップのIDは記録時点の値です。
-- 対象メンバーの削除・脱退や、操作者・対象のアカウント削除後も、組織が残る間は記録を閲覧できます。組織を削除すると記録も削除されます。
+- プロジェクト操作3種は、共通項目に加えて `projectId`（記録時点のID。外部キーではなく、プロジェクト削除後も残る）と、名前・説明のスナップショット `before` / `after` を持ちます。スナップショットは `{ "name": string, "description": string | null }` の2キーだけで、更新では省略した項目も含めて操作前後の両方を保存します。`PROJECT_CREATED` は `before: null`、`PROJECT_DELETED` は `after: null` です（キーは省略されません）。`actorUserId` は操作者です。DBに保存済みの値をそのまま記録し、API入力の文字数上限を超える既存値も切り詰めません。
+
+  ```json
+  {
+    "id": 501,
+    "organizationId": 10,
+    "action": "PROJECT_UPDATED",
+    "actorUserId": 7,
+    "createdAt": "2026-11-13T12:00:00.000Z",
+    "projectId": 42,
+    "before": { "name": "旧名称", "description": null },
+    "after": { "name": "新名称", "description": "" }
+  }
+  ```
+
+- ロールの更新・メンバーの削除・プロジェクトの作成/更新/削除と記録は同じトランザクションで確定します。記録に失敗した場合はロールの更新（所有権移譲では移譲先と移譲元の両方の更新）やメンバーの削除、プロジェクトの作成・更新・削除も取り消され、500を返します。メンバー削除は、ロール変更・所有権移譲・自主脱退と行ロックで直列化され、確定後の最新のロールで認可と記録を行います。プロジェクト操作は、組織 → 操作者のメンバーシップ → 対象プロジェクトの順にロックし、ロック取得後の最新のロールで認可し、ロック後のDB値を `before`、保存後の値を `after` として記録します。同一プロジェクトの同時更新では、先に確定した更新の `after` が後続の更新の `before` に反映されます。
+- 6種のイベントは同じ一覧に混在して返り、並び順（`createdAt DESC, id DESC`）・カーソル・閲覧権限（OWNER / ADMINのみ。プロジェクトを閲覧できるMEMBERにも監査ログの閲覧権限は付きません）はイベント種別によらず共通です。`createdAt` は記録日時（トランザクション開始時刻）で、一覧の順序は操作の確定順を保証しません（[pagination.md](pagination.md#カーソル式-監査ログ一覧)を参照）。
+- レスポンスは `{ items, nextCursor }` です。各itemは `action` で区別できる次のいずれかの形です。
+  - メンバー操作3種（`MEMBER_ROLE_CHANGED` / `OWNERSHIP_TRANSFERRED` / `MEMBER_REMOVED`）: `id`・`organizationId`・`action`・`actorUserId`・`targetUserId`・`targetMembershipId`・`previousRole`・`newRole`・`createdAt`（ISO 8601）。`newRole` は常にキーを返し、`MEMBER_REMOVED` では `null`、ほかの2種ではロールの値です。プロジェクト向けのキーは含みません。
+  - プロジェクト操作3種: `id`・`organizationId`・`action`・`actorUserId`・`createdAt`・`projectId`・`before`・`after`。メンバー向けのキーは含みません。
+
+  DBのCHECK制約で、イベントごとの必須項目・null条件・スナップショットの形状を担保します。氏名・メールアドレス・認証情報は保存せず、ユーザー・メンバーシップ・プロジェクトのIDは記録時点の値です。
+- クライアントへの影響は次の2点を分けて確認してください。
+  - 既存3イベントの実行時のJSON（項目・値の意味）は変わりません。
+  - `action` の値が3種から6種に増え、OpenAPIの `AuditLog` コンポーネントは単一のobjectから6つのコンポーネント（`MemberRoleChangedAuditLog` / `OwnershipTransferredAuditLog` / `MemberRemovedAuditLog` / `ProjectCreatedAuditLog` / `ProjectUpdatedAuditLog` / `ProjectDeletedAuditLog`）の `oneOf`（`action` が判別子）に変わります。生成クライアントでは型の構造・参照先が変わり得るため、enumや `action` の網羅判定（未知の `action` を想定した分岐）の更新と、型の再生成が必要です。
+- 対象メンバーの削除・脱退や、操作者・対象のアカウント削除、プロジェクトの完全削除後も、組織が残る間は記録を閲覧できます。組織を削除すると記録も削除されます。
 - ステータスは、未認証401、不正な組織ID・不正なquery（未対応の `offset`、不正なlimit・cursorを含む）400、未所属または存在しない組織404、所属MEMBER403です。確認の順序は 認証 → パス検証 → 所属確認 → ロール確認 → query検証 です。
 
 ## Organization Invitations
