@@ -154,6 +154,23 @@ curl -H "Authorization: Bearer $ACCESS_TOKEN" \
 
 上の例のように、`MEMBER_ROLE_CHANGED`（id 11）と `OWNERSHIP_TRANSFERRED`（id 12）は同じ一覧に混在し、イベント種別に関係なく同じ並び順とカーソルで取得します。`MEMBER_REMOVED`（管理者によるメンバー削除）も同じ一覧に混在します。項目の意味はイベント種別ごとに異なります（[endpoints.md](endpoints.md#organization-audit-logs) を参照）。この例の `OWNERSHIP_TRANSFERRED` は、ユーザー1（移譲元のOWNER、移譲後はADMIN）が、メンバーシップ40のユーザー5（移譲前はADMIN）へ所有権を移譲したことを表します。
 
+プロジェクトの作成・更新・削除（`PROJECT_CREATED` / `PROJECT_UPDATED` / `PROJECT_DELETED`）も同じ一覧に混在し、既存の3イベントと合わせて6種のイベントを同じ並び順とカーソルで取得します。プロジェクトイベントのitemは、共通項目に加えて `projectId` と、名前・説明のスナップショット `before` / `after` を返します（メンバー向けの項目は返しません）。
+
+```json
+{
+  "id": 14,
+  "organizationId": 1,
+  "action": "PROJECT_UPDATED",
+  "actorUserId": 1,
+  "createdAt": "2026-02-04T09:00:00.000Z",
+  "projectId": 42,
+  "before": { "name": "旧名称", "description": null },
+  "after": { "name": "新名称", "description": "" }
+}
+```
+
+`createdAt` は記録日時で、DBの既定値（`CURRENT_TIMESTAMP`）によりトランザクション開始時刻になります。そのため、ロック待ちが発生すると、操作の確定順と `createdAt` の順が逆になることがあります。一覧の `createdAt DESC, id DESC` の順序は操作の確定順を保証せず、`id` だけで組織をまたいだ確定順を保証することもできません。同一プロジェクトの更新の `before` / `after`（名前・説明）は、先に確定した更新の `after` が後続の更新の `before` に反映される連続性を保ちますが、これは一覧の表示順とは別の性質です。また、ページ間のスナップショット一貫性（ページ取得の間に追加された記録の扱い）は保証しません。
+
 `MEMBER_REMOVED` のitemは、`newRole` が常に `null` になります（キーは省略されません）。次の例は、ユーザー1がメンバーシップ41のユーザー6（削除前はMEMBER）を削除した記録です。
 
 ```json

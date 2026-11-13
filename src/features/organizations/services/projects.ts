@@ -3,7 +3,7 @@ import { AppError } from '@/utils/errors'
 
 import type { ProjectDtoType, ProjectListDtoType } from '../dtos/projects'
 import { decodeProjectCursor, encodeProjectCursor, toProjectListResponse, toProjectResponse } from '../mappers/projects'
-import { type ProjectPageBoundary, projectRepository, projectWriteResults } from '../repositories/projects'
+import { type ProjectPageBoundary, projectRepository, projectWriteResults, type ShouldRecordProjectUpdate } from '../repositories/projects'
 
 /** プロジェクト作成の入力。`description` を省略した場合はnullとして保存する。 */
 export type CreateProjectInput = {
@@ -28,6 +28,13 @@ const authorizeProjectWrite = (operatorRole: Role): AppError | null => {
   }
   return new AppError(403, 'この操作には管理者以上の権限が必要です')
 }
+
+/**
+ * プロジェクト更新を監査ログへ記録するかを判定する（実変更の基準）。
+ * ロック後のDB値（before）と保存後の値（after）を比較し、名前または説明のいずれかが異なるときだけ記録する。
+ * 説明は null と空文字を区別して比較する。`updatedAt` だけの変化（同値PATCH）は記録条件に含めない。
+ */
+const shouldRecordProjectUpdate: ShouldRecordProjectUpdate = ({ before, after }) => before.name !== after.name || before.description !== after.description
 
 /**
  * 書き込み系repositoryの失敗結果（成功以外）をAppErrorへ変換する。
@@ -119,6 +126,7 @@ export const projectsService = {
         },
       },
       (locked) => authorizeProjectWrite(locked.operatorRole),
+      shouldRecordProjectUpdate,
     )
 
     if (result.status === projectWriteResults.succeeded) {

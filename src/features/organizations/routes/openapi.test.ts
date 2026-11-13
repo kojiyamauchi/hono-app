@@ -179,30 +179,104 @@ describe('organizations routes OpenAPI定義', () => {
     }
   })
 
-  test('AuditLogのactionに3種のイベント種別が含まれ、イベント種別ごとの項目の意味がdescriptionに出る', async () => {
-    const doc = await fetchOpenApiDoc()
+  describe('AuditLog（6イベントのunion）', () => {
+    type Property = { enum?: string[]; type?: string | string[]; description?: string; $ref?: string }
+    type EventSchema = { type?: string; properties: Record<string, Property>; required?: string[] }
+    type Union = { oneOf?: { $ref: string }[]; discriminator?: { propertyName: string; mapping: Record<string, string> } }
 
-    type Property = { enum?: (string | null)[]; type?: string | string[]; anyOf?: unknown[]; nullable?: boolean; description?: string }
-    const auditLog = doc.components?.schemas?.AuditLog as { properties: Record<string, Property>; required?: string[] }
+    const eventComponents = {
+      MEMBER_ROLE_CHANGED: 'MemberRoleChangedAuditLog',
+      OWNERSHIP_TRANSFERRED: 'OwnershipTransferredAuditLog',
+      MEMBER_REMOVED: 'MemberRemovedAuditLog',
+      PROJECT_CREATED: 'ProjectCreatedAuditLog',
+      PROJECT_UPDATED: 'ProjectUpdatedAuditLog',
+      PROJECT_DELETED: 'ProjectDeletedAuditLog',
+    } as const
 
-    expect(auditLog.properties.action.enum).toEqual(['MEMBER_ROLE_CHANGED', 'OWNERSHIP_TRANSFERRED', 'MEMBER_REMOVED'])
-    for (const name of ['actorUserId', 'previousRole', 'newRole']) {
-      expect(auditLog.properties[name].description).toContain('MEMBER_ROLE_CHANGED')
-      expect(auditLog.properties[name].description).toContain('OWNERSHIP_TRANSFERRED')
-      expect(auditLog.properties[name].description).toContain('MEMBER_REMOVED')
-    }
-    expect(auditLog.properties.actorUserId.description).toContain('移譲元')
-    expect(auditLog.properties.newRole.description).toContain('OWNER')
+    const eventSchema = (doc: Awaited<ReturnType<typeof fetchOpenApiDoc>>, name: string): EventSchema => doc.components?.schemas?.[name] as EventSchema
 
-    // newRoleは常にキーを返し、MEMBER_REMOVEDではnullになるためrequiredのまま、OpenAPI 3.1のJSON Schemaとしてnullを許容する型で公開する
-    // 説明文中の「null」で通らないよう、生成されたtypeとenumを個別に検証する
-    expect(auditLog.required).toContain('newRole')
-    expect(auditLog.properties.newRole.type).toEqual(['string', 'null'])
-    expect(auditLog.properties.newRole.enum).toEqual([...roleValues, null])
+    test('AuditLogは6 componentのoneOfで、actionを判別子とするdiscriminatorが各componentへ対応する', async () => {
+      const doc = await fetchOpenApiDoc()
+      const union = doc.components?.schemas?.AuditLog as Union
 
-    const auditLogsGet = doc.paths?.['/organizations/{id}/audit-logs']?.get as { description?: string }
-    expect(auditLogsGet.description).toContain('OWNERSHIP_TRANSFERRED')
-    expect(auditLogsGet.description).toContain('MEMBER_REMOVED')
+      expect(union.oneOf?.map((entry) => entry.$ref)).toEqual(Object.values(eventComponents).map((name) => `#/components/schemas/${name}`))
+      expect(union.discriminator?.propertyName).toBe('action')
+      expect(union.discriminator?.mapping).toEqual(
+        Object.fromEntries(Object.entries(eventComponents).map(([action, name]) => [action, `#/components/schemas/${name}`])),
+      )
+      // 一覧はAuditLogの配列を参照する
+      const list = doc.components?.schemas?.AuditLogList as { properties: { items: { items: { $ref: string } } } }
+      expect(list.properties.items.items.$ref).toBe('#/components/schemas/AuditLog')
+    })
+
+    test('各イベントcomponentのactionは対応する単一値に固定される', async () => {
+      const doc = await fetchOpenApiDoc()
+
+      for (const [action, name] of Object.entries(eventComponents)) {
+        expect(eventSchema(doc, name).properties.action.enum).toEqual([action])
+        expect(eventSchema(doc, name).required).toContain('action')
+      }
+    })
+
+    test('既存3イベントはメンバー向け項目が必須でプロジェクト向け項目を持たず、MEMBER_REMOVEDのnewRoleはnull型、他2種はロール値', async () => {
+      const doc = await fetchOpenApiDoc()
+      const memberRequired = ['id', 'organizationId', 'action', 'actorUserId', 'createdAt', 'targetUserId', 'targetMembershipId', 'previousRole', 'newRole']
+
+      for (const name of ['MemberRoleChangedAuditLog', 'OwnershipTransferredAuditLog', 'MemberRemovedAuditLog']) {
+        const schema = eventSchema(doc, name)
+        expect([...(schema.required ?? [])].sort()).toEqual([...memberRequired].sort())
+        for (const key of ['projectId', 'before', 'after', 'projectBefore', 'projectAfter']) {
+          expect(schema.properties).not.toHaveProperty(key)
+        }
+      }
+      expect(eventSchema(doc, 'MemberRoleChangedAuditLog').properties.newRole.enum).toEqual([...roleValues])
+      expect(eventSchema(doc, 'OwnershipTransferredAuditLog').properties.newRole.enum).toEqual([...roleValues])
+      // 説明文中の「null」で通らないよう、生成されたtypeを個別に検証する
+      expect(eventSchema(doc, 'MemberRemovedAuditLog').properties.newRole.type).toBe('null')
+      expect(eventSchema(doc, 'OwnershipTransferredAuditLog').properties.actorUserId.description).toContain('移譲元')
+    })
+
+    test('プロジェクト3イベントは共通項目 + projectId + before + after が必須でメンバー向け項目を持たず、nullを型で表現する', async () => {
+      const doc = await fetchOpenApiDoc()
+      const projectRequired = ['id', 'organizationId', 'action', 'actorUserId', 'createdAt', 'projectId', 'before', 'after']
+
+      for (const name of ['ProjectCreatedAuditLog', 'ProjectUpdatedAuditLog', 'ProjectDeletedAuditLog']) {
+        const schema = eventSchema(doc, name)
+        expect([...(schema.required ?? [])].sort()).toEqual([...projectRequired].sort())
+        for (const key of ['targetUserId', 'targetMembershipId', 'previousRole', 'newRole', 'projectBefore', 'projectAfter']) {
+          expect(schema.properties).not.toHaveProperty(key)
+        }
+      }
+      // 作成のbefore、削除のafterはnull型。それ以外はスナップショット参照
+      expect(eventSchema(doc, 'ProjectCreatedAuditLog').properties.before.type).toBe('null')
+      expect(eventSchema(doc, 'ProjectCreatedAuditLog').properties.after.$ref).toBe('#/components/schemas/ProjectAuditSnapshot')
+      expect(eventSchema(doc, 'ProjectDeletedAuditLog').properties.after.type).toBe('null')
+      expect(eventSchema(doc, 'ProjectDeletedAuditLog').properties.before.$ref).toBe('#/components/schemas/ProjectAuditSnapshot')
+      expect(JSON.stringify(eventSchema(doc, 'ProjectUpdatedAuditLog').properties.before)).toContain('#/components/schemas/ProjectAuditSnapshot')
+      expect(JSON.stringify(eventSchema(doc, 'ProjectUpdatedAuditLog').properties.after)).toContain('#/components/schemas/ProjectAuditSnapshot')
+    })
+
+    test('ProjectAuditSnapshotはnameとdescriptionを必須とし、descriptionはstring | nullで文字数制約を持たない', async () => {
+      const doc = await fetchOpenApiDoc()
+      const snapshot = doc.components?.schemas?.ProjectAuditSnapshot as EventSchema
+
+      expect([...(snapshot.required ?? [])].sort()).toEqual(['description', 'name'])
+      expect(Object.keys(snapshot.properties).sort()).toEqual(['description', 'name'])
+      expect(snapshot.properties.description.type).toEqual(['string', 'null'])
+      expect(snapshot.properties.name).not.toHaveProperty('maxLength')
+      expect(snapshot.properties.name).not.toHaveProperty('minLength')
+      expect(snapshot.properties.description).not.toHaveProperty('maxLength')
+    })
+
+    test('一覧の説明に6イベントとcreatedAt・順序の注意が含まれる', async () => {
+      const doc = await fetchOpenApiDoc()
+
+      const auditLogsGet = doc.paths?.['/organizations/{id}/audit-logs']?.get as { description?: string }
+      for (const action of Object.keys(eventComponents)) {
+        expect(auditLogsGet.description).toContain(action)
+      }
+      expect(auditLogsGet.description).toContain('確定順を保証しない')
+    })
   })
 
   test('組織IDの上限（maximum）は監査ログ一覧のpath parameterだけに出て、他の組織ルートには出ない', async () => {

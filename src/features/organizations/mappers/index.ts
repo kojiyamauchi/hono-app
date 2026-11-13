@@ -1,10 +1,11 @@
-import type { Membership } from '@/shared/membership/entities'
+import type { Membership, Role } from '@/shared/membership/entities'
 import { toMemberResponse } from '@/shared/membership/mappers'
 import type { Organization } from '@/shared/organization/entities'
 import { toOrganizationResponse } from '@/shared/organization/mappers'
 
 import type { AuditLogDtoType, AuditLogListDtoType, MemberListDtoType, OrganizationListDtoType } from '../dtos'
-import type { AuditLog } from '../entities'
+import type { AuditLog, MemberRemovedAuditLog, MemberRoleChangedAuditLog, OwnershipTransferredAuditLog } from '../entities'
+import type { ProjectSnapshot } from '../entities/projects'
 import {
   AUDIT_LOG_CURSOR_KIND,
   AUDIT_LOG_CURSOR_VERSION,
@@ -112,20 +113,72 @@ export const decodeAuditLogCursor = (raw: string): AuditLogCursorBoundary | null
   }
 }
 
+type MemberAuditLog = MemberRoleChangedAuditLog | OwnershipTransferredAuditLog | MemberRemovedAuditLog
+
+/** 想定外のeventが追加されたときにコンパイルエラーにし、実行時には暗黙の変換をせず例外にする。 */
+const assertNever = (value: never): never => {
+  throw new Error(`未対応の監査ログです: ${JSON.stringify(value)}`)
+}
+
+/** メンバー操作イベント共通の対象項目をDTO形式へ変換する。 */
+const toMemberTargetResponse = (auditLog: MemberAuditLog): { targetUserId: number; targetMembershipId: number; previousRole: Role } => ({
+  targetUserId: auditLog.targetUserId,
+  targetMembershipId: auditLog.targetMembershipId,
+  previousRole: auditLog.previousRole,
+})
+
+/** プロジェクトのスナップショットを、name・descriptionの2キーだけのDTOへ変換する（空文字とnullは区別して保持する）。 */
+const toProjectSnapshotResponse = (snapshot: ProjectSnapshot): { name: string; description: string | null } => ({
+  name: snapshot.name,
+  description: snapshot.description,
+})
+
 /**
  * 監査ログをレスポンス用DTOへ変換する。`createdAt` はISO 8601の日時文字列にする。
  */
 export const toAuditLogResponse = (auditLog: AuditLog): AuditLogDtoType => {
-  return {
+  const common = {
     id: auditLog.id,
     organizationId: auditLog.organizationId,
-    action: auditLog.action,
     actorUserId: auditLog.actorUserId,
-    targetUserId: auditLog.targetUserId,
-    targetMembershipId: auditLog.targetMembershipId,
-    previousRole: auditLog.previousRole,
-    newRole: auditLog.newRole,
     createdAt: auditLog.createdAt.toISOString(),
+  }
+
+  // 既存3イベントはメンバー向け項目だけ、プロジェクトイベントはprojectId・before・afterだけを返す（互いのキーを持ち込まない）。
+  // projectBefore / projectAfter は before / after へ変換し、両キーを必ず返す（存在しない側はnull）。
+  switch (auditLog.action) {
+    case 'MEMBER_ROLE_CHANGED':
+      return { ...common, action: auditLog.action, ...toMemberTargetResponse(auditLog), newRole: auditLog.newRole }
+    case 'OWNERSHIP_TRANSFERRED':
+      return { ...common, action: auditLog.action, ...toMemberTargetResponse(auditLog), newRole: auditLog.newRole }
+    case 'MEMBER_REMOVED':
+      return { ...common, action: auditLog.action, ...toMemberTargetResponse(auditLog), newRole: null }
+    case 'PROJECT_CREATED':
+      return {
+        ...common,
+        action: auditLog.action,
+        projectId: auditLog.projectId,
+        before: null,
+        after: toProjectSnapshotResponse(auditLog.projectAfter),
+      }
+    case 'PROJECT_UPDATED':
+      return {
+        ...common,
+        action: auditLog.action,
+        projectId: auditLog.projectId,
+        before: toProjectSnapshotResponse(auditLog.projectBefore),
+        after: toProjectSnapshotResponse(auditLog.projectAfter),
+      }
+    case 'PROJECT_DELETED':
+      return {
+        ...common,
+        action: auditLog.action,
+        projectId: auditLog.projectId,
+        before: toProjectSnapshotResponse(auditLog.projectBefore),
+        after: null,
+      }
+    default:
+      return assertNever(auditLog)
   }
 }
 

@@ -12,6 +12,7 @@ const projectCreate = mock()
 const projectUpdate = mock()
 const projectDeleteMany = mock()
 const projectFindFirst = mock()
+const auditLogCreate = mock()
 
 await mock.module('@/libs/prisma', () => ({
   prisma: { $transaction: transaction, $queryRaw: pageQueryRaw, project: { findFirst: projectFindFirst } },
@@ -116,9 +117,14 @@ describe('projectRepository の書き込み', () => {
     projectCreate.mockReset()
     projectUpdate.mockReset()
     projectDeleteMany.mockReset()
+    auditLogCreate.mockReset()
     transaction.mockReset()
     transaction.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) =>
-      callback({ $queryRaw: queryRaw, project: { create: projectCreate, update: projectUpdate, deleteMany: projectDeleteMany } }),
+      callback({
+        $queryRaw: queryRaw,
+        project: { create: projectCreate, update: projectUpdate, deleteMany: projectDeleteMany },
+        auditLog: { create: auditLogCreate },
+      }),
     )
   })
 
@@ -142,6 +148,41 @@ describe('projectRepository の書き込み', () => {
       // 認可コールバックはロック後の最新ロールを受け取る
       expect(authorize).toHaveBeenCalledWith({ operatorRole: role })
       expect(projectCreate).toHaveBeenCalledWith({ data: { organizationId: 1, name: 'Alpha', description: null } })
+    })
+
+    test('作成と同じtransaction内で、実際に保存された値をafterとするPROJECT_CREATEDを1件記録する（beforeは持たない）', async () => {
+      prepareLocks('OWNER')
+      // 保存結果（DBが返した値）が入力と異なっても、保存結果を記録する
+      projectCreate.mockResolvedValue({ ...project, name: 'Saved', description: '' })
+
+      await projectRepository.createWithAuthorization(input, allow)
+
+      expect(transaction).toHaveBeenCalledTimes(1)
+      expect(auditLogCreate).toHaveBeenCalledTimes(1)
+      expect(auditLogCreate).toHaveBeenCalledWith({
+        data: { organizationId: 1, action: 'PROJECT_CREATED', actorUserId: 3, projectId: 7, projectAfter: { name: 'Saved', description: '' } },
+      })
+      expect(auditLogCreate.mock.calls[0]?.[0].data).not.toHaveProperty('projectBefore')
+    })
+
+    test('組織なし・所属なし・認可拒否では作成も記録もしない', async () => {
+      prepareLocks(null, false)
+      await projectRepository.createWithAuthorization(input, allow)
+      prepareLocks(null)
+      await projectRepository.createWithAuthorization(input, allow)
+      prepareLocks('MEMBER')
+      await projectRepository.createWithAuthorization(input, () => 'forbidden')
+
+      expect(projectCreate).not.toHaveBeenCalled()
+      expect(auditLogCreate).not.toHaveBeenCalled()
+    })
+
+    test('監査ログのINSERTに失敗した場合はそのままthrowする（作成もrollbackされる）', async () => {
+      prepareLocks('OWNER')
+      projectCreate.mockResolvedValue(project)
+      auditLogCreate.mockRejectedValue(new Error('ログINSERT失敗'))
+
+      await expect(projectRepository.createWithAuthorization(input, allow)).rejects.toThrow('ログINSERT失敗')
     })
 
     test('組織が存在しなければorganizationNotFoundを返し、作成しない', async () => {
@@ -178,14 +219,17 @@ describe('projectRepository の書き込み', () => {
 
   describe('updateWithAuthorization', () => {
     const input = { organizationId: 1, projectId: 7, actorUserId: 3, data: { name: 'Beta' } }
+    const lockedProject = { id: 7, name: 'Alpha', description: null }
+    const record = (): boolean => true
+    const skip = (): boolean => false
 
     test('Organization → Membership → Projectの順でロックし、Projectは組織IDとIDで絞ってFOR UPDATEする', async () => {
       prepareLocks('ADMIN')
-      queryRaw.mockResolvedValueOnce([{ id: 7 }])
+      queryRaw.mockResolvedValueOnce([lockedProject])
       projectUpdate.mockResolvedValue({ ...project, name: 'Beta' })
       const authorize = mock(allow)
 
-      const result = await projectRepository.updateWithAuthorization(input, authorize)
+      const result = await projectRepository.updateWithAuthorization(input, authorize, record)
 
       expect(result).toEqual({ status: projectWriteResults.succeeded, value: { ...project, name: 'Beta' } })
       expect(queryOf(0).sql).toContain('FROM "Organization"')
@@ -193,6 +237,7 @@ describe('projectRepository の書き込み', () => {
       expect(queryOf(2).sql).toContain('FROM "Project"')
       expect(queryOf(2).sql).toContain('"organizationId" =')
       expect(queryOf(2).sql).toContain('FOR UPDATE')
+      expect(queryOf(2).sql).toContain('SELECT id, name, description')
       expect(queryOf(2).values).toEqual([7, 1])
       expect(authorize).toHaveBeenCalledWith({ operatorRole: 'ADMIN' })
       // 最終UPDATEの条件にも組織IDとプロジェクトIDの両方を含める（whereの完全一致）
@@ -201,36 +246,83 @@ describe('projectRepository の書き込み', () => {
 
     test('指定された項目だけを更新する', async () => {
       prepareLocks('OWNER')
-      queryRaw.mockResolvedValueOnce([{ id: 7 }])
+      queryRaw.mockResolvedValueOnce([lockedProject])
       projectUpdate.mockResolvedValue(project)
 
-      await projectRepository.updateWithAuthorization({ ...input, data: { description: null } }, allow)
+      await projectRepository.updateWithAuthorization({ ...input, data: { description: null } }, allow, skip)
       expect(projectUpdate).toHaveBeenLastCalledWith({ where: { id: 7, organizationId: 1 }, data: { description: null } })
 
       prepareLocks('OWNER')
-      queryRaw.mockResolvedValueOnce([{ id: 7 }])
-      await projectRepository.updateWithAuthorization({ ...input, data: { name: 'B', description: '' } }, allow)
+      queryRaw.mockResolvedValueOnce([lockedProject])
+      await projectRepository.updateWithAuthorization({ ...input, data: { name: 'B', description: '' } }, allow, skip)
       expect(projectUpdate).toHaveBeenLastCalledWith({ where: { id: 7, organizationId: 1 }, data: { name: 'B', description: '' } })
     })
 
     test('MEMBERは対象Projectをロックする前に拒否される', async () => {
       prepareLocks('MEMBER')
 
-      const result = await projectRepository.updateWithAuthorization(input, () => 'forbidden')
+      const result = await projectRepository.updateWithAuthorization(input, () => 'forbidden', record)
 
       expect(result).toEqual({ status: projectWriteResults.rejected, rejection: 'forbidden' })
       expect(queryRaw).toHaveBeenCalledTimes(2)
       expect(projectUpdate).not.toHaveBeenCalled()
+      expect(auditLogCreate).not.toHaveBeenCalled()
     })
 
-    test('組織または所属がなければorganizationNotFound、ProjectがなければprojectNotFoundを返し更新しない', async () => {
+    test('組織または所属がなければorganizationNotFound、ProjectがなければprojectNotFoundを返し更新も記録もしない', async () => {
       prepareLocks(null)
-      expect(await projectRepository.updateWithAuthorization(input, allow)).toEqual({ status: projectWriteResults.organizationNotFound })
+      expect(await projectRepository.updateWithAuthorization(input, allow, record)).toEqual({ status: projectWriteResults.organizationNotFound })
 
       prepareLocks('OWNER')
       queryRaw.mockResolvedValueOnce([])
-      expect(await projectRepository.updateWithAuthorization(input, allow)).toEqual({ status: projectWriteResults.projectNotFound })
+      expect(await projectRepository.updateWithAuthorization(input, allow, record)).toEqual({ status: projectWriteResults.projectNotFound })
       expect(projectUpdate).not.toHaveBeenCalled()
+      expect(auditLogCreate).not.toHaveBeenCalled()
+    })
+
+    test('判定コールバックにはロック後のDB値（before）と保存後の値（after）を渡し、trueなら同じtransactionで両方を記録する', async () => {
+      prepareLocks('OWNER')
+      // ロック後のDB値は、リクエスト前に読んだ値とは無関係にこの値がbeforeになる
+      queryRaw.mockResolvedValueOnce([{ id: 7, name: 'Locked', description: 'old' }])
+      projectUpdate.mockResolvedValue({ ...project, name: 'Saved', description: null })
+      const shouldRecord = mock(record)
+
+      await projectRepository.updateWithAuthorization(input, allow, shouldRecord)
+
+      expect(shouldRecord).toHaveBeenCalledWith({ before: { name: 'Locked', description: 'old' }, after: { name: 'Saved', description: null } })
+      expect(transaction).toHaveBeenCalledTimes(1)
+      expect(auditLogCreate).toHaveBeenCalledTimes(1)
+      expect(auditLogCreate).toHaveBeenCalledWith({
+        data: {
+          organizationId: 1,
+          action: 'PROJECT_UPDATED',
+          actorUserId: 3,
+          projectId: 7,
+          projectBefore: { name: 'Locked', description: 'old' },
+          projectAfter: { name: 'Saved', description: null },
+        },
+      })
+    })
+
+    test('判定コールバックがfalse（実変更なし）なら更新は確定しログは作らない', async () => {
+      prepareLocks('OWNER')
+      queryRaw.mockResolvedValueOnce([lockedProject])
+      projectUpdate.mockResolvedValue(project)
+
+      const result = await projectRepository.updateWithAuthorization(input, allow, skip)
+
+      expect(result).toEqual({ status: projectWriteResults.succeeded, value: project })
+      expect(projectUpdate).toHaveBeenCalledTimes(1)
+      expect(auditLogCreate).not.toHaveBeenCalled()
+    })
+
+    test('監査ログのINSERTに失敗した場合はそのままthrowする（更新もrollbackされる）', async () => {
+      prepareLocks('OWNER')
+      queryRaw.mockResolvedValueOnce([lockedProject])
+      projectUpdate.mockResolvedValue({ ...project, name: 'Beta' })
+      auditLogCreate.mockRejectedValue(new Error('ログINSERT失敗'))
+
+      await expect(projectRepository.updateWithAuthorization(input, allow, record)).rejects.toThrow('ログINSERT失敗')
     })
   })
 
@@ -239,7 +331,7 @@ describe('projectRepository の書き込み', () => {
 
     test('Organization → Membership → Projectの順でロックし、組織IDとIDで絞って削除する', async () => {
       prepareLocks('OWNER')
-      queryRaw.mockResolvedValueOnce([{ id: 7 }])
+      queryRaw.mockResolvedValueOnce([{ id: 7, name: 'Alpha', description: null }])
       projectDeleteMany.mockResolvedValue({ count: 1 })
 
       const result = await projectRepository.removeWithAuthorization(input, allow)
@@ -248,6 +340,52 @@ describe('projectRepository の書き込み', () => {
       expect(queryOf(2).sql).toContain('FROM "Project"')
       expect(queryOf(2).values).toEqual([7, 1])
       expect(projectDeleteMany).toHaveBeenCalledWith({ where: { id: 7, organizationId: 1 } })
+    })
+
+    test('削除と同じtransaction内で、ロック後のDB値をbeforeとするPROJECT_DELETEDを1件記録する（afterは持たない）', async () => {
+      prepareLocks('ADMIN')
+      const longDescription = 'd'.repeat(5000)
+      queryRaw.mockResolvedValueOnce([{ id: 7, name: 'n'.repeat(300), description: longDescription }])
+      projectDeleteMany.mockResolvedValue({ count: 1 })
+
+      await projectRepository.removeWithAuthorization(input, allow)
+
+      expect(transaction).toHaveBeenCalledTimes(1)
+      expect(auditLogCreate).toHaveBeenCalledTimes(1)
+      // 入力上限を超える既存値も切り詰めずに記録する
+      expect(auditLogCreate).toHaveBeenCalledWith({
+        data: {
+          organizationId: 1,
+          action: 'PROJECT_DELETED',
+          actorUserId: 3,
+          projectId: 7,
+          projectBefore: { name: 'n'.repeat(300), description: longDescription },
+        },
+      })
+      expect(auditLogCreate.mock.calls[0]?.[0].data).not.toHaveProperty('projectAfter')
+    })
+
+    test('削除0件・Project不存在・認可拒否では記録しない', async () => {
+      prepareLocks('OWNER')
+      queryRaw.mockResolvedValueOnce([{ id: 7, name: 'Alpha', description: null }])
+      projectDeleteMany.mockResolvedValue({ count: 0 })
+      await projectRepository.removeWithAuthorization(input, allow)
+      prepareLocks('OWNER')
+      queryRaw.mockResolvedValueOnce([])
+      await projectRepository.removeWithAuthorization(input, allow)
+      prepareLocks('MEMBER')
+      await projectRepository.removeWithAuthorization(input, () => 'forbidden')
+
+      expect(auditLogCreate).not.toHaveBeenCalled()
+    })
+
+    test('監査ログのINSERTに失敗した場合はそのままthrowする（削除もrollbackされる）', async () => {
+      prepareLocks('OWNER')
+      queryRaw.mockResolvedValueOnce([{ id: 7, name: 'Alpha', description: null }])
+      projectDeleteMany.mockResolvedValue({ count: 1 })
+      auditLogCreate.mockRejectedValue(new Error('ログINSERT失敗'))
+
+      await expect(projectRepository.removeWithAuthorization(input, allow)).rejects.toThrow('ログINSERT失敗')
     })
 
     test('MEMBERは対象の有無を確認せずに拒否される', async () => {

@@ -203,6 +203,45 @@ describe('projectsService.update', () => {
     updateWithAuthorization.mockResolvedValue({ status: 'UNKNOWN' })
     await expect(projectsService.update(1, 5, 3, { name: 'B' })).rejects.toThrow('プロジェクト操作の結果が不明です')
   })
+
+  describe('監査ログの記録条件（実変更の判定）', () => {
+    type Snapshot = { name: string; description: string | null }
+    /** repositoryへ渡された記録判定コールバックを、指定のbefore / afterで実行する。 */
+    const decide = async (before: Snapshot, after: Snapshot): Promise<boolean> => {
+      updateWithAuthorization.mockResolvedValue({ status: 'SUCCEEDED', value: makeProject(5) })
+      await projectsService.update(1, 5, 3, { name: 'x' })
+      const shouldRecord = updateWithAuthorization.mock.calls[0]?.[2] as (change: { before: Snapshot; after: Snapshot }) => boolean
+      return shouldRecord({ before, after })
+    }
+
+    test('名前が変わるか説明が変わるとき、または両方が変わるときは記録する', async () => {
+      expect(await decide({ name: 'A', description: null }, { name: 'B', description: null })).toBe(true)
+      updateWithAuthorization.mockReset()
+      expect(await decide({ name: 'A', description: null }, { name: 'A', description: 'd' })).toBe(true)
+      updateWithAuthorization.mockReset()
+      expect(await decide({ name: 'A', description: 'x' }, { name: 'B', description: null })).toBe(true)
+    })
+
+    test('説明のnullと空文字は区別し、変化として記録する', async () => {
+      expect(await decide({ name: 'A', description: null }, { name: 'A', description: '' })).toBe(true)
+      updateWithAuthorization.mockReset()
+      expect(await decide({ name: 'A', description: '' }, { name: 'A', description: null })).toBe(true)
+    })
+
+    test('名前・説明がすべて同値なら記録しない（updatedAtだけの変化は対象外）', async () => {
+      expect(await decide({ name: 'A', description: 'd' }, { name: 'A', description: 'd' })).toBe(false)
+      updateWithAuthorization.mockReset()
+      expect(await decide({ name: 'A', description: null }, { name: 'A', description: null })).toBe(false)
+      updateWithAuthorization.mockReset()
+      expect(await decide({ name: 'A', description: '' }, { name: 'A', description: '' })).toBe(false)
+    })
+  })
+
+  test('監査ログ保存失敗などrepositoryの例外はAppErrorへ変換せずそのままthrowする（500になる）', async () => {
+    updateWithAuthorization.mockRejectedValue(new Error('ログINSERT失敗'))
+
+    await expect(projectsService.update(1, 5, 3, { name: 'B' })).rejects.toThrow('ログINSERT失敗')
+  })
 })
 
 describe('projectsService.remove', () => {
@@ -234,5 +273,11 @@ describe('projectsService.remove', () => {
 
     removeWithAuthorization.mockResolvedValue({ status: 'UNKNOWN' })
     await expect(projectsService.remove(1, 5, 3)).rejects.toThrow('プロジェクト操作の結果が不明です')
+  })
+
+  test('監査ログ保存失敗などrepositoryの例外はそのままthrowする（500になる）', async () => {
+    removeWithAuthorization.mockRejectedValue(new Error('ログINSERT失敗'))
+
+    await expect(projectsService.remove(1, 5, 3)).rejects.toThrow('ログINSERT失敗')
   })
 })
