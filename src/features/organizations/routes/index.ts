@@ -28,6 +28,7 @@ import {
   updateMemberRoleBodySchema,
   updateOrganizationSchema,
 } from '../schemas'
+import { organizationsProjectsRoutes } from './projects'
 
 /** JSONエラーレスポンス（`{ error: { message } }`）の共通定義を生成する。 */
 const errorResponse = (description: string): { content: { 'application/json': { schema: typeof errorResponseDto } }; description: string } => ({
@@ -469,7 +470,8 @@ const resendInvitationEmailRoute = createRoute({
  * 組織関連のルート（/organizations配下）。
  * すべて認証が必要。`/:id` 系は組織メンバーシップの確認も行う。
  * バリデーションエラー時は defaultHook で既存と同じ `{ error: { message } }`（400）を返す。
- * 静的パス（`/`）→ `/{id}` → `/{id}/members` 系 → `/{id}/audit-logs` → `/{id}/invitations` 系の順で登録する。
+ * 静的パス（`/`）→ `/{id}` → `/{id}/members` 系 → `/{id}/audit-logs` → `/{id}/invitations` 系の順で登録し、
+ * 最後に `/{id}/projects` 系（`routes/projects.ts`）をmountする。
  */
 export const organizationsRoutes = new OpenAPIHono({ defaultHook: openApiDefaultHook })
   .openapi(createRouteDef, (c) => organizationsController.create(c, c.get('userId'), c.req.valid('json')))
@@ -507,3 +509,4 @@ export const organizationsRoutes = new OpenAPIHono({ defaultHook: openApiDefault
   .openapi(resendInvitationEmailRoute, (c) =>
     organizationsInvitationsController.resendInvitationEmail(c, c.req.valid('param').id, c.req.valid('param').invitationId, c.get('userId')),
   )
+  .route('/', organizationsProjectsRoutes)
