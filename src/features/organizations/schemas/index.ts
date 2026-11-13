@@ -143,8 +143,8 @@ export const invitationRouteParamSchema = z.object({
  */
 const rejectBlankNumericQuery = (value: unknown): unknown => (value === null || (typeof value === 'string' && value.trim() === '') ? Number.NaN : value)
 
-/** ページネーション共通のlimit。省略時20、1〜100の整数。 */
-const paginationLimitSchema = z.preprocess(
+/** ページネーション共通のlimit。省略時20、1〜100の整数。プロジェクト一覧のschemaからも再利用するためexportする。 */
+export const paginationLimitSchema = z.preprocess(
   rejectBlankNumericQuery,
   z.coerce.number().int('limitは整数で指定してください').min(1, 'limitは1以上で指定してください').max(100, 'limitは100以下で指定してください').default(20),
 )
@@ -212,12 +212,12 @@ export const listAuditLogsQuerySchema = z
   })
 
 /**
- * カーソルの境界日時のスキーマ（メンバー一覧・監査ログ一覧で共通）。
+ * カーソルの境界日時のスキーマ（メンバー一覧・監査ログ一覧・プロジェクト一覧で共通。projects側からも参照するためexportする）。
  * `z.iso.datetime()` は4桁年を許容するため0年（`0000-01-01T00:00:00.000Z`）も通る。
  * PostgreSQLに0年は存在せず、Dateとしてバインドすると `22008 date/time field value out of range` で
  * 500になる。カーソルはクライアントが改変できる入力のため、DBへ渡す前にここで弾いて400にする。
  */
-const cursorCreatedAtSchema = z.iso.datetime().refine((value) => new Date(value).getUTCFullYear() >= 1, { error: 'カーソルの日時が範囲外です' })
+export const cursorCreatedAtSchema = z.iso.datetime().refine((value) => new Date(value).getUTCFullYear() >= 1, { error: 'カーソルの日時が範囲外です' })
 
 /** メンバー一覧カーソルのペイロード形式のバージョン。形式を変える場合はここを上げ、旧カーソルを不正として扱う。 */
 export const MEMBER_LIST_CURSOR_VERSION = 1
