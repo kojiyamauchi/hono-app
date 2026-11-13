@@ -188,7 +188,6 @@ describe('toAuditLogResponse / toAuditLogListResponse', () => {
 
   test('OWNERSHIP_TRANSFERREDの監査ログも同じ形でauditLogDto schemaに通る', () => {
     const transferred: AuditLog = { ...auditLog, id: 2, action: 'OWNERSHIP_TRANSFERRED', previousRole: 'ADMIN', newRole: 'OWNER' }
-
     const result = toAuditLogResponse(transferred)
 
     expect(result).toEqual({ ...transferred, createdAt: '2026-01-01T00:00:00.000Z' })
@@ -203,6 +202,137 @@ describe('toAuditLogResponse / toAuditLogListResponse', () => {
     expect(result).toEqual({ ...removed, createdAt: '2026-01-01T00:00:00.000Z' })
     expect(result).toHaveProperty('newRole', null)
     expect(auditLogDto.safeParse(result).success).toBe(true)
+  })
+
+  describe('プロジェクトイベント', () => {
+    const common = { organizationId: 2, actorUserId: 10, projectId: 42, createdAt: new Date('2026-01-01T00:00:00.000Z') }
+    const createdAt = '2026-01-01T00:00:00.000Z'
+
+    test('PROJECT_CREATEDはbeforeをnull、afterに作成内容を返し、メンバー向けキーとprojectBefore/Afterを返さない', () => {
+      const created: AuditLog = { ...common, id: 5, action: 'PROJECT_CREATED', projectBefore: null, projectAfter: { name: 'Alpha', description: null } }
+
+      const result = toAuditLogResponse(created)
+
+      expect(result).toEqual({
+        id: 5,
+        organizationId: 2,
+        action: 'PROJECT_CREATED',
+        actorUserId: 10,
+        createdAt,
+        projectId: 42,
+        before: null,
+        after: { name: 'Alpha', description: null },
+      })
+      expect(auditLogDto.safeParse(result).success).toBe(true)
+    })
+
+    test('PROJECT_UPDATEDはbefore/afterの両方を返し、説明のnullと空文字を区別する', () => {
+      const updated: AuditLog = {
+        ...common,
+        id: 6,
+        action: 'PROJECT_UPDATED',
+        projectBefore: { name: '旧名称', description: null },
+        projectAfter: { name: '新名称', description: '' },
+      }
+
+      const result = toAuditLogResponse(updated)
+
+      expect(result).toEqual({
+        id: 6,
+        organizationId: 2,
+        action: 'PROJECT_UPDATED',
+        actorUserId: 10,
+        createdAt,
+        projectId: 42,
+        before: { name: '旧名称', description: null },
+        after: { name: '新名称', description: '' },
+      })
+      expect(auditLogDto.safeParse(result).success).toBe(true)
+    })
+
+    test('PROJECT_DELETEDはbeforeに削除直前の内容、afterをnullのままキーを残す', () => {
+      const deleted: AuditLog = { ...common, id: 7, action: 'PROJECT_DELETED', projectBefore: { name: 'Alpha', description: 'desc' }, projectAfter: null }
+
+      const result = toAuditLogResponse(deleted)
+
+      expect(result).toEqual({
+        id: 7,
+        organizationId: 2,
+        action: 'PROJECT_DELETED',
+        actorUserId: 10,
+        createdAt,
+        projectId: 42,
+        before: { name: 'Alpha', description: 'desc' },
+        after: null,
+      })
+      expect(result).toHaveProperty('after', null)
+      expect(auditLogDto.safeParse(result).success).toBe(true)
+    })
+
+    test('入力に余分なキーがあってもスナップショットはnameとdescriptionの2キーだけを返す', () => {
+      const created = {
+        ...common,
+        id: 8,
+        action: 'PROJECT_CREATED',
+        projectBefore: null,
+        projectAfter: { name: 'Alpha', description: null, updatedAt: 'x' },
+      } as AuditLog
+
+      const result = toAuditLogResponse(created)
+
+      expect(Object.keys((result as { after: object }).after)).toEqual(['name', 'description'])
+    })
+
+    test('2,000文字超の説明や100文字超の名前も切り詰めずに返す（DTOに文字数制約はない）', () => {
+      const longName = 'あ'.repeat(150)
+      const longDescription = 'a'.repeat(2500)
+      const deleted: AuditLog = {
+        ...common,
+        id: 9,
+        action: 'PROJECT_DELETED',
+        projectBefore: { name: longName, description: longDescription },
+        projectAfter: null,
+      }
+
+      const result = toAuditLogResponse(deleted)
+
+      expect(result).toMatchObject({ before: { name: longName, description: longDescription } })
+      expect(auditLogDto.safeParse(result).success).toBe(true)
+    })
+
+    test('未知のactionは暗黙に変換せず例外にする', () => {
+      const unknown = { ...common, id: 10, action: 'PROJECT_ARCHIVED' } as unknown as AuditLog
+
+      expect(() => toAuditLogResponse(unknown)).toThrow()
+    })
+
+    test('既存3イベントの応答にプロジェクト向けキーが含まれない', () => {
+      const member: AuditLog = {
+        id: 1,
+        organizationId: 2,
+        action: 'MEMBER_ROLE_CHANGED',
+        actorUserId: 10,
+        targetUserId: 11,
+        targetMembershipId: 12,
+        previousRole: 'MEMBER',
+        newRole: 'ADMIN',
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      }
+
+      const keys = Object.keys(toAuditLogResponse(member)).sort()
+
+      expect(keys).toEqual(['action', 'actorUserId', 'createdAt', 'id', 'newRole', 'organizationId', 'previousRole', 'targetMembershipId', 'targetUserId'])
+    })
+
+    test('6イベント混在のリストがauditLogListDto schemaに通る', () => {
+      const logs: AuditLog[] = [
+        { ...common, id: 3, action: 'PROJECT_DELETED', projectBefore: { name: 'A', description: null }, projectAfter: null },
+        { ...common, id: 2, action: 'PROJECT_UPDATED', projectBefore: { name: 'A', description: null }, projectAfter: { name: 'B', description: null } },
+        { ...common, id: 1, action: 'PROJECT_CREATED', projectBefore: null, projectAfter: { name: 'A', description: null } },
+      ]
+
+      expect(auditLogListDto.safeParse(toAuditLogListResponse(logs, null)).success).toBe(true)
+    })
   })
 
   test('監査ログとnextCursorをレスポンス用に変換し、auditLogListDto schemaに通る', () => {
