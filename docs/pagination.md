@@ -8,6 +8,7 @@
 | ------------ | ----------------------------------- | ---------- | ------------------------------ |
 | カーソル式   | `GET /organizations/:id/members`    | `cursor`   | `nextCursor`                   |
 | カーソル式   | `GET /organizations/:id/audit-logs` | `cursor`   | `nextCursor`                   |
+| カーソル式   | `GET /organizations/:id/projects`   | `cursor`   | `nextCursor`                   |
 | オフセット式 | `GET /organizations`                | `offset`   | `limit` / `offset` / `hasNext` |
 
 エンドポイントの一覧は [endpoints.md](endpoints.md) を参照してください。
@@ -43,6 +44,11 @@
   - 有効な組織IDに対する非所属ユーザー: 不正queryでも404
   - 所属MEMBER: 不正queryでも403
   - OWNER / ADMINで不正query（未対応の `offset`、不正なlimit・cursorを含む）: 400
+- `GET /organizations/:id/projects`（認証 → パスパラメータ検証 → 組織への所属確認 → query検証）
+  - 未認証: 不正queryでも401
+  - 認証済みで不正な組織ID: 不正queryでも400
+  - 有効な組織IDに対する非所属ユーザー: 不正queryでも404
+  - 所属ユーザー（MEMBERを含む）で不正query（未対応の `offset` などの未知のquery、不正なlimit・cursorを含む）: 400
 
 ## カーソル式: メンバー一覧
 
@@ -184,6 +190,79 @@ curl -H "Authorization: Bearer $ACCESS_TOKEN" \
 - 次ページの境界は `(createdAt, id) < (境界createdAt, 境界id)` で絞り込みます。ページの取得間に新しい記録が追加されても、すでに辿ったページの続きに重複や読み飛ばしは発生しません。
 - ページの取得間に追加された新しい記録は、先頭ページを取り直すまで現れません。
 - 前方向へのページ移動と、ページ位置への直接移動はできません。
+
+## カーソル式: プロジェクト一覧
+
+`GET /organizations/:id/projects` は、対象組織の全メンバー（OWNER / ADMIN / MEMBER）が閲覧できます。プロジェクトのAPI全体は [endpoints.md](endpoints.md#organization-projects) を参照してください。
+
+### リクエスト
+
+| パラメータ | 必須 | 既定値 | 説明                                                   |
+| ---------- | ---- | ------ | ------------------------------------------------------ |
+| `limit`    | 任意 | 20     | 1〜100の整数                                           |
+| `cursor`   | 任意 | 先頭   | 前ページのレスポンスの `nextCursor` をそのまま指定する |
+
+並び順は `createdAt DESC, id DESC`（新しい順）です。`createdAt` が同一のプロジェクトも `id` で一意に順序付けられます。受け付けるqueryは `limit` と `cursor` のみで、`offset` などの未知のqueryは400です。
+
+```bash
+curl -H "Authorization: Bearer $ACCESS_TOKEN" \
+  'http://localhost:3000/organizations/1/projects?limit=2'
+```
+
+```json
+{
+  "items": [
+    {
+      "id": 12,
+      "organizationId": 1,
+      "name": "Beta",
+      "description": null,
+      "createdAt": "2026-02-02T09:00:00.000Z",
+      "updatedAt": "2026-02-02T09:00:00.000Z"
+    },
+    {
+      "id": 11,
+      "organizationId": 1,
+      "name": "Alpha",
+      "description": "最初のプロジェクト",
+      "createdAt": "2026-02-01T09:30:00.000Z",
+      "updatedAt": "2026-02-03T10:00:00.000Z"
+    }
+  ],
+  "nextCursor": "eyJraW5kIjoicHJvamVjdHMiLCJ2ZXJzaW9uIjoxLCJvcmdhbml6YXRpb25JZCI6MSwiY3JlYXRlZEF0IjoiMjAyNi0wMi0wMVQwOTozMDowMC4wMDBaIiwiaWQiOjExfQ"
+}
+```
+
+最終ページと0件の場合は `nextCursor: null` です。DBからは最大 `limit + 1` 件を取得し、`limit` 件を超えた場合だけ、返した最後のitemの境界から次のカーソルを生成します。
+
+### カーソルの扱い
+
+基本的な扱い（不透明な文字列、署名・暗号化なし、サーバーでの毎回の検証、境界値の日時の範囲検証、バージョン管理、認可はカーソル内の組織情報を根拠にしないこと）は[メンバー一覧](#カーソルの扱い)・[監査ログ一覧](#カーソルの扱い-1)と同じです。プロジェクトのカーソルには、次の違いがあります。
+
+- ペイロードに `kind: "projects"` と `version: 1` を持ちます。`kind` は必須で、一致しないカーソルは不正です。
+- `kind` を持たないメンバー一覧のカーソルや、`kind: "auditLogs"` の監査ログのカーソルは、同じ組織のものでもプロジェクトAPIでは400です。別組織のカーソル、形式が不正なカーソル、バージョンが異なるカーソルも400です。
+- 逆方向（プロジェクトのカーソルをメンバー一覧APIへ渡すこと）は、メンバー一覧の既存仕様を変えないため拒否の対象にしていません。メンバー一覧のカーソルは `kind` を検証せず未知のキーを取り除いて受け付けるためです。同じ組織の認可済みの範囲に限られ、情報漏えいにはなりません。一方、監査ログAPIは `kind` の一致を必須にしているため、プロジェクトのカーソルは400になります。
+- カーソル内の組織IDと境界のID、およびパスの組織ID・プロジェクトIDは、1〜2147483647（PostgreSQL INTEGERの範囲）です。範囲外はDBの整数変換で500になるため、DBへ渡す前に400で返します。
+- 発行時と同じ正規のbase64url文字列以外は400です（不正な文字の付加や `=` パディングを含む）。
+
+カーソルは境界値としてのみ使うため、**基準になったプロジェクトが削除されても、その行の存在に依存せず続きを取得できます。**
+
+### 追加・削除時の挙動
+
+- 次ページの境界は `(createdAt, id) < (境界createdAt, 境界id)` で絞り込みます。ページの取得間にプロジェクトが追加・削除されても、すでに辿ったページの続きに重複や読み飛ばしは発生しません。
+- ページの取得間に追加された新しいプロジェクトは、先頭ページを取り直すまで現れません。
+- 前方向へのページ移動と、ページ位置への直接移動はできません。ページをまたぐスナップショット一貫性は保証しません。
+
+### クエリとindex
+
+```sql
+WHERE "organizationId" = $1
+  AND ("createdAt", id) < ($2, $3)
+ORDER BY "createdAt" DESC, id DESC
+LIMIT $4
+```
+
+index は `[organizationId, createdAt, id]` の複合index（`Project_organizationId_createdAt_id_idx`）で、btreeの逆方向スキャンで `DESC` の並びを満たします。
 
 ## オフセット式: 所属組織一覧
 

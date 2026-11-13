@@ -64,7 +64,7 @@ GCPのdev環境では、以下を含む全エンドポイントへのアクセ�
 | GET    | `/organizations`                        | 必要 | 自分が所属する組織一覧をオフセット式ページネーションで取得する（`limit` / `offset`、詳細は [pagination.md](pagination.md)） |
 | GET    | `/organizations/:id`                    | 必要 | 所属している組織の詳細を取得する                                                                                            |
 | PATCH  | `/organizations/:id`                    | 必要 | OWNERまたはADMINが組織情報を更新する                                                                                        |
-| DELETE | `/organizations/:id`                    | 必要 | OWNERのみ、組織を削除する                                                                                                   |
+| DELETE | `/organizations/:id`                    | 必要 | OWNERのみ、組織を削除する（メンバーシップ・招待・監査ログ・プロジェクトも同時に削除される）                                |
 | POST   | `/organizations/:id/transfer-ownership` | 必要 | OWNERが既存のADMINまたはMEMBERへ組織の所有権を移譲する（成立時は監査ログ `OWNERSHIP_TRANSFERRED` を記録する）               |
 
 ## Organization Members
@@ -76,6 +76,30 @@ GCPのdev環境では、以下を含む全エンドポイントへのアクセ�
 | DELETE | `/organizations/:id/members/me`            | 必要 | ADMINまたはMEMBERが自分自身を組織から脱退させる                                                                                        |
 | PATCH  | `/organizations/:id/members/:membershipId` | 必要 | OWNERまたはADMINがメンバーのロールを更新する（実際にロールが変わったときは監査ログを記録する）                                         |
 | DELETE | `/organizations/:id/members/:membershipId` | 必要 | OWNERまたはADMINがメンバーを削除する（204を返したときは監査ログ `MEMBER_REMOVED` を記録する。記録に失敗した場合は削除も取り消され500） |
+
+## Organization Projects
+
+組織が所有するプロジェクトのCRUDです。すべてBearerアクセストークンが必要で、組織のメンバーシップを確認します。プロジェクトは組織の資産として扱い、作成したユーザーが脱退・アカウント削除をしても残ります。同名のプロジェクトも作成できます（IDで識別します）。
+
+| Method | Path                                     | 認証 | 概要                                                                                                                                          |
+| ------ | ---------------------------------------- | ---- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/organizations/:id/projects`            | 必要 | OWNERまたはADMINがプロジェクトを作成する（201、作成したProject）                                                                              |
+| GET    | `/organizations/:id/projects`            | 必要 | 組織の全メンバーがプロジェクト一覧を新しい順にカーソル式ページネーションで取得する（`limit` / `cursor`、詳細は [pagination.md](pagination.md)） |
+| GET    | `/organizations/:id/projects/:projectId` | 必要 | 組織の全メンバーがプロジェクトを1件取得する                                                                                                   |
+| PATCH  | `/organizations/:id/projects/:projectId` | 必要 | OWNERまたはADMINがプロジェクトを部分更新する（200、更新後のProject）                                                                          |
+| DELETE | `/organizations/:id/projects/:projectId` | 必要 | OWNERまたはADMINがプロジェクトを完全削除する（204、本文なし。復元不可）                                                                       |
+
+仕様は次のとおりです。
+
+- Projectは `id` / `organizationId` / `name` / `description` / `createdAt` / `updatedAt` の6項目です。`description` は未設定でも `null` で返します。
+- `:id`・`:projectId` は1〜2147483647の整数です。不正値は400です。
+- `name` は必須で、前後の空白を除去した後に1〜100文字です。`description` は省略可能かつnullableで、最大2000文字です（trimや空文字→nullの変換はせず、空文字も有効です）。POSTで省略した `description` は `null` として保存します。
+- PATCHは `name` / `description` のうち少なくとも1項目が必須で、指定した項目だけを更新します（省略した項目は維持、`description: null` は説明の削除、`name: null` は400）。同値の指定も200で、`updatedAt` は更新されます。
+- POST / PATCHで未知の項目（`id`・`organizationId`・日時を含む）を送ると400です。
+- 一覧は `createdAt DESC, id DESC` の新しい順で、queryは `limit`（既定20、1〜100）と `cursor` のみです。`offset` などの未知のqueryや空文字・空白は400です。
+- 判定順は 401（認証）→ 400（パスパラメータ）→ 404（組織が存在しない、または未所属）→ 403（MEMBERによる書き込み。bodyの検証より先に確定する）→ 400（body / query）→ 404（対象プロジェクトなし。別組織のIDを含む。削除済みへの再削除も404）です。MEMBERの書き込みは対象の有無にかかわらず403です。
+- 作成・更新・削除は、トランザクション内でロック取得後の最新の所属・ロールで再判定します。組織または所属が消えていれば404、MEMBERへ降格していれば403、対象プロジェクトが消えていれば404です。
+- プロジェクト操作の監査ログは記録しません。
 
 ## Organization Audit Logs
 
