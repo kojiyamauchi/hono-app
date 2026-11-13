@@ -17,6 +17,8 @@ const projectDescriptionSchema = z
   .openapi({
     // OpenAPI 3.1ではnullableが無効なため、JSON Schemaの書き方でnull許容を明示する（Zod定義と実行時挙動は変えない）
     type: ['string', 'null'],
+    // typeの上書きで生成されなくなる文字数制約を、公開仕様に維持する
+    maxLength: 2000,
   })
 
 /** PostgreSQL INTEGER上限までの正の整数ID（パスパラメータ用）。DBへ渡す前に不正値を400にする。 */
