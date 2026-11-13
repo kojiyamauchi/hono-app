@@ -639,6 +639,18 @@ describe('organizationAuditLogRepository.findPageByOrganization', () => {
     expect(sql).not.toContain('JOIN')
   })
 
+  /**
+   * DBが返す行を再現する。SELECTの補助boolean（`IS NULL` 判定）を、値がnullかどうかから既定で補う。
+   * JSON nullのように「値はnullだがSQL NULLではない」行は、行側で補助booleanをfalseに明示して上書きする。
+   */
+  const withFlags = (row: unknown): unknown => {
+    const r = row as Record<string, unknown>
+    return { projectBeforeIsSqlNull: r.projectBefore === null, projectAfterIsSqlNull: r.projectAfter === null, ...r }
+  }
+  const mockRows = (rows: unknown[]): void => {
+    pageQueryRaw.mockResolvedValue(rows.map(withFlags))
+  }
+
   const memberRow = {
     id: 1,
     organizationId: 2,
@@ -667,7 +679,7 @@ describe('organizationAuditLogRepository.findPageByOrganization', () => {
 
   test('既存3イベントの行をAuditLogエンティティへ変換する（プロジェクト向けキーは含めない）', async () => {
     const removedRow = { ...memberRow, id: 3, action: 'MEMBER_REMOVED', newRole: null }
-    pageQueryRaw.mockResolvedValue([memberRow, { ...memberRow, id: 2, action: 'OWNERSHIP_TRANSFERRED', newRole: 'OWNER' }, removedRow])
+    mockRows([memberRow, { ...memberRow, id: 2, action: 'OWNERSHIP_TRANSFERRED', newRole: 'OWNER' }, removedRow])
 
     const result = await organizationAuditLogRepository.findPageByOrganization(2, 21, null)
 
@@ -699,7 +711,7 @@ describe('organizationAuditLogRepository.findPageByOrganization', () => {
       projectAfter: { name: 'A', description: '' },
     }
     const deleted = { ...projectRowBase, id: 7, action: 'PROJECT_DELETED', projectBefore: { name: 'A', description: '' }, projectAfter: null }
-    pageQueryRaw.mockResolvedValue([deleted, updated, created])
+    mockRows([deleted, updated, created])
 
     const result = await organizationAuditLogRepository.findPageByOrganization(2, 21, null)
 
@@ -740,7 +752,7 @@ describe('organizationAuditLogRepository.findPageByOrganization', () => {
   test('入力上限を超える名前・説明も切り詰めずに返す', async () => {
     const name = 'n'.repeat(300)
     const description = 'd'.repeat(5000)
-    pageQueryRaw.mockResolvedValue([{ ...projectRowBase, action: 'PROJECT_DELETED', projectBefore: { name, description }, projectAfter: null }])
+    mockRows([{ ...projectRowBase, action: 'PROJECT_DELETED', projectBefore: { name, description }, projectAfter: null }])
 
     const result = await organizationAuditLogRepository.findPageByOrganization(2, 21, null)
 
@@ -783,16 +795,73 @@ describe('organizationAuditLogRepository.findPageByOrganization', () => {
     ['スナップショットのdescriptionが数値', { ...createdRow, projectAfter: { name: 'A', description: 1 } }],
     ['スナップショットが配列', { ...createdRow, projectAfter: [] }],
     ['スナップショットが文字列', { ...createdRow, projectAfter: 'x' }],
+    // JSON null（'null'::jsonb）はデコード後にJSのnullとなるが、SQL NULLではないため補助booleanで区別して拒否する
+    ['PROJECT_CREATEDのprojectBeforeがJSON null', { ...createdRow, projectBefore: null, projectBeforeIsSqlNull: false }],
+    ['PROJECT_DELETEDのprojectAfterがJSON null', { ...deletedRow, projectAfter: null, projectAfterIsSqlNull: false }],
+    ['MEMBER_ROLE_CHANGEDのprojectBeforeがJSON null', { ...memberRow, projectBefore: null, projectBeforeIsSqlNull: false }],
+    ['MEMBER_ROLE_CHANGEDのprojectAfterがJSON null', { ...memberRow, projectAfter: null, projectAfterIsSqlNull: false }],
+    [
+      'MEMBER_REMOVEDのprojectBefore/AfterがJSON null',
+      { ...memberRow, action: 'MEMBER_REMOVED', newRole: null, projectBeforeIsSqlNull: false, projectAfterIsSqlNull: false },
+    ],
+    ['OWNERSHIP_TRANSFERREDのprojectAfterがJSON null', { ...memberRow, action: 'OWNERSHIP_TRANSFERRED', projectAfterIsSqlNull: false }],
+    ['PROJECT_UPDATEDのprojectBeforeがJSON null', { ...updatedRow, projectBefore: null, projectBeforeIsSqlNull: false }],
+    ['PROJECT_UPDATEDのprojectAfterがJSON null', { ...updatedRow, projectAfter: null, projectAfterIsSqlNull: false }],
+    ['PROJECT_CREATEDのprojectAfterがJSON null', { ...createdRow, projectAfter: null, projectAfterIsSqlNull: false }],
+    ['PROJECT_DELETEDのprojectBeforeがJSON null', { ...deletedRow, projectBefore: null, projectBeforeIsSqlNull: false }],
+    // 補助booleanの欠落・型違い・値との矛盾
+    ['補助booleanが欠落', { ...memberRow, projectBeforeIsSqlNull: undefined }],
+    ['補助booleanが文字列', { ...memberRow, projectAfterIsSqlNull: 'true' }],
+    ['補助booleanがnull', { ...memberRow, projectBeforeIsSqlNull: null }],
+    ['SQL NULLと判定されたのに値が存在', { ...createdRow, projectBefore: { name: 'A', description: null }, projectBeforeIsSqlNull: true }],
+    ['必要なスナップショットがSQL NULL(補助booleanがtrue)', { ...deletedRow, projectBefore: { name: 'A', description: null }, projectBeforeIsSqlNull: true }],
     ['idが整数でない', { ...memberRow, id: '1' }],
     ['createdAtが日時でない', { ...memberRow, createdAt: '2026-01-01' }],
   ])('不整合な行（%s）は例外にして、他の行を読み飛ばさず一覧全体を失敗させる', async (_name, badRow) => {
-    pageQueryRaw.mockResolvedValue([memberRow, badRow, { ...memberRow, id: 9 }])
+    mockRows([memberRow, badRow, { ...memberRow, id: 9 }])
 
     await expect(organizationAuditLogRepository.findPageByOrganization(2, 21, null)).rejects.toThrow()
   })
 
+  test('正しいSQL NULL（補助booleanがtrue）を持つ行は受理し、補助booleanをEntityへ含めない', async () => {
+    mockRows([
+      { ...createdRow, id: 11 },
+      { ...deletedRow, id: 12 },
+      { ...memberRow, id: 13 },
+      { ...createdRow, id: 14, projectAfter: { name: 'A', description: null } },
+    ])
+
+    const result = await organizationAuditLogRepository.findPageByOrganization(2, 21, null)
+
+    expect(result.map((r) => r.id)).toEqual([11, 12, 13, 14])
+    for (const entity of result) {
+      expect(entity).not.toHaveProperty('projectBeforeIsSqlNull')
+      expect(entity).not.toHaveProperty('projectAfterIsSqlNull')
+    }
+    expect(result[0]).toMatchObject({ projectBefore: null, projectAfter: { name: 'A', description: null } })
+    expect(result[1]).toMatchObject({ projectBefore: { name: 'A', description: null }, projectAfter: null })
+  })
+
+  test('スナップショット内のdescriptionのJSON nullは有効で、SQL NULLの判定には影響しない', async () => {
+    mockRows([{ ...createdRow, projectAfter: { name: 'A', description: null }, projectBeforeIsSqlNull: true, projectAfterIsSqlNull: false }])
+
+    const [entity] = await organizationAuditLogRepository.findPageByOrganization(2, 21, null)
+
+    expect(entity).toMatchObject({ action: 'PROJECT_CREATED', projectAfter: { name: 'A', description: null } })
+  })
+
+  test('SELECTはSQLの IS NULL 判定を補助booleanとして取得する', async () => {
+    pageQueryRaw.mockResolvedValue([])
+
+    await organizationAuditLogRepository.findPageByOrganization(2, 21, null)
+
+    const sql = (pageQueryRaw.mock.calls[0]?.[0] as Prisma.Sql).sql
+    expect(sql).toContain('"projectBefore" IS NULL AS "projectBeforeIsSqlNull"')
+    expect(sql).toContain('"projectAfter" IS NULL AS "projectAfterIsSqlNull"')
+  })
+
   test('不整合の例外メッセージにプロジェクトの名前・説明を含めない', async () => {
-    pageQueryRaw.mockResolvedValue([{ ...createdRow, projectAfter: { name: '秘密の名前', description: 5 } }])
+    mockRows([{ ...createdRow, projectAfter: { name: '秘密の名前', description: 5 } }])
 
     await expect(organizationAuditLogRepository.findPageByOrganization(2, 21, null)).rejects.toThrow(/^(?!.*秘密の名前)/)
   })
