@@ -3,8 +3,6 @@ import { beforeEach, describe, expect, mock, test } from 'bun:test'
 import type { Prisma } from '@/generated/prisma/client'
 import type { Role } from '@/shared/membership/entities'
 
-import type { AuditLog } from '../entities'
-
 const queryRaw = mock()
 const updateMany = mock()
 const auditLogCreate = mock()
@@ -631,23 +629,172 @@ describe('organizationAuditLogRepository.findPageByOrganization', () => {
     expect(sql.sql).toContain('"organizationId" = ')
   })
 
-  test('取得した行をAuditLogエンティティへ変換する', async () => {
-    const row: AuditLog = {
-      id: 1,
-      organizationId: 2,
-      action: 'MEMBER_ROLE_CHANGED',
-      actorUserId: 10,
-      targetUserId: 11,
-      targetMembershipId: 12,
-      previousRole: 'MEMBER',
-      newRole: 'ADMIN',
-      createdAt,
-    }
-    pageQueryRaw.mockResolvedValue([row])
+  test('プロジェクト向け列も取得し、ProjectやUserをJOINしない', async () => {
+    pageQueryRaw.mockResolvedValue([])
+
+    await organizationAuditLogRepository.findPageByOrganization(2, 21, null)
+
+    const sql = getIssuedSql().sql
+    expect(sql).toContain('"projectId", "projectBefore", "projectAfter"')
+    expect(sql).not.toContain('JOIN')
+  })
+
+  const memberRow = {
+    id: 1,
+    organizationId: 2,
+    action: 'MEMBER_ROLE_CHANGED',
+    actorUserId: 10,
+    targetUserId: 11,
+    targetMembershipId: 12,
+    previousRole: 'MEMBER',
+    newRole: 'ADMIN',
+    projectId: null,
+    projectBefore: null,
+    projectAfter: null,
+    createdAt,
+  }
+  const projectRowBase = {
+    id: 5,
+    organizationId: 2,
+    actorUserId: 10,
+    targetUserId: null,
+    targetMembershipId: null,
+    previousRole: null,
+    newRole: null,
+    projectId: 42,
+    createdAt,
+  }
+
+  test('既存3イベントの行をAuditLogエンティティへ変換する（プロジェクト向けキーは含めない）', async () => {
+    const removedRow = { ...memberRow, id: 3, action: 'MEMBER_REMOVED', newRole: null }
+    pageQueryRaw.mockResolvedValue([memberRow, { ...memberRow, id: 2, action: 'OWNERSHIP_TRANSFERRED', newRole: 'OWNER' }, removedRow])
 
     const result = await organizationAuditLogRepository.findPageByOrganization(2, 21, null)
 
-    expect(result).toEqual([row])
+    expect(result).toEqual([
+      {
+        id: 1,
+        organizationId: 2,
+        action: 'MEMBER_ROLE_CHANGED',
+        actorUserId: 10,
+        targetUserId: 11,
+        targetMembershipId: 12,
+        previousRole: 'MEMBER',
+        newRole: 'ADMIN',
+        createdAt,
+      },
+      expect.objectContaining({ id: 2, action: 'OWNERSHIP_TRANSFERRED', newRole: 'OWNER' }),
+      expect.objectContaining({ id: 3, action: 'MEMBER_REMOVED', newRole: null }),
+    ])
+    expect(result[0]).not.toHaveProperty('projectId')
+  })
+
+  test('プロジェクト3イベントの行をAuditLogエンティティへ変換する（説明のnullと空文字は区別する）', async () => {
+    const created = { ...projectRowBase, id: 5, action: 'PROJECT_CREATED', projectBefore: null, projectAfter: { name: 'A', description: null } }
+    const updated = {
+      ...projectRowBase,
+      id: 6,
+      action: 'PROJECT_UPDATED',
+      projectBefore: { name: 'A', description: null },
+      projectAfter: { name: 'A', description: '' },
+    }
+    const deleted = { ...projectRowBase, id: 7, action: 'PROJECT_DELETED', projectBefore: { name: 'A', description: '' }, projectAfter: null }
+    pageQueryRaw.mockResolvedValue([deleted, updated, created])
+
+    const result = await organizationAuditLogRepository.findPageByOrganization(2, 21, null)
+
+    expect(result).toEqual([
+      {
+        id: 7,
+        organizationId: 2,
+        action: 'PROJECT_DELETED',
+        actorUserId: 10,
+        projectId: 42,
+        projectBefore: { name: 'A', description: '' },
+        projectAfter: null,
+        createdAt,
+      },
+      {
+        id: 6,
+        organizationId: 2,
+        action: 'PROJECT_UPDATED',
+        actorUserId: 10,
+        projectId: 42,
+        projectBefore: { name: 'A', description: null },
+        projectAfter: { name: 'A', description: '' },
+        createdAt,
+      },
+      {
+        id: 5,
+        organizationId: 2,
+        action: 'PROJECT_CREATED',
+        actorUserId: 10,
+        projectId: 42,
+        projectBefore: null,
+        projectAfter: { name: 'A', description: null },
+        createdAt,
+      },
+    ])
+  })
+
+  test('入力上限を超える名前・説明も切り詰めずに返す', async () => {
+    const name = 'n'.repeat(300)
+    const description = 'd'.repeat(5000)
+    pageQueryRaw.mockResolvedValue([{ ...projectRowBase, action: 'PROJECT_DELETED', projectBefore: { name, description }, projectAfter: null }])
+
+    const result = await organizationAuditLogRepository.findPageByOrganization(2, 21, null)
+
+    expect(result[0]).toMatchObject({ projectBefore: { name, description } })
+  })
+
+  const createdRow = { ...projectRowBase, action: 'PROJECT_CREATED', projectBefore: null, projectAfter: { name: 'A', description: null } }
+  const updatedRow = {
+    ...projectRowBase,
+    action: 'PROJECT_UPDATED',
+    projectBefore: { name: 'A', description: null },
+    projectAfter: { name: 'B', description: null },
+  }
+  const deletedRow = { ...projectRowBase, action: 'PROJECT_DELETED', projectBefore: { name: 'A', description: null }, projectAfter: null }
+
+  test.each<[string, unknown]>([
+    ['未知のaction', { ...memberRow, action: 'PROJECT_ARCHIVED' }],
+    ['actionがnull', { ...memberRow, action: null }],
+    ['メンバーイベントのtargetUserIdがnull', { ...memberRow, targetUserId: null }],
+    ['メンバーイベントのpreviousRoleがnull', { ...memberRow, previousRole: null }],
+    ['MEMBER_ROLE_CHANGEDのnewRoleがnull', { ...memberRow, newRole: null }],
+    ['MEMBER_REMOVEDのnewRoleがnullでない', { ...memberRow, action: 'MEMBER_REMOVED', newRole: 'ADMIN' }],
+    ['不正なロール値', { ...memberRow, previousRole: 'SUPER' }],
+    ['メンバーイベントにprojectIdが混入', { ...memberRow, projectId: 1 }],
+    ['メンバーイベントにprojectAfterが混入', { ...memberRow, projectAfter: { name: 'A', description: null } }],
+    ['プロジェクト向け列が欠落（undefined）', { ...memberRow, projectId: undefined }],
+    ['プロジェクトイベントにtargetUserIdが混入', { ...createdRow, targetUserId: 1 }],
+    ['プロジェクトイベントにnewRoleが混入', { ...createdRow, newRole: 'ADMIN' }],
+    ['プロジェクトイベントのprojectIdがnull', { ...createdRow, projectId: null }],
+    ['PROJECT_CREATEDにprojectBeforeが存在', { ...createdRow, projectBefore: { name: 'A', description: null } }],
+    ['PROJECT_CREATEDのprojectAfterがnull', { ...createdRow, projectAfter: null }],
+    ['PROJECT_UPDATEDのprojectBeforeがnull', { ...updatedRow, projectBefore: null }],
+    ['PROJECT_UPDATEDのbeforeとafterが同値', { ...updatedRow, projectAfter: { name: 'A', description: null } }],
+    ['PROJECT_DELETEDにprojectAfterが存在', { ...deletedRow, projectAfter: { name: 'A', description: null } }],
+    ['スナップショットのdescriptionキー欠落', { ...createdRow, projectAfter: { name: 'A' } }],
+    ['スナップショットのnameキー欠落', { ...createdRow, projectAfter: { description: null } }],
+    ['スナップショットに余分なキー', { ...createdRow, projectAfter: { name: 'A', description: null, extra: 1 } }],
+    ['スナップショットのnameが数値', { ...createdRow, projectAfter: { name: 1, description: null } }],
+    ['スナップショットのnameがnull', { ...createdRow, projectAfter: { name: null, description: null } }],
+    ['スナップショットのdescriptionが数値', { ...createdRow, projectAfter: { name: 'A', description: 1 } }],
+    ['スナップショットが配列', { ...createdRow, projectAfter: [] }],
+    ['スナップショットが文字列', { ...createdRow, projectAfter: 'x' }],
+    ['idが整数でない', { ...memberRow, id: '1' }],
+    ['createdAtが日時でない', { ...memberRow, createdAt: '2026-01-01' }],
+  ])('不整合な行（%s）は例外にして、他の行を読み飛ばさず一覧全体を失敗させる', async (_name, badRow) => {
+    pageQueryRaw.mockResolvedValue([memberRow, badRow, { ...memberRow, id: 9 }])
+
+    await expect(organizationAuditLogRepository.findPageByOrganization(2, 21, null)).rejects.toThrow()
+  })
+
+  test('不整合の例外メッセージにプロジェクトの名前・説明を含めない', async () => {
+    pageQueryRaw.mockResolvedValue([{ ...createdRow, projectAfter: { name: '秘密の名前', description: 5 } }])
+
+    await expect(organizationAuditLogRepository.findPageByOrganization(2, 21, null)).rejects.toThrow(/^(?!.*秘密の名前)/)
   })
 
   test('予期しないDBエラーはそのままthrowする', async () => {
