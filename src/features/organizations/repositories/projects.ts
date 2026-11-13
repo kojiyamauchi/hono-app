@@ -213,7 +213,7 @@ export const projectRepository = {
 
       // 指定された項目だけを更新する。updatedAtはPrismaの@updatedAtが更新操作ごとに設定する。
       const updated = await tx.project.update({
-        where: { id: projectId },
+        where: { id: projectId, organizationId },
         data: {
           ...(data.name !== undefined ? { name: data.name } : {}),
           ...(data.description !== undefined ? { description: data.description } : {}),
