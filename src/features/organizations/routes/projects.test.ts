@@ -271,6 +271,20 @@ describe('organizations projects routes', () => {
     })
   })
 
+  describe('監査ログの保存に失敗した場合', () => {
+    test('作成・更新・削除はいずれも例外が伝播して500になる（成功レスポンスを返さない）', async () => {
+      findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))
+      const token = await createToken(1)
+      createWithAuthorization.mockRejectedValue(new Error('ログINSERT失敗'))
+      updateWithAuthorization.mockRejectedValue(new Error('ログINSERT失敗'))
+      removeWithAuthorization.mockRejectedValue(new Error('ログINSERT失敗'))
+
+      expect((await request('POST', '/organizations/1/projects', { token, body: { name: 'a' } })).status).toBe(500)
+      expect((await request('PATCH', '/organizations/1/projects/2', { token, body: { name: 'a' } })).status).toBe(500)
+      expect((await request('DELETE', '/organizations/1/projects/2', { token })).status).toBe(500)
+    })
+  })
+
   describe('GET /organizations/:id/projects/:projectId', () => {
     test.each<Role>(['OWNER', 'ADMIN', 'MEMBER'])('%sはプロジェクトを取得でき、組織IDとプロジェクトIDで検索する', async (role) => {
       findByUserAndOrganization.mockResolvedValue(membershipWithRole(role))

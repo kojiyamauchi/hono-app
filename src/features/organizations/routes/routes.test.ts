@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, mock, test } from 'bun:test'
 import { sign } from 'hono/jwt'
 
-import type { AuditLog } from '@/features/organizations/entities'
+import type { AuditLog, MemberRoleChangedAuditLog } from '@/features/organizations/entities'
 import type { Invitation } from '@/shared/invitation/entities'
 import type { Membership, Role } from '@/shared/membership/entities'
 import type { Organization } from '@/shared/organization/entities'
@@ -917,7 +917,7 @@ describe('organizations routes', () => {
 
   // --- 監査ログルート ---
 
-  const auditLog = (id: number, createdAt = '2026-01-01T00:00:00.000Z'): AuditLog => ({
+  const auditLog = (id: number, createdAt = '2026-01-01T00:00:00.000Z'): MemberRoleChangedAuditLog => ({
     id,
     organizationId: 1,
     action: 'MEMBER_ROLE_CHANGED',
@@ -1095,6 +1095,80 @@ describe('organizations routes', () => {
       [1, 'MEMBER_ROLE_CHANGED', 'ADMIN'],
     ])
     expect(secondBody.nextCursor).toBeNull()
+  })
+
+  test('GET /organizations/:id/audit-logs は既存3イベントとプロジェクト3イベントの6種が混在しても、イベントごとの形で返す', async () => {
+    findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))
+    const at = '2026-01-01T00:00:00.000Z'
+    const base = { organizationId: 1, actorUserId: 1, createdAt: new Date(at) }
+    const items: AuditLog[] = [
+      { ...base, id: 6, action: 'PROJECT_DELETED', projectId: 9, projectBefore: { name: 'B', description: '' }, projectAfter: null },
+      {
+        ...base,
+        id: 5,
+        action: 'PROJECT_UPDATED',
+        projectId: 9,
+        projectBefore: { name: 'A', description: null },
+        projectAfter: { name: 'B', description: '' },
+      },
+      { ...base, id: 4, action: 'PROJECT_CREATED', projectId: 9, projectBefore: null, projectAfter: { name: 'A', description: null } },
+      { ...auditLog(3, at), action: 'MEMBER_REMOVED', previousRole: 'ADMIN', newRole: null },
+      { ...auditLog(2, at), action: 'OWNERSHIP_TRANSFERRED', previousRole: 'ADMIN', newRole: 'OWNER' },
+      auditLog(1, at),
+    ]
+    findAuditLogPage.mockResolvedValueOnce(items)
+
+    const response = await auditLogsRequest('/organizations/1/audit-logs', await createToken(1))
+    const body = (await response.json()) as { items: Record<string, unknown>[]; nextCursor: string | null }
+
+    expect(response.status).toBe(200)
+    expect(body.items.map((item) => item.action)).toEqual([
+      'PROJECT_DELETED',
+      'PROJECT_UPDATED',
+      'PROJECT_CREATED',
+      'MEMBER_REMOVED',
+      'OWNERSHIP_TRANSFERRED',
+      'MEMBER_ROLE_CHANGED',
+    ])
+    // プロジェクトイベントは共通項目 + projectId + before/after のみ（メンバー向けキー・projectBefore/Afterを返さない）
+    expect(body.items[0]).toEqual({
+      id: 6,
+      organizationId: 1,
+      action: 'PROJECT_DELETED',
+      actorUserId: 1,
+      createdAt: at,
+      projectId: 9,
+      before: { name: 'B', description: '' },
+      after: null,
+    })
+    expect(body.items[1]).toMatchObject({ before: { name: 'A', description: null }, after: { name: 'B', description: '' } })
+    expect(body.items[2]).toMatchObject({ before: null, after: { name: 'A', description: null } })
+    // 既存3イベントにはプロジェクト向けキーを追加しない
+    for (const item of body.items.slice(3)) {
+      expect(item).not.toHaveProperty('projectId')
+      expect(item).not.toHaveProperty('before')
+      expect(item).not.toHaveProperty('after')
+      expect(item).toHaveProperty('newRole')
+    }
+    expect(body.items[3]).toHaveProperty('newRole', null)
+  })
+
+  test('GET /organizations/:id/audit-logs は読み取り境界が不整合な行を検出して失敗したら一覧全体を500にする', async () => {
+    findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))
+    findAuditLogPage.mockRejectedValueOnce(new Error('監査ログの行が不正です'))
+
+    const response = await auditLogsRequest('/organizations/1/audit-logs', await createToken(1))
+
+    expect(response.status).toBe(500)
+    expect(await response.json()).not.toHaveProperty('items')
+  })
+
+  test('GET /organizations/:id/audit-logs はMEMBERを403で拒否する（プロジェクトを閲覧できても監査ログの権限は追加されない）', async () => {
+    findByUserAndOrganization.mockResolvedValue(membershipWithRole('MEMBER'))
+
+    const response = await auditLogsRequest('/organizations/1/audit-logs', await createToken(1))
+
+    expect(response.status).toBe(403)
   })
 
   const encodeCursorPayload = (payload: Record<string, unknown>): string => Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url')
