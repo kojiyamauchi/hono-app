@@ -2,7 +2,7 @@ import { Prisma } from '@/generated/prisma/client'
 import { prisma } from '@/libs/prisma'
 import type { Role } from '@/shared/membership/entities'
 
-import type { Project } from '../entities/projects'
+import type { Project, ProjectSnapshot } from '../entities/projects'
 
 /** プロジェクト一覧のカーソル式ページ取得の境界値（この行より後ろ、つまりより古い行を取得する）。 */
 export type ProjectPageBoundary = { createdAt: Date; id: number }
@@ -38,6 +38,19 @@ export type LockedProjectWriteState = {
  */
 export type AuthorizeProjectWrite<TRejection> = (state: LockedProjectWriteState) => TRejection | null
 
+/** プロジェクト更新の前後のスナップショット。ロック後のDB値を変更前、保存後の値を変更後とする。 */
+export type ProjectUpdateChange = {
+  before: ProjectSnapshot
+  after: ProjectSnapshot
+}
+
+/**
+ * 更新を監査ログへ記録するかを、ロック後の変更前と保存後の変更後から判定する同期コールバック。
+ * 実変更があるときだけ `true` を返す（業務上の基準はserviceが持つ）。
+ * ロック中に待たせないため、DBアクセスや非同期処理は行わない。
+ */
+export type ShouldRecordProjectUpdate = (change: ProjectUpdateChange) => boolean
+
 /** プロジェクト作成の入力。 */
 export type CreateProjectInput = {
   organizationId: number
@@ -64,6 +77,7 @@ export type RemoveProjectInput = {
 
 type LockedIdRow = { id: number }
 type LockedOperatorRow = { id: number; role: Role }
+type LockedProjectRow = { id: number; name: string; description: string | null }
 type ProjectRow = Project
 
 /** ロック済みの行・Prismaの結果から、必要な項目だけのProjectを作る。 */
@@ -122,18 +136,26 @@ const lockOrganizationAndAuthorize = async <TRejection>(
 }
 
 /**
- * 対象Projectを `organizationId` と `projectId` の両方で絞って `FOR UPDATE` でロックする。
- * 存在しない（別組織のIDを含む）場合は `false` を返す。
+ * 対象Projectを `organizationId` と `projectId` の両方で絞って `FOR UPDATE` でロックし、ロック後のDB値を返す。
+ * 監査ログの変更前スナップショットは、リクエスト前の読取ではなくこのロック後の値を使う。
+ * 存在しない（別組織のIDを含む）場合は `null` を返す。
  */
-const lockProject = async (tx: Prisma.TransactionClient, organizationId: number, projectId: number): Promise<boolean> => {
-  const lockedProjects = await tx.$queryRaw<LockedIdRow[]>`
-    SELECT id
+const lockProject = async (tx: Prisma.TransactionClient, organizationId: number, projectId: number): Promise<ProjectSnapshot | null> => {
+  const lockedProjects = await tx.$queryRaw<LockedProjectRow[]>`
+    SELECT id, name, description
     FROM "Project"
     WHERE id = ${projectId} AND "organizationId" = ${organizationId}
     FOR UPDATE
   `
-  return lockedProjects.length > 0
+  const locked = lockedProjects[0]
+  return locked ? toProjectSnapshot(locked) : null
 }
+
+/** Projectから監査ログ用のスナップショット（名前と説明のみ）を作る。値は加工しない。 */
+const toProjectSnapshot = (project: { name: string; description: string | null }): ProjectSnapshot => ({
+  name: project.name,
+  description: project.description,
+})
 
 /**
  * organizations feature固有のProjectデータアクセスを提供するリポジトリ。
@@ -188,6 +210,18 @@ export const projectRepository = {
       }
 
       const created = await tx.project.create({ data: { organizationId, name, description } })
+
+      // 実際に保存された値を作成後のスナップショットとして記録する。
+      // INSERTに失敗した場合はそのままthrowし、上の作成もrollbackする。
+      await tx.auditLog.create({
+        data: {
+          organizationId,
+          action: 'PROJECT_CREATED',
+          actorUserId,
+          projectId: created.id,
+          projectAfter: toProjectSnapshot(created),
+        },
+      })
       return { status: projectWriteResults.succeeded, value: toProject(created) }
     })
   },
@@ -199,6 +233,7 @@ export const projectRepository = {
   updateWithAuthorization: async <TRejection>(
     input: UpdateProjectInput,
     authorize: AuthorizeProjectWrite<TRejection>,
+    shouldRecord: ShouldRecordProjectUpdate,
   ): Promise<ProjectWriteResult<Project, TRejection>> => {
     const { organizationId, projectId, actorUserId, data } = input
 
@@ -207,7 +242,8 @@ export const projectRepository = {
       if (denied) {
         return denied
       }
-      if (!(await lockProject(tx, organizationId, projectId))) {
+      const before = await lockProject(tx, organizationId, projectId)
+      if (!before) {
         return { status: projectWriteResults.projectNotFound }
       }
 
@@ -219,6 +255,22 @@ export const projectRepository = {
           ...(data.description !== undefined ? { description: data.description } : {}),
         },
       })
+
+      // ロック後のDB値（before）と保存後の値（after）で実変更を判定する。同値の更新は200で確定するが記録しない。
+      const after = toProjectSnapshot(updated)
+      if (shouldRecord({ before, after })) {
+        // INSERTに失敗した場合はそのままthrowし、上の更新もrollbackする。
+        await tx.auditLog.create({
+          data: {
+            organizationId,
+            action: 'PROJECT_UPDATED',
+            actorUserId,
+            projectId,
+            projectBefore: before,
+            projectAfter: after,
+          },
+        })
+      }
       return { status: projectWriteResults.succeeded, value: toProject(updated) }
     })
   },
@@ -238,15 +290,28 @@ export const projectRepository = {
       if (denied) {
         return denied
       }
-      if (!(await lockProject(tx, organizationId, projectId))) {
+      const before = await lockProject(tx, organizationId, projectId)
+      if (!before) {
         return { status: projectWriteResults.projectNotFound }
       }
 
-      // ロック済みのため削除は必ず1件になるが、0件なら対象なしとして扱う。
+      // ロック済みのため削除は必ず1件になるが、0件なら対象なしとして扱う（ログも作らない）。
       const deleted = await tx.project.deleteMany({ where: { id: projectId, organizationId } })
       if (deleted.count !== 1) {
         return { status: projectWriteResults.projectNotFound }
       }
+
+      // ロック後のDB値を削除直前のスナップショットとして記録する（文字数で切り詰めない）。
+      // INSERTに失敗した場合はそのままthrowし、上の削除もrollbackする。
+      await tx.auditLog.create({
+        data: {
+          organizationId,
+          action: 'PROJECT_DELETED',
+          actorUserId,
+          projectId,
+          projectBefore: before,
+        },
+      })
       return { status: projectWriteResults.succeeded, value: null }
     })
   },
