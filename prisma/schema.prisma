@@ -35,6 +35,7 @@ model Organization {
   memberships Membership[]
   invitations Invitation[]
   auditLogs   AuditLog[]
+  projects    Project[]
 }
 
 model Membership {
@@ -76,6 +77,23 @@ model AuditLog {
   organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // 組織単位の監査ログ一覧取得（新しい順）を支援する。
+  // カーソル式ページネーションの行値比較（("createdAt", id) < (...)）の境界条件をIndex Condへ入れるため、idまで含める。
+  // 並びはDESCだが、btreeの逆方向スキャンで満たせるためindexはASCのまま定義する。
+  @@index([organizationId, createdAt, id])
+}
+
+model Project {
+  id             Int          @id @default(autoincrement())
+  organizationId Int
+  name           String
+  // 未設定はnull。空文字も有効な値として保存し、trimや空文字→nullの変換は行わない。
+  description    String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  // 組織が削除されたときは、同じトランザクション内でプロジェクトも削除する（監査ログと同じくDBのcascadeに任せる）。
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // 組織単位のプロジェクト一覧取得（新しい順）を支援する。
   // カーソル式ページネーションの行値比較（("createdAt", id) < (...)）の境界条件をIndex Condへ入れるため、idまで含める。
   // 並びはDESCだが、btreeの逆方向スキャンで満たせるためindexはASCのまま定義する。
   @@index([organizationId, createdAt, id])
