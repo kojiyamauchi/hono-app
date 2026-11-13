@@ -195,6 +195,8 @@ describe('projectRepository の書き込み', () => {
       expect(queryOf(2).sql).toContain('FOR UPDATE')
       expect(queryOf(2).values).toEqual([7, 1])
       expect(authorize).toHaveBeenCalledWith({ operatorRole: 'ADMIN' })
+      // 最終UPDATEの条件にも組織IDとプロジェクトIDの両方を含める（whereの完全一致）
+      expect(projectUpdate).toHaveBeenCalledWith({ where: { id: 7, organizationId: 1 }, data: { name: 'Beta' } })
     })
 
     test('指定された項目だけを更新する', async () => {
@@ -203,12 +205,12 @@ describe('projectRepository の書き込み', () => {
       projectUpdate.mockResolvedValue(project)
 
       await projectRepository.updateWithAuthorization({ ...input, data: { description: null } }, allow)
-      expect(projectUpdate).toHaveBeenLastCalledWith({ where: { id: 7 }, data: { description: null } })
+      expect(projectUpdate).toHaveBeenLastCalledWith({ where: { id: 7, organizationId: 1 }, data: { description: null } })
 
       prepareLocks('OWNER')
       queryRaw.mockResolvedValueOnce([{ id: 7 }])
       await projectRepository.updateWithAuthorization({ ...input, data: { name: 'B', description: '' } }, allow)
-      expect(projectUpdate).toHaveBeenLastCalledWith({ where: { id: 7 }, data: { name: 'B', description: '' } })
+      expect(projectUpdate).toHaveBeenLastCalledWith({ where: { id: 7, organizationId: 1 }, data: { name: 'B', description: '' } })
     })
 
     test('MEMBERは対象Projectをロックする前に拒否される', async () => {
