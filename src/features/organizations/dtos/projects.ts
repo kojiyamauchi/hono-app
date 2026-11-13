@@ -28,7 +28,18 @@ export const projectDto = z
  * 次ページの有無は `nextCursor !== null` で表す。
  * OpenAPI response schemaとして参照するため、`.openapi()` でcomponent名を付与する。
  */
-export const projectListDto = z.object({ items: z.array(projectDto), nextCursor: z.string().nullable() }).openapi('ProjectList')
+export const projectListDto = z
+  .object({
+    items: z.array(projectDto),
+    nextCursor: z
+      .string()
+      .nullable()
+      .openapi({
+        // OpenAPI 3.1ではnullableが無効なため、JSON Schemaの書き方でnull許容を明示する（Zod定義と実行時挙動は変えない）
+        type: ['string', 'null'],
+      }),
+  })
+  .openapi('ProjectList')
 
 export type ProjectDtoType = z.infer<typeof projectDto>
 export type ProjectListDtoType = z.infer<typeof projectListDto>
