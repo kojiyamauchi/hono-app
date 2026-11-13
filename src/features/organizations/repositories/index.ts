@@ -438,7 +438,9 @@ export const organizationAuditLogRepository = {
     // プロジェクトやユーザーの現存を前提にしたJOINは行わず、削除後も記録を取得できるようにする。
     const rows = await prisma.$queryRaw<unknown[]>(Prisma.sql`
       SELECT id, "organizationId", action, "actorUserId", "targetUserId", "targetMembershipId", "previousRole", "newRole",
-        "projectId", "projectBefore", "projectAfter", "createdAt"
+        "projectId", "projectBefore", "projectAfter",
+        "projectBefore" IS NULL AS "projectBeforeIsSqlNull", "projectAfter" IS NULL AS "projectAfterIsSqlNull",
+        "createdAt"
       FROM "AuditLog"
       WHERE "organizationId" = ${organizationId}
       ${boundaryCondition}
@@ -505,10 +507,25 @@ const toAuditLogEntity = (row: unknown): AuditLog => {
     createdAt: row.createdAt,
   }
 
+  // JSONB列はデコードするとSQL NULLとJSON nullがどちらもJSのnullになるため、SQLの `IS NULL` 判定を補助booleanとして取得し、
+  // 区別したまま検証する。補助booleanはここでの検証だけに使い、Entity・DTOへは含めない。
+  const sqlNullFlags = { projectBefore: row.projectBeforeIsSqlNull, projectAfter: row.projectAfterIsSqlNull }
+  for (const [field, flag] of Object.entries(sqlNullFlags)) {
+    if (typeof flag !== 'boolean') {
+      return invalidAuditLogRow(`${field}のSQL NULL判定が真偽値ではありません`)
+    }
+  }
+  /** 存在しない側のスナップショット。SQL NULLだけを許可し、JSON nullは拒否する。 */
+  const absentSnapshot = (field: 'projectBefore' | 'projectAfter'): null =>
+    sqlNullFlags[field] === true && row[field] === null ? null : invalidAuditLogRow(`${field}はこのイベントではSQL NULLでなければなりません`)
+  /** 必要な側のスナップショット。SQL NULLは拒否し、JSON null・不正な形状は固定形状検証で拒否する。 */
+  const presentSnapshot = (field: 'projectBefore' | 'projectAfter'): ProjectSnapshot =>
+    sqlNullFlags[field] === true ? invalidAuditLogRow(`${field}がSQL NULLです`) : parseProjectSnapshot(row[field], field)
+
   const parseMemberFields = (): { targetUserId: number; targetMembershipId: number; previousRole: Role } => {
     requireNull(row.projectId, 'projectId')
-    requireNull(row.projectBefore, 'projectBefore')
-    requireNull(row.projectAfter, 'projectAfter')
+    absentSnapshot('projectBefore')
+    absentSnapshot('projectAfter')
     return {
       targetUserId: requireInteger(row.targetUserId, 'targetUserId'),
       targetMembershipId: requireInteger(row.targetMembershipId, 'targetMembershipId'),
@@ -536,15 +553,15 @@ const toAuditLogEntity = (row: unknown): AuditLog => {
         ...base,
         action: 'PROJECT_CREATED',
         projectId,
-        projectBefore: requireNull(row.projectBefore, 'projectBefore'),
-        projectAfter: parseProjectSnapshot(row.projectAfter, 'projectAfter'),
+        projectBefore: absentSnapshot('projectBefore'),
+        projectAfter: presentSnapshot('projectAfter'),
       }
     }
     case 'PROJECT_UPDATED': {
       requireNoMemberFields()
       const projectId = requireInteger(row.projectId, 'projectId')
-      const projectBefore = parseProjectSnapshot(row.projectBefore, 'projectBefore')
-      const projectAfter = parseProjectSnapshot(row.projectAfter, 'projectAfter')
+      const projectBefore = presentSnapshot('projectBefore')
+      const projectAfter = presentSnapshot('projectAfter')
       // 更新イベントは実変更があるときだけ記録される。同値のスナップショットは不整合として扱う。
       if (projectBefore.name === projectAfter.name && projectBefore.description === projectAfter.description) {
         return invalidAuditLogRow('PROJECT_UPDATEDのbeforeとafterが同値です')
@@ -558,8 +575,8 @@ const toAuditLogEntity = (row: unknown): AuditLog => {
         ...base,
         action: 'PROJECT_DELETED',
         projectId,
-        projectBefore: parseProjectSnapshot(row.projectBefore, 'projectBefore'),
-        projectAfter: requireNull(row.projectAfter, 'projectAfter'),
+        projectBefore: presentSnapshot('projectBefore'),
+        projectAfter: absentSnapshot('projectAfter'),
       }
     }
     default:
