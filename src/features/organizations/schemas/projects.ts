@@ -10,7 +10,14 @@ const unknownKeysError = (issue: { code: string; keys?: string[] }): string | un
 const projectNameSchema = z.string().trim().min(1, 'プロジェクト名は必須です').max(100, 'プロジェクト名は100文字以下で指定してください')
 
 /** プロジェクトの説明。nullは説明なし。空文字は有効な値で、trimや空文字→nullの変換は行わない。最大2,000文字。 */
-const projectDescriptionSchema = z.string().max(2000, '説明は2000文字以下で指定してください').nullable()
+const projectDescriptionSchema = z
+  .string()
+  .max(2000, '説明は2000文字以下で指定してください')
+  .nullable()
+  .openapi({
+    // OpenAPI 3.1ではnullableが無効なため、JSON Schemaの書き方でnull許容を明示する（Zod定義と実行時挙動は変えない）
+    type: ['string', 'null'],
+  })
 
 /** PostgreSQL INTEGER上限までの正の整数ID（パスパラメータ用）。DBへ渡す前に不正値を400にする。 */
 const idParamSchema = (label: string, name: string): z.ZodType<number> =>
