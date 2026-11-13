@@ -418,7 +418,12 @@ describe('organizations routes OpenAPI定義', () => {
   test('プロジェクトのrequest bodyは未知の項目を拒否し、更新はnameのnullを許容しない', async () => {
     const doc = await fetchOpenApiDoc()
 
-    type BodySchema = { additionalProperties?: boolean; required?: string[]; properties: Record<string, { type?: string | string[]; maxLength?: number }> }
+    type BodySchema = {
+      additionalProperties?: boolean
+      minProperties?: number
+      required?: string[]
+      properties: Record<string, { type?: string | string[]; maxLength?: number }>
+    }
     const createBody = doc.components?.schemas?.CreateProjectRequest as BodySchema
     const updateBody = doc.components?.schemas?.UpdateProjectRequest as BodySchema
 
@@ -427,6 +432,10 @@ describe('organizations routes OpenAPI定義', () => {
     expect(createBody.properties.name.maxLength).toBe(100)
     expect(updateBody.additionalProperties).toBe(false)
     expect(updateBody.required ?? []).toEqual([])
+    // 空のPATCH（{}）はrefineで400になるため、公開仕様にも少なくとも1項目必須として反映する
+    expect(updateBody.minProperties).toBe(1)
+    expect(Object.keys(updateBody.properties).sort()).toEqual(['description', 'name'])
+    expect(createBody.minProperties).toBeUndefined()
     expect(updateBody.properties.name.type).toBe('string')
   })
 })
