@@ -393,6 +393,28 @@ describe('organizations routes OpenAPI定義', () => {
     expect([...(projectList.required ?? [])].sort()).toEqual(['items', 'nextCursor'])
   })
 
+  test('プロジェクトのnull許容項目（POST/PATCHのdescription、一覧のnextCursor）はOpenAPI 3.1のtype配列で表現され、nullableを持たない', async () => {
+    const doc = await fetchOpenApiDoc()
+
+    type Property = { type?: string | string[]; nullable?: boolean; maxLength?: number }
+    const propertyOf = (schemaName: string, property: string): Property =>
+      (doc.components?.schemas?.[schemaName] as { properties: Record<string, Property> }).properties[property]
+
+    for (const [schemaName, property] of [
+      ['CreateProjectRequest', 'description'],
+      ['UpdateProjectRequest', 'description'],
+      ['ProjectList', 'nextCursor'],
+    ]) {
+      const generated = propertyOf(schemaName, property)
+      expect(generated.type).toContain('null')
+      expect(generated.type).toContain('string')
+      expect(generated).not.toHaveProperty('nullable')
+    }
+    // 型の上書きで既存の文字数制約が失われていない
+    expect(propertyOf('CreateProjectRequest', 'description').maxLength).toBe(2000)
+    expect(propertyOf('UpdateProjectRequest', 'description').maxLength).toBe(2000)
+  })
+
   test('プロジェクトのrequest bodyは未知の項目を拒否し、更新はnameのnullを許容しない', async () => {
     const doc = await fetchOpenApiDoc()
 
