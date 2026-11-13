@@ -77,7 +77,8 @@ export const updateProjectBodySchema = z
   .refine((value) => value.name !== undefined || value.description !== undefined, {
     error: 'nameまたはdescriptionの少なくとも1項目を指定してください',
   })
-  .openapi('UpdateProjectRequest')
+  // 実行時のrefineはOpenAPIに反映されないため、少なくとも1項目が必須の契約をminPropertiesで公開仕様に表す
+  .openapi('UpdateProjectRequest', { minProperties: 1 })
 
 /**
  * プロジェクト一覧（カーソル式）のqueryスキーマ。
