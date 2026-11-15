@@ -8,15 +8,12 @@ import type { UserDtoType } from '@/shared/user/dtos'
 import { AppError } from '@/utils/errors'
 
 import type { ListDtoType as SessionListDtoType } from '../dtos/sessions'
-import type {
-  ChangePasswordSchemaType,
-  ConfirmEmailVerificationSchemaType,
-  ConfirmPasswordResetSchemaType,
-  DeleteSessionParamSchemaType,
-  LoginSchemaType,
-  RequestPasswordResetSchemaType,
-  SignupSchemaType,
-} from '../schemas'
+import type { BodySchemaType as ChangePasswordSchemaType } from '../schemas/changePassword'
+import type { ConfirmBodySchemaType as ConfirmEmailVerificationSchemaType } from '../schemas/emailVerification'
+import type { BodySchemaType as LoginSchemaType } from '../schemas/login'
+import type { ConfirmBodySchemaType as ConfirmPasswordResetSchemaType, RequestBodySchemaType as RequestPasswordResetSchemaType } from '../schemas/passwordReset'
+import type { ItemParamSchemaType as DeleteSessionParamSchemaType } from '../schemas/sessions'
+import type { BodySchemaType as SignupSchemaType } from '../schemas/signup'
 import { changePasswordService } from '../services/changePassword'
 import { emailVerificationService } from '../services/emailVerification'
 import { loginService } from '../services/login'

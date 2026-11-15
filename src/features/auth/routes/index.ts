@@ -10,15 +10,12 @@ import { openApiDefaultHook } from '@/utils/validation'
 
 import { authController } from '../controllers'
 import { listDto as sessionListDto } from '../dtos/sessions'
-import {
-  changePasswordSchema,
-  confirmEmailVerificationSchema,
-  confirmPasswordResetSchema,
-  deleteSessionParamSchema,
-  loginSchema,
-  requestPasswordResetSchema,
-  signupSchema,
-} from '../schemas'
+import { bodySchema as changePasswordSchema } from '../schemas/changePassword'
+import { confirmBodySchema as confirmEmailVerificationSchema } from '../schemas/emailVerification'
+import { bodySchema as loginSchema } from '../schemas/login'
+import { confirmBodySchema as confirmPasswordResetSchema, requestBodySchema as requestPasswordResetSchema } from '../schemas/passwordReset'
+import { itemParamSchema as deleteSessionParamSchema } from '../schemas/sessions'
+import { bodySchema as signupSchema } from '../schemas/signup'
 
 /** JSONエラーレスポンス（`{ error: { message } }`）の共通定義を生成する。 */
 const errorResponse = (description: string): { content: { 'application/json': { schema: typeof errorResponseDto } }; description: string } => ({

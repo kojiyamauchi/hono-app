@@ -4,7 +4,7 @@ import { userRepository } from '@/shared/user/repositories'
 import { AppError } from '@/utils/errors'
 import { createInMemoryRateLimiter } from '@/utils/rateLimit'
 
-import type { LoginSchemaType as BodySchemaType } from '../schemas'
+import type { BodySchemaType } from '../schemas/login'
 import { issueAuthentication, normalizeEmailForRateLimit } from './common'
 
 /** ログインのIP単位制限回数。 */

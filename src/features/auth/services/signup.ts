@@ -4,7 +4,7 @@ import { userRepository } from '@/shared/user/repositories'
 import { AppError } from '@/utils/errors'
 import { createInMemoryRateLimiter } from '@/utils/rateLimit'
 
-import type { SignupSchemaType as BodySchemaType } from '../schemas'
+import type { BodySchemaType } from '../schemas/signup'
 import { issueAuthentication } from './common'
 
 /** サインアップのIP単位制限回数。 */
