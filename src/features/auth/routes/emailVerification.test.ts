@@ -71,11 +71,15 @@ await mock.module('@/shared/user/repositories', () => ({
 // notifierをモックしてno-op実装を差し替える
 const notifierSend = mock()
 const sendEmailVerificationBestEffort = mock()
-const authServicesModule = await import('@/shared/auth/services')
-await mock.module('@/shared/auth/services', () => ({
-  ...authServicesModule,
-  passwordResetNotifier: { send: notifierSend },
+const emailVerificationModule = await import('@/shared/auth/services/emailVerification')
+await mock.module('@/shared/auth/services/emailVerification', () => ({
+  ...emailVerificationModule,
   sendEmailVerificationBestEffort,
+}))
+const passwordResetModule = await import('@/shared/auth/services/passwordReset')
+await mock.module('@/shared/auth/services/passwordReset', () => ({
+  ...passwordResetModule,
+  passwordResetNotifier: { send: notifierSend },
 }))
 
 const passwordResetRequestDelayMs = mock(() => 0)

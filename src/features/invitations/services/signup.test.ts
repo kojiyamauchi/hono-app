@@ -17,9 +17,9 @@ await mock.module('@/shared/auth/repositories/refreshToken', () => ({
 }))
 
 const sendEmailVerificationBestEffort = mock()
-const authServicesModule = await import('@/shared/auth/services')
-await mock.module('@/shared/auth/services', () => ({
-  ...authServicesModule,
+const emailVerificationModule = await import('@/shared/auth/services/emailVerification')
+await mock.module('@/shared/auth/services/emailVerification', () => ({
+  ...emailVerificationModule,
   sendEmailVerificationBestEffort,
 }))
 

@@ -1,10 +1,12 @@
 import { describe, expect, test } from 'bun:test'
 import { Hono } from 'hono'
 
+import { REFRESH_TOKEN_TTL_MS } from './common'
+
 process.env.JWT_SECRET = 'test-jwt-secret'
 process.env.REFRESH_TOKEN_SECRET = 'test-refresh-secret'
 
-const { clearRefreshTokenCookie, getRefreshTokenCookie, REFRESH_TOKEN_COOKIE_NAME, REFRESH_TOKEN_TTL_MS, setRefreshTokenCookie } = await import('.')
+const { clearRefreshTokenCookie, getRefreshTokenCookie, REFRESH_TOKEN_COOKIE_NAME, setRefreshTokenCookie } = await import('./cookie')
 
 /**
  * Set-Cookieヘッダーから属性をパースするヘルパー。
