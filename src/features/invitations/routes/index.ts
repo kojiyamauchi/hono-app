@@ -10,7 +10,10 @@ import { SECURITY_SCHEME } from '@/shared/openApi/schemes'
 import { openApiDefaultHook } from '@/utils/validation'
 
 import { invitationsController } from '../controllers'
-import { acceptInvitationBodySchema, declineInvitationBodySchema, invitationTokenParamSchema, signupInvitationBodySchema } from '../schemas'
+import { tokenParamSchema } from '../schemas'
+import { bodySchema as acceptBodySchema } from '../schemas/accept'
+import { bodySchema as declineBodySchema } from '../schemas/decline'
+import { bodySchema as signupBodySchema } from '../schemas/signup'
 
 /** JSONエラーレスポンス（`{ error: { message } }`）の共通定義を生成する。 */
 const errorResponse = (description: string): { content: { 'application/json': { schema: typeof errorResponseDto } }; description: string } => ({
@@ -28,7 +31,7 @@ const getDetailRoute = createRoute({
   tags: ['Invitations'],
   summary: '招待トークンから招待詳細を取得する',
   request: {
-    params: invitationTokenParamSchema,
+    params: tokenParamSchema,
   },
   responses: {
     200: {
@@ -53,7 +56,7 @@ const acceptRoute = createRoute({
       // required: true を付けないと、Content-Typeなし/bodyなしのPOSTが任意bodyとして
       // 検証スキップされ c.req.valid('json') が {} になり400が返らなくなる。既存の必須body検証を維持する。
       required: true,
-      content: { 'application/json': { schema: acceptInvitationBodySchema } },
+      content: { 'application/json': { schema: acceptBodySchema } },
     },
   },
   responses: {
@@ -81,7 +84,7 @@ const declineRoute = createRoute({
       // required: true を付けないと、Content-Typeなし/bodyなしのPOSTが任意bodyとして
       // 検証スキップされ c.req.valid('json') が {} になり400が返らなくなる。既存の必須body検証を維持する。
       required: true,
-      content: { 'application/json': { schema: declineInvitationBodySchema } },
+      content: { 'application/json': { schema: declineBodySchema } },
     },
   },
   responses: {
@@ -107,7 +110,7 @@ const signupRoute = createRoute({
       // required: true を付けないと、Content-Typeなし/bodyなしのPOSTが任意bodyとして
       // 検証スキップされ c.req.valid('json') が {} になり400が返らなくなる。既存の必須body検証を維持する。
       required: true,
-      content: { 'application/json': { schema: signupInvitationBodySchema } },
+      content: { 'application/json': { schema: signupBodySchema } },
     },
   },
   responses: {

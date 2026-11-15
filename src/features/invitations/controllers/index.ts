@@ -5,7 +5,9 @@ import { setRefreshTokenCookie } from '@/shared/auth/services'
 import type { InvitationDetailDtoType } from '@/shared/invitation/dtos'
 import type { MemberDtoType } from '@/shared/membership/dtos'
 
-import type { AcceptInvitationBodySchemaType, DeclineInvitationBodySchemaType, SignupInvitationBodySchemaType } from '../schemas'
+import type { BodySchemaType as AcceptBodySchemaType } from '../schemas/accept'
+import type { BodySchemaType as DeclineBodySchemaType } from '../schemas/decline'
+import type { BodySchemaType as SignupBodySchemaType } from '../schemas/signup'
 import { service } from '../services'
 import { acceptService } from '../services/accept'
 import { declineService } from '../services/decline'
@@ -31,7 +33,7 @@ export const invitationsController = {
   /**
    * 招待を受諾してメンバーになる。201でMemberDtoTypeを返す。
    */
-  accept: async (c: Context, userId: number, input: AcceptInvitationBodySchemaType): Promise<TypedResponse<MemberDtoType, 201, 'json'>> => {
+  accept: async (c: Context, userId: number, input: AcceptBodySchemaType): Promise<TypedResponse<MemberDtoType, 201, 'json'>> => {
     const result = await acceptService.execute(userId, input.token)
     return c.json(result, 201)
   },
@@ -39,7 +41,7 @@ export const invitationsController = {
   /**
    * 招待を辞退する。204 No Contentを返す。
    */
-  decline: async (c: Context, input: DeclineInvitationBodySchemaType): Promise<Response> => {
+  decline: async (c: Context, input: DeclineBodySchemaType): Promise<Response> => {
     await declineService.execute(input.token)
     return c.body(null, 204)
   },
@@ -48,7 +50,7 @@ export const invitationsController = {
    * 招待経由で新規登録する。201でアクセストークンとユーザー情報を返す。
    * リフレッシュトークンはCookieへセットする。
    */
-  signup: async (c: Context, input: SignupInvitationBodySchemaType): Promise<TypedResponse<AuthResultDtoType, 201, 'json'>> => {
+  signup: async (c: Context, input: SignupBodySchemaType): Promise<TypedResponse<AuthResultDtoType, 201, 'json'>> => {
     const result = await signupService.execute(input.token, input.name, input.password)
     setRefreshTokenCookie(c, result.refreshToken)
     return c.json({ token: result.token, user: result.user }, 201)
