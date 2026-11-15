@@ -67,10 +67,52 @@ Bun上で動作するHono.js APIアプリケーションです。TypeScriptを�
   - 新しい処理を置く場合は、まず既存の標準ディレクトリのどれに属するかを判断すること
   - 標準ディレクトリでは表現しづらい責務が出た場合は、実装前に設計方針を確認し、必要に応じてREADME/AGENTS/CLAUDEを更新してから追加すること
 - 現時点で実装がない標準ディレクトリには `.gitkeep` を置き、構成の一貫性を保つこと
-- OpenAPIドキュメント公開（`/open-api/doc` / `/open-api/scalar`）は、上記の標準構成に対する例外として以下を許容する
+- OpenAPIドキュメント公開（`/open-api/doc` / `/open-api/scalar`）は、登録方式とsecurity schemeの置き場所に限り、上記の標準構成に対する例外を許容する。`features/openApi` 自体も後述のファイル分割・命名ルールの適用対象であり、feature全体を例外扱いしない
   - `src/shared/openApi/schemes/`: OpenAPIのsecurity scheme（認証「方式」の定義）を置く標準外の責務ディレクトリ。入力検証用Zod schema（データ構造）を置く `schemas/` とは責務が異なるため別ディレクトリとして分離する。scheme（方式）と schema（構造）を混在させない
-  - `src/features/openApi`: OpenAPI仕様は各featureのroute定義がroot app（`OpenAPIHono`）のregistryへ集約されて初めて全体が揃うため、`app.route()` でmountする通常のfeature routesではなく、root appを受け取って `/open-api/doc`・`/open-api/scalar` を登録する登録関数 `registerOpenApiRoutes(app)` を提供する。`src/routes/index.ts` は全 `app.route(...)` の後にこれを1回呼ぶ
+  - `src/features/openApi` の登録方式: OpenAPI仕様は各featureのroute定義がroot app（`OpenAPIHono`）のregistryへ集約されて初めて全体が揃うため、`app.route()` でmountする通常のfeature routesではなく、root appを受け取って登録する。`routes/doc.ts`・`routes/scalar.ts` がそれぞれroot appへ公開URL `/open-api/doc`・`/open-api/scalar` で直接登録し、`routes/index.ts` が集約して登録関数 `registerOpenApiRoutes(app)` を提供する。`src/routes/index.ts` は全 `app.route(...)` の後にこれを1回呼ぶ
   - これらは例外であり、他featureへ横展開しないこと
+
+#### features / shared のファイル分割と命名
+
+`src/features/<feature>/` と `src/shared/<domain>/` の各標準ディレクトリは、リソース・操作の単位でファイル分割する。
+
+##### ファイル配置
+
+- ファイル名はcamelCaseとし、リソース・操作の名前をそのまま使う（例: `members.ts`、`transferOwnership.ts`、`auditLogs.ts`）
+- `index.ts` にはfeature・ドメイン本体の定義を置く。routesの `index.ts` だけは、分割したルートの集約も担当する
+- routes以外では、他ファイルの集約・再export専用の `index.ts` を作らないこと。本体の定義がなければ `index.ts` を作らず、定義が残らなくなった既存の `index.ts` は参照更新後に削除する
+- 実装・定義が存在するファイルだけを作り、全レイヤーに同じファイル一覧を機械的に揃えない
+- 同じ標準ディレクトリ内の複数ファイルが共有する定義は、そのディレクトリの `common.ts` に置き、利用側から直接importする。本体（`index.ts`）の定義でも配下のファイルが使う場合は `common.ts` を優先し、`index.ts` 側も `common.ts` から直接importする。必要な場合にだけ作成し、共通化してもレイヤーの責務を保つ
+- 一つのファイル内だけで使う補助定義は、そのファイルに置く。他レイヤーから参照されるだけの定義を機械的に `common.ts` へ移さない
+- 個別ファイルと `index.ts` の間で循環importを作らないこと
+- テストは対象ファイルに対応させる（例: `members.test.ts`）。`controllers.test.ts` のような旧来のレイヤー単位テストは各テストケースを責務別ファイルのテストへ分配し、`index.ts` 本体のケースが残る場合だけ `index.test.ts` にまとめる。型だけのファイルなどへ機械的にテストを増やさず、[docs/testing.md](docs/testing.md) に従う
+
+##### routesの分割
+
+- feature本体の直下（本体IDがあればその直下）の先頭の固定セグメントをファイル単位とし、HTTP methodごと・末端の操作ごとには分けない。同じセグメント配下の動的パス・操作・子リソースは同じファイルにまとめ、異なるセグメントは意味が近くても統合しない（例: `logout.ts` と `logoutAll.ts` は分け、`password-reset/request` と `password-reset/confirm` は `passwordReset.ts` にまとめる）
+- featureのトップレベルのルートと、feature本体を指す動的パスは `routes/index.ts` に定義する
+- 各ファイルはfeatureのトップレベルURLからの相対パスを定義し、`index.ts` でmountする（openApiのroot appへの直接登録は前述の例外）
+- 同じHTTP methodで同じ階層の静的パスと動的パスが衝突しうる場合は、静的パスのルートを先にmountし、その後に動的パスを登録する（例: usersの `GET /me` は `GET /{id}` より先）。ファイル内でも静的パスを先に登録する
+- routesは各エンドポイントのURL・HTTP method・OpenAPI定義・middlewareと適用順序・入力検証・Controller呼び出しを担当し、業務処理はController以下へ委ねる
+
+##### 命名
+
+- feature名や、ファイル名から分かるリソース名の重複は省く。対象はController／Service／Repositoryのオブジェクト名とメソッド名、Zod schemaとその型、DTOとその型、mapper関数である
+- `<リソース名・操作名>` はファイル名から `.ts` を除いた文字列をそのまま使い、単数・複数を独自に変えない
+- Controller／Service／Repositoryのexport名は、`index.ts` の本体が `controller`／`service`／`repository`、配下が `<リソース名・操作名>Controller`／`<リソース名・操作名>Service`／`<リソース名・操作名>Repository`（例: `membersController`、`projectsRepository`）とする。メソッド名も `membersController.list()` のように重複を省く
+- ファイル名が単一の操作名である次のファイルでは、単一操作メソッドを `execute()` とする: `transferOwnership`／`signup`／`login`／`refresh`／`logout`／`logoutAll`／`changePassword`／`accept`／`decline`。複数操作をまとめるリソース（`passwordReset`・`emailVerification`・`sessions` など）は、操作を区別できるメソッド名を使う
+- `me.ts` は認証中のユーザー自身を表すリソースとし、`execute()` は使わず、GETは `get()`、PATCHは `update()`、DELETEは `remove()` とする
+- schema: 単一操作ファイルのbodyは `bodySchema`／`BodySchemaType`、queryは `querySchema`／`QuerySchemaType`。複数操作を持つリソースは `updateBodySchema`／`UpdateBodySchemaType` のように操作を区別する。カーソルのペイロードは `cursorPayloadSchema`
+- param schema: 本体の動的IDは `idParamSchema`／`IdParamSchemaType`（配下と共有する場合は `schemas/common.ts`）、単体リソースを指すparamは `itemParamSchema`、本体と検証条件が異なるコレクションparamは `collectionParamSchema`。APIごとの検証条件とパラメータ名は変えない
+- DTO: 単体は `itemDto`／`ItemDtoType`、一覧は `listDto`／`ListDtoType`。同一ファイル内で区別が必要な場合は `memberRoleChangedDto` のように区別できる名前を付ける。OpenAPI component名はTypeScript上のexport名を変えても維持する
+- mapper: 単体変換は `toResponse`、一覧変換は `toListResponse`、カーソルは `encodeCursor`／`decodeCursor`
+- 複数ファイルの同名exportを同時に使う場合は、利用側でimport aliasを付けて区別する
+- 既存の定数・補助型（結果定数、入力型・結果型・境界型など）とEntityの型名・定数名は省略の対象に含めず、名前と意味を維持する
+
+##### sharedへの適用
+
+- `src/shared/<domain>/` にも上記の配置ルールを適用する。ただしURLではなくドメイン内の責務でファイルを分割する（例: `shared/invitation/repositories/` の `index.ts`（招待本体）・`emailDelivery.ts`（配信）・`emailResend.ts`（再送））
+- 複数featureから利用する前提のため、exportにはドメイン名を残す（例: `organizationRepository`、`toOrganizationResponse`、`organizationDto`、`OrganizationDtoType`）。`sharedOrganizationRepository` のような `shared` 接頭辞は付けず、同名衝突がある利用箇所でのみimport aliasを用いる
 
 #### src配下のレイヤー依存ルール
 
@@ -296,11 +338,12 @@ import { prisma } from '../libs/prisma'
 `src/features/**/schemas/` および `src/shared/**/schemas/` 配下で定義するZod schemaと、そのschemaからexportする型は以下の命名に揃えること:
 
 - Zod schemaは `***Schema` として定義すること
-  - 例: `signupSchema`、`updateMeSchema`、`userIdParamSchema`
+  - 例: `bodySchema`、`updateBodySchema`、`idParamSchema`
 - schemaから `z.infer` でexportする型は、対応するschema名に `Type` を付与した `***SchemaType` とすること
-  - 例: `SignupSchemaType`、`UpdateMeSchemaType`
+  - 例: `BodySchemaType`、`UpdateBodySchemaType`
 - param系schemaの型も同じ規則に従い、`***ParamSchemaType` とすること
-  - 例: `UserIdParamSchemaType`、`OrganizationIdParamSchemaType`
+  - 例: `IdParamSchemaType`、`ItemParamSchemaType`
+- feature名やファイル名から分かるリソース名は名前に含めない。具体的な命名（`bodySchema`／`querySchema`／`idParamSchema`／`itemParamSchema`／`collectionParamSchema`）と配置は 「features / shared のファイル分割と命名」節 に従うこと
 - schema由来の型に `***Input` や `***Param` のような別接尾語を使わないこと
 - repository内部など、`schemas/` 配下のZod schema由来ではない入出力型はこの規則の対象外とする
 - `dtos/` 配下のZod DTO定義とその型もこの規則の対象外とし、[### DTOとOpenAPI schemaの配置](#dtoとopenapi-schemaの配置) の `***Dto` / `***DtoType` 命名に従うこと
@@ -313,7 +356,7 @@ OpenAPIを導入しており、入力検証用schemaとレスポンスDTOの責�
 - `dtos/` はAPIレスポンスDTOに寄せること
 - レスポンスDTOはZodで定義し、OpenAPI response schemaとDTO型の正本にすること
 - DTO定義名は `***Dto`、そこから `z.infer` でexportする型名は `***DtoType` とすること
-  - 例: `userDto`、`UserDtoType`
+  - 例: `itemDto`、`ItemDtoType`、`listDto`、`ListDtoType`（feature名やファイル名から分かるリソース名は省く。sharedではドメイン名を残し、`userDto`、`UserDtoType` のように命名する）
 - `dtos/` 配下のZod DTO定義は、`schemas/` 配下の `***Schema` / `***SchemaType` 命名規則の対象外とする
 - レスポンスDTOのZodは通常の本番レスポンスで毎回parseせず、mapperテストで `safeParse` して実装との整合を担保すること
 - OpenAPI JSONは `/open-api/doc` で動的生成し、手書きの `openapi.yml` を正本にしないこと
