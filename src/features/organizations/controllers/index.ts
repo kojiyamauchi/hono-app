@@ -19,7 +19,11 @@ import type {
   UpdateMemberRoleBodySchemaType,
   UpdateOrganizationSchemaType,
 } from '../schemas'
-import { organizationsService } from '../services'
+import { service } from '../services'
+import { auditLogsService } from '../services/auditLogs'
+import { invitationsService } from '../services/invitations'
+import { membersService } from '../services/members'
+import { transferOwnershipService } from '../services/transferOwnership'
 
 /**
  * organizations featureのコントローラ。
@@ -32,7 +36,7 @@ export const organizationsController = {
    * 組織を作成する。201で作成結果を返す。
    */
   create: async (c: Context, userId: number, input: CreateOrganizationSchemaType): Promise<TypedResponse<OrganizationDtoType, 201, 'json'>> => {
-    const result = await organizationsService.create(userId, input)
+    const result = await service.create(userId, input)
     return c.json(result, 201)
   },
 
@@ -40,7 +44,7 @@ export const organizationsController = {
    * 認証済みユーザーが所属する組織の一覧を、検証済みqueryのlimit・offsetで1ページ分返す。
    */
   listMine: async (c: Context, userId: number, query: ListMineQuerySchemaType): Promise<TypedResponse<OrganizationListDtoType, 200, 'json'>> => {
-    const result = await organizationsService.listMine(userId, query.limit, query.offset)
+    const result = await service.listMine(userId, query.limit, query.offset)
     return c.json(result, 200)
   },
 
@@ -48,7 +52,7 @@ export const organizationsController = {
    * 指定IDの組織情報を返す。
    */
   getById: async (c: Context, organizationId: number): Promise<TypedResponse<OrganizationDtoType, 200, 'json'>> => {
-    const result = await organizationsService.getById(organizationId)
+    const result = await service.getById(organizationId)
     return c.json(result, 200)
   },
 
@@ -61,7 +65,7 @@ export const organizationsController = {
     input: UpdateOrganizationSchemaType,
     role: Role,
   ): Promise<TypedResponse<OrganizationDtoType, 200, 'json'>> => {
-    const result = await organizationsService.update(organizationId, input, role)
+    const result = await service.update(organizationId, input, role)
     return c.json(result, 200)
   },
 
@@ -69,7 +73,7 @@ export const organizationsController = {
    * 組織を削除する。204を返す。
    */
   remove: async (c: Context, organizationId: number, role: Role): Promise<Response> => {
-    await organizationsService.remove(organizationId, role)
+    await service.remove(organizationId, role)
     return c.body(null, 204)
   },
 
@@ -83,7 +87,7 @@ export const organizationsController = {
     operatorRole: Role,
     input: TransferOwnershipBodySchemaType,
   ): Promise<Response> => {
-    await organizationsService.transferOwnership(organizationId, currentOwnerUserId, operatorRole, input.membershipId)
+    await transferOwnershipService.execute(organizationId, currentOwnerUserId, operatorRole, input.membershipId)
     return c.body(null, 204)
   },
 }
@@ -96,7 +100,7 @@ export const organizationsMembersController = {
    * 認証ユーザー自身を組織から脱退させる。204を返す。
    */
   leave: async (c: Context, organizationId: number, userId: number): Promise<Response> => {
-    await organizationsService.leave(organizationId, userId)
+    await membersService.leave(organizationId, userId)
     return c.body(null, 204)
   },
 
@@ -104,7 +108,7 @@ export const organizationsMembersController = {
    * 組織のメンバー一覧を、検証済みqueryのlimit・cursorで1ページ分返す。
    */
   listMembers: async (c: Context, organizationId: number, query: ListMembersQuerySchemaType): Promise<TypedResponse<MemberListDtoType, 200, 'json'>> => {
-    const result = await organizationsService.listMembers(organizationId, query.limit, query.cursor)
+    const result = await membersService.list(organizationId, query.limit, query.cursor)
     return c.json(result, 200)
   },
 
@@ -117,7 +121,7 @@ export const organizationsMembersController = {
     operatorRole: Role,
     input: AddMemberBodySchemaType,
   ): Promise<TypedResponse<MemberDtoType, 201, 'json'>> => {
-    const result = await organizationsService.addMember(organizationId, operatorRole, input)
+    const result = await membersService.add(organizationId, operatorRole, input)
     return c.json(result, 201)
   },
 
@@ -132,7 +136,7 @@ export const organizationsMembersController = {
     operatorRole: Role,
     input: UpdateMemberRoleBodySchemaType,
   ): Promise<TypedResponse<MemberDtoType, 200, 'json'>> => {
-    const result = await organizationsService.updateMemberRole(organizationId, membershipId, actorUserId, operatorRole, input)
+    const result = await membersService.updateRole(organizationId, membershipId, actorUserId, operatorRole, input)
     return c.json(result, 200)
   },
 
@@ -140,7 +144,7 @@ export const organizationsMembersController = {
    * メンバーを削除する。204を返す。操作者は認証済みユーザーIDで渡し、認可はserviceがロック後のロールで判定する。
    */
   removeMember: async (c: Context, organizationId: number, membershipId: number, actorUserId: number): Promise<Response> => {
-    await organizationsService.removeMember(organizationId, membershipId, actorUserId)
+    await membersService.remove(organizationId, membershipId, actorUserId)
     return c.body(null, 204)
   },
 }
@@ -153,7 +157,7 @@ export const organizationsAuditLogsController = {
    * 組織の監査ログを、検証済みqueryのlimit・cursorで1ページ分返す。
    */
   listAuditLogs: async (c: Context, organizationId: number, query: ListAuditLogsQuerySchemaType): Promise<TypedResponse<AuditLogListDtoType, 200, 'json'>> => {
-    const result = await organizationsService.listAuditLogs(organizationId, query.limit, query.cursor)
+    const result = await auditLogsService.list(organizationId, query.limit, query.cursor)
     return c.json(result, 200)
   },
 }
@@ -171,7 +175,7 @@ export const organizationsInvitationsController = {
     operatorRole: Role,
     input: CreateInvitationBodySchemaType,
   ): Promise<TypedResponse<InvitationDtoType, 201, 'json'>> => {
-    const result = await organizationsService.createInvitation(organizationId, operatorRole, input)
+    const result = await invitationsService.create(organizationId, operatorRole, input)
     return c.json(result, 201)
   },
 
@@ -179,7 +183,7 @@ export const organizationsInvitationsController = {
    * 招待一覧を返す。デフォルトはPENDINGのみ。
    */
   listInvitations: async (c: Context, organizationId: number, operatorRole: Role): Promise<TypedResponse<InvitationListItemDtoType[], 200, 'json'>> => {
-    const result = await organizationsService.listInvitations(organizationId, operatorRole)
+    const result = await invitationsService.list(organizationId, operatorRole)
     return c.json(result, 200)
   },
 
@@ -187,7 +191,7 @@ export const organizationsInvitationsController = {
    * 招待をキャンセルする。204を返す。
    */
   cancelInvitation: async (c: Context, organizationId: number, invitationId: number, operatorRole: Role): Promise<Response> => {
-    await organizationsService.cancelInvitation(organizationId, invitationId, operatorRole)
+    await invitationsService.cancel(organizationId, invitationId, operatorRole)
     return c.body(null, 204)
   },
 
@@ -195,7 +199,7 @@ export const organizationsInvitationsController = {
    * 招待メールの再送を受け付ける。配信待ちの保存までを示す本文なしの202を返す。
    */
   resendInvitationEmail: async (c: Context, organizationId: number, invitationId: number, actorUserId: number): Promise<Response> => {
-    await organizationsService.resendInvitationEmail(organizationId, invitationId, actorUserId)
+    await invitationsService.resendEmail(organizationId, invitationId, actorUserId)
     return c.body(null, 202)
   },
 }
