@@ -3,7 +3,7 @@ import { AppError } from '@/utils/errors'
 
 import type { ItemDtoType as ProjectDtoType, ListDtoType as ProjectListDtoType } from '../dtos/projects'
 import { decodeCursor, encodeCursor, toListResponse, toResponse } from '../mappers/projects'
-import { type ProjectPageBoundary, projectRepository, projectWriteResults, type ShouldRecordProjectUpdate } from '../repositories/projects'
+import { type ProjectPageBoundary, projectsRepository, projectWriteResults, type ShouldRecordProjectUpdate } from '../repositories/projects'
 
 /** プロジェクト作成の入力。`description` を省略した場合はnullとして保存する。 */
 export type CreateProjectInput = {
@@ -76,7 +76,7 @@ export const projectsService = {
     }
 
     // 認可はカーソル内の組織情報ではなく、引数で渡された認可済みのorganizationIdで毎回適用する
-    const projects = await projectRepository.findPageByOrganization(organizationId, limit + 1, boundary)
+    const projects = await projectsRepository.findPage(organizationId, limit + 1, boundary)
     const items = projects.slice(0, limit)
     const last = items.at(-1)
     const nextCursor = projects.length > limit && last !== undefined ? encodeCursor({ organizationId, createdAt: last.createdAt, id: last.id }) : null
@@ -88,7 +88,7 @@ export const projectsService = {
    * 組織内のプロジェクトを1件返す。指定組織内に存在しない（別組織のIDを含む）場合は404。
    */
   getById: async (organizationId: number, projectId: number): Promise<ProjectDtoType> => {
-    const project = await projectRepository.findByOrganizationAndId(organizationId, projectId)
+    const project = await projectsRepository.findByOrganizationAndId(organizationId, projectId)
     if (!project) {
       throw new AppError(404, 'プロジェクトが見つかりません')
     }
@@ -99,7 +99,7 @@ export const projectsService = {
    * プロジェクトを作成する。OWNER / ADMINのみ可。省略された説明はnullとして保存する。
    */
   create: async (organizationId: number, actorUserId: number, input: CreateProjectInput): Promise<ProjectDtoType> => {
-    const result = await projectRepository.createWithAuthorization<AppError>(
+    const result = await projectsRepository.createWithAuthorization<AppError>(
       { organizationId, actorUserId, name: input.name, description: input.description ?? null },
       (locked) => authorizeProjectWrite(locked.operatorRole),
     )
@@ -115,7 +115,7 @@ export const projectsService = {
    * MEMBERは対象の有無にかかわらず403（対象の存在を漏らさない）。
    */
   update: async (organizationId: number, projectId: number, actorUserId: number, input: UpdateProjectInput): Promise<ProjectDtoType> => {
-    const result = await projectRepository.updateWithAuthorization<AppError>(
+    const result = await projectsRepository.updateWithAuthorization<AppError>(
       {
         organizationId,
         projectId,
@@ -140,7 +140,7 @@ export const projectsService = {
    * MEMBERは対象の有無にかかわらず403（対象の存在を漏らさない）。
    */
   remove: async (organizationId: number, projectId: number, actorUserId: number): Promise<void> => {
-    const result = await projectRepository.removeWithAuthorization<AppError>({ organizationId, projectId, actorUserId }, (locked) =>
+    const result = await projectsRepository.removeWithAuthorization<AppError>({ organizationId, projectId, actorUserId }, (locked) =>
       authorizeProjectWrite(locked.operatorRole),
     )
 

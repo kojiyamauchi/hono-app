@@ -20,18 +20,9 @@ import type { ListDtoType as MemberListDtoType } from '../dtos/members'
 import { toListResponse as toOrganizationListResponse } from '../mappers'
 import { decodeCursor as decodeAuditLogCursor, encodeCursor as encodeAuditLogCursor, toListResponse as toAuditLogListResponse } from '../mappers/auditLogs'
 import { decodeCursor as decodeMemberListCursor, encodeCursor as encodeMemberListCursor, toListResponse as toMemberListResponse } from '../mappers/members'
-import {
-  type AuditLogPageBoundary,
-  leaveOrganizationResults,
-  memberRemovalResults,
-  memberRoleChangeResults,
-  organizationAuditLogRepository,
-  organizationMemberRemovalRepository,
-  organizationMemberRoleRepository,
-  organizationMembershipRepository,
-  organizationOwnershipRepository,
-  ownershipTransferResults,
-} from '../repositories'
+import { type AuditLogPageBoundary, auditLogsRepository } from '../repositories/auditLogs'
+import { leaveOrganizationResults, memberRemovalResults, memberRoleChangeResults, membersRepository } from '../repositories/members'
+import { ownershipTransferResults, transferOwnershipRepository } from '../repositories/transferOwnership'
 import type {
   AddMemberBodySchemaType,
   CreateInvitationBodySchemaType,
@@ -162,7 +153,7 @@ export const organizationsService = {
       throw new AppError(403, 'この操作にはオーナー権限が必要です')
     }
 
-    const result = await organizationOwnershipRepository.transferOwnership(organizationId, currentOwnerUserId, targetMembershipId)
+    const result = await transferOwnershipRepository.execute(organizationId, currentOwnerUserId, targetMembershipId)
     if (result === ownershipTransferResults.transferred) {
       return
     }
@@ -179,7 +170,7 @@ export const organizationsService = {
    * 認証ユーザー自身を組織から脱退させる。OWNERは先に所有権を移譲する必要がある。
    */
   leave: async (organizationId: number, userId: number): Promise<void> => {
-    const result = await organizationMembershipRepository.leave(organizationId, userId)
+    const result = await membersRepository.leave(organizationId, userId)
     if (result === leaveOrganizationResults.left) {
       return
     }
@@ -235,7 +226,7 @@ export const organizationsService = {
     }
 
     // 認可はカーソル内の組織情報ではなく、引数で渡された認可済みのorganizationIdで毎回適用する
-    const auditLogs = await organizationAuditLogRepository.findPageByOrganization(organizationId, limit + 1, boundary)
+    const auditLogs = await auditLogsRepository.findPage(organizationId, limit + 1, boundary)
     const items = auditLogs.slice(0, limit)
     const last = items.at(-1)
     const nextCursor = auditLogs.length > limit && last !== undefined ? encodeAuditLogCursor({ organizationId, createdAt: last.createdAt, id: last.id }) : null
@@ -295,7 +286,7 @@ export const organizationsService = {
       throw new AppError(403, 'この操作には管理者以上の権限が必要です')
     }
 
-    const result = await organizationMemberRoleRepository.changeRoleWithAuditLog<AppError>(
+    const result = await membersRepository.changeRole<AppError>(
       { organizationId, targetMembershipId: membershipId, actorUserId, newRole: input.role },
       (locked) => authorizeMemberRoleChange(locked.operatorRole, locked.targetRole, input.role),
     )
@@ -328,9 +319,8 @@ export const organizationsService = {
    * そのため操作者のロールは引数で受け取らず、認証済みユーザーIDだけを受け取る。
    */
   removeMember: async (organizationId: number, membershipId: number, actorUserId: number): Promise<void> => {
-    const result = await organizationMemberRemovalRepository.removeWithAuditLog<AppError>(
-      { organizationId, targetMembershipId: membershipId, actorUserId },
-      (locked) => authorizeMemberRemoval(locked.operatorRole, locked.targetRole),
+    const result = await membersRepository.remove<AppError>({ organizationId, targetMembershipId: membershipId, actorUserId }, (locked) =>
+      authorizeMemberRemoval(locked.operatorRole, locked.targetRole),
     )
 
     // 成功値を明示的に判定し、未知の結果を暗黙の成功として扱わない。

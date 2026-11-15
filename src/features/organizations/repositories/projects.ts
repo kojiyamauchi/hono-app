@@ -4,6 +4,7 @@ import type { Role } from '@/shared/membership/entities'
 
 import type { ProjectSnapshot } from '../entities/auditLogs'
 import type { Project } from '../entities/projects'
+import type { LockedIdRow } from './common'
 
 /** プロジェクト一覧のカーソル式ページ取得の境界値（この行より後ろ、つまりより古い行を取得する）。 */
 export type ProjectPageBoundary = { createdAt: Date; id: number }
@@ -76,7 +77,6 @@ export type RemoveProjectInput = {
   actorUserId: number
 }
 
-type LockedIdRow = { id: number }
 type LockedOperatorRow = { id: number; role: Role }
 type LockedProjectRow = { id: number; name: string; description: string | null }
 type ProjectRow = Project
@@ -162,7 +162,7 @@ const toProjectSnapshot = (project: { name: string; description: string | null }
  * organizations feature固有のProjectデータアクセスを提供するリポジトリ。
  * 詳細・更新・削除のDB条件には必ず `organizationId` と `projectId` の両方を含める。
  */
-export const projectRepository = {
+export const projectsRepository = {
   /**
    * 組織IDに紐づくプロジェクトを、作成日時・IDの降順（新しい順）でカーソル式に1ページ分取得する。
    * `boundary` が指定された場合は、その行より後ろ（`("createdAt", id) < (境界値)`）だけを返す。
@@ -172,7 +172,7 @@ export const projectRepository = {
    * 深いページでも読み捨てが発生しない。降順の並びはindexの逆方向スキャンで満たす。
    * 境界行そのものが存在するかには依存しない。
    */
-  findPageByOrganization: async (organizationId: number, take: number, boundary: ProjectPageBoundary | null): Promise<Project[]> => {
+  findPage: async (organizationId: number, take: number, boundary: ProjectPageBoundary | null): Promise<Project[]> => {
     const boundaryCondition = boundary ? Prisma.sql`AND ("createdAt", id) < (${boundary.createdAt}, ${boundary.id})` : Prisma.empty
 
     const rows = await prisma.$queryRaw<ProjectRow[]>(Prisma.sql`
