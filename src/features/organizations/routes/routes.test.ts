@@ -37,18 +37,14 @@ const changeRoleWithAuditLog = mock()
 const findAuditLogPage = mock()
 const removeWithAuditLog = mock()
 
-await mock.module('@/features/organizations/repositories', () => ({
-  organizationMemberRemovalRepository: { removeWithAuditLog },
+await mock.module('@/features/organizations/repositories/members', () => ({
+  membersRepository: { remove: removeWithAuditLog, leave: leaveOrganization, changeRole: changeRoleWithAuditLog },
   memberRemovalResults: {
     removed: 'REMOVED',
     organizationNotFound: 'ORGANIZATION_NOT_FOUND',
     targetNotFound: 'TARGET_NOT_FOUND',
     rejected: 'REJECTED',
   },
-  organizationMembershipRepository: { leave: leaveOrganization },
-  organizationOwnershipRepository: { transferOwnership },
-  organizationMemberRoleRepository: { changeRoleWithAuditLog },
-  organizationAuditLogRepository: { findPageByOrganization: findAuditLogPage },
   memberRoleChangeResults: {
     changed: 'CHANGED',
     unchanged: 'UNCHANGED',
@@ -63,12 +59,20 @@ await mock.module('@/features/organizations/repositories', () => ({
     notMember: 'NOT_MEMBER',
     conflict: 'CONFLICT',
   },
+}))
+
+await mock.module('@/features/organizations/repositories/transferOwnership', () => ({
+  transferOwnershipRepository: { execute: transferOwnership },
   ownershipTransferResults: {
     transferred: 'TRANSFERRED',
     targetNotFound: 'TARGET_NOT_FOUND',
     selfTransfer: 'SELF_TRANSFER',
     conflict: 'CONFLICT',
   },
+}))
+
+await mock.module('@/features/organizations/repositories/auditLogs', () => ({
+  auditLogsRepository: { findPage: findAuditLogPage },
 }))
 
 await mock.module('@/shared/organization/repositories', () => ({

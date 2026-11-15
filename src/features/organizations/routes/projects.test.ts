@@ -17,7 +17,7 @@ const findByUserAndOrganization = mock()
 const existsById = mock()
 
 await mock.module('@/features/organizations/repositories/projects', () => ({
-  projectRepository: { findPageByOrganization, findByOrganizationAndId, createWithAuthorization, updateWithAuthorization, removeWithAuthorization },
+  projectsRepository: { findPage: findPageByOrganization, findByOrganizationAndId, createWithAuthorization, updateWithAuthorization, removeWithAuthorization },
   projectWriteResults: {
     succeeded: 'SUCCEEDED',
     organizationNotFound: 'ORGANIZATION_NOT_FOUND',
