@@ -6,7 +6,10 @@ import type { InvitationDetailDtoType } from '@/shared/invitation/dtos'
 import type { MemberDtoType } from '@/shared/membership/dtos'
 
 import type { AcceptInvitationBodySchemaType, DeclineInvitationBodySchemaType, SignupInvitationBodySchemaType } from '../schemas'
-import { invitationsService } from '../services'
+import { service } from '../services'
+import { acceptService } from '../services/accept'
+import { declineService } from '../services/decline'
+import { signupService } from '../services/signup'
 
 /**
  * invitations featureのコントローラ。
@@ -21,7 +24,7 @@ export const invitationsController = {
    * 認証不要・読み取り専用。
    */
   getDetail: async (c: Context, token: string): Promise<TypedResponse<InvitationDetailDtoType, 200, 'json'>> => {
-    const result = await invitationsService.getDetailByToken(token)
+    const result = await service.getDetailByToken(token)
     return c.json(result, 200)
   },
 
@@ -29,7 +32,7 @@ export const invitationsController = {
    * 招待を受諾してメンバーになる。201でMemberDtoTypeを返す。
    */
   accept: async (c: Context, userId: number, input: AcceptInvitationBodySchemaType): Promise<TypedResponse<MemberDtoType, 201, 'json'>> => {
-    const result = await invitationsService.accept(userId, input.token)
+    const result = await acceptService.execute(userId, input.token)
     return c.json(result, 201)
   },
 
@@ -37,7 +40,7 @@ export const invitationsController = {
    * 招待を辞退する。204 No Contentを返す。
    */
   decline: async (c: Context, input: DeclineInvitationBodySchemaType): Promise<Response> => {
-    await invitationsService.decline(input.token)
+    await declineService.execute(input.token)
     return c.body(null, 204)
   },
 
@@ -46,7 +49,7 @@ export const invitationsController = {
    * リフレッシュトークンはCookieへセットする。
    */
   signup: async (c: Context, input: SignupInvitationBodySchemaType): Promise<TypedResponse<AuthResultDtoType, 201, 'json'>> => {
-    const result = await invitationsService.signup(input.token, input.name, input.password)
+    const result = await signupService.execute(input.token, input.name, input.password)
     setRefreshTokenCookie(c, result.refreshToken)
     return c.json({ token: result.token, user: result.user }, 201)
   },
