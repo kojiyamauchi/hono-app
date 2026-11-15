@@ -19,21 +19,18 @@ const logoutAll = mock()
 const listSessions = mock()
 const logoutSession = mock()
 
-await mock.module('../services', () => ({
-  authService: {
-    signup,
-    login,
-    refresh,
-    logout,
-    requestPasswordReset,
-    requestEmailVerification,
-    confirmEmailVerification,
-    changePassword,
-    logoutAll,
-    listSessions,
-    logoutSession,
-  },
+await mock.module('../services/signup', () => ({ signupService: { execute: signup } }))
+await mock.module('../services/login', () => ({ loginService: { execute: login } }))
+await mock.module('../services/refresh', () => ({ refreshService: { execute: refresh } }))
+await mock.module('../services/logout', () => ({ logoutService: { execute: logout } }))
+await mock.module('../services/changePassword', () => ({ changePasswordService: { execute: changePassword } }))
+await mock.module('../services/me', () => ({ meService: { get: mock() } }))
+await mock.module('../services/passwordReset', () => ({ passwordResetService: { request: requestPasswordReset, confirm: mock() } }))
+await mock.module('../services/emailVerification', () => ({
+  emailVerificationService: { request: requestEmailVerification, confirm: confirmEmailVerification },
 }))
+await mock.module('../services/logoutAll', () => ({ logoutAllService: { execute: logoutAll } }))
+await mock.module('../services/sessions', () => ({ sessionsService: { list: listSessions, revoke: logoutSession } }))
 
 const { authController } = await import('.')
 

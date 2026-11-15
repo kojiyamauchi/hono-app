@@ -75,7 +75,10 @@ await mock.module('@/utils/timing', () => ({
 }))
 
 const { app } = await import('@/app')
-const { emailVerificationRequestRateLimiter, passwordResetRequestRateLimiter, loginRateLimiter, signupRateLimiter } = await import('../services')
+const { emailVerificationRequestRateLimiter } = await import('../services/emailVerification')
+const { passwordResetRequestRateLimiter } = await import('../services/passwordReset')
+const { loginRateLimiter } = await import('../services/login')
+const { signupRateLimiter } = await import('../services/signup')
 
 const user: User = {
   id: 1,
