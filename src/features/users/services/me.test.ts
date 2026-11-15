@@ -4,14 +4,14 @@ import type { User } from '@/shared/user/entities'
 
 const findById = mock()
 const updateById = mock()
-const deleteAccount = mock()
+const remove = mock()
 
 await mock.module('@/shared/user/repositories', () => ({
   userRepository: { findById, updateById },
 }))
 
-await mock.module('../repositories', () => ({
-  accountDeletionRepository: { deleteAccount },
+await mock.module('../repositories/me', () => ({
+  meRepository: { remove },
   accountDeletionResults: {
     deleted: 'DELETED',
     notFound: 'NOT_FOUND',
@@ -20,7 +20,7 @@ await mock.module('../repositories', () => ({
   },
 }))
 
-const { usersService } = await import('.')
+const { meService } = await import('./me')
 
 const user: User = {
   id: 1,
@@ -32,7 +32,7 @@ const user: User = {
   updatedAt: new Date('2026-01-02T00:00:00.000Z'),
 }
 
-describe('usersService.getMe', () => {
+describe('meService.get', () => {
   beforeEach(() => {
     findById.mockReset()
     updateById.mockReset()
@@ -41,7 +41,7 @@ describe('usersService.getMe', () => {
   test('認証済みユーザー自身の詳細情報を返す', async () => {
     findById.mockResolvedValue(user)
 
-    const result = await usersService.getMe(1)
+    const result = await meService.get(1)
 
     expect(result).toEqual({
       id: 1,
@@ -57,11 +57,11 @@ describe('usersService.getMe', () => {
   test('ユーザーが存在しないなら404エラーを投げる', async () => {
     findById.mockResolvedValue(null)
 
-    await expect(usersService.getMe(999)).rejects.toThrow('ユーザーが見つかりません')
+    await expect(meService.get(999)).rejects.toThrow('ユーザーが見つかりません')
   })
 })
 
-describe('usersService.updateMe', () => {
+describe('meService.update', () => {
   beforeEach(() => {
     findById.mockReset()
     updateById.mockReset()
@@ -72,7 +72,7 @@ describe('usersService.updateMe', () => {
     findById.mockResolvedValue(user)
     updateById.mockResolvedValue(updatedUser)
 
-    const result = await usersService.updateMe(1, { name: 'Updated User' })
+    const result = await meService.update(1, { name: 'Updated User' })
 
     expect(updateById).toHaveBeenCalledWith(1, { name: 'Updated User' })
     expect(result.name).toBe('Updated User')
@@ -84,7 +84,7 @@ describe('usersService.updateMe', () => {
   test('ユーザーが存在しないなら更新せず404エラーを投げる', async () => {
     findById.mockResolvedValue(null)
 
-    await expect(usersService.updateMe(999, { name: 'Updated User' })).rejects.toThrow('ユーザーが見つかりません')
+    await expect(meService.update(999, { name: 'Updated User' })).rejects.toThrow('ユーザーが見つかりません')
     expect(updateById).not.toHaveBeenCalled()
   })
 
@@ -92,73 +92,47 @@ describe('usersService.updateMe', () => {
     findById.mockResolvedValue(user)
     updateById.mockResolvedValue(null)
 
-    await expect(usersService.updateMe(1, { name: 'Updated User' })).rejects.toThrow('ユーザーが見つかりません')
+    await expect(meService.update(1, { name: 'Updated User' })).rejects.toThrow('ユーザーが見つかりません')
   })
 })
 
-describe('usersService.getById', () => {
+describe('meService.remove', () => {
   beforeEach(() => {
-    findById.mockReset()
-    updateById.mockReset()
-  })
-
-  test('指定IDのユーザー公開情報だけを返す', async () => {
-    findById.mockResolvedValue(user)
-
-    const result = await usersService.getById(1)
-
-    expect(result).toEqual({
-      id: 1,
-      name: 'Taro',
-    })
-    expect(result).not.toHaveProperty('email')
-    expect(result).not.toHaveProperty('password')
-  })
-
-  test('ユーザーが存在しないなら404エラーを投げる', async () => {
-    findById.mockResolvedValue(null)
-
-    await expect(usersService.getById(999)).rejects.toThrow('ユーザーが見つかりません')
-  })
-})
-
-describe('usersService.deleteMe', () => {
-  beforeEach(() => {
-    deleteAccount.mockReset()
+    remove.mockReset()
   })
 
   test('現在のパスワードが一致すればアカウントを削除する', async () => {
     const hashed = await Bun.password.hash('current-password-123')
-    deleteAccount.mockImplementation(async (_userId: number, verifyPassword: (passwordHash: string) => Promise<boolean>) => {
+    remove.mockImplementation(async (_userId: number, verifyPassword: (passwordHash: string) => Promise<boolean>) => {
       expect(await verifyPassword(hashed)).toBe(true)
       return 'DELETED'
     })
 
-    await expect(usersService.deleteMe(1, 'current-password-123')).resolves.toBeUndefined()
-    expect(deleteAccount).toHaveBeenCalledTimes(1)
+    await expect(meService.remove(1, 'current-password-123')).resolves.toBeUndefined()
+    expect(remove).toHaveBeenCalledTimes(1)
   })
 
   test('ユーザーが存在しない場合は404エラーを投げる', async () => {
-    deleteAccount.mockResolvedValue('NOT_FOUND')
+    remove.mockResolvedValue('NOT_FOUND')
 
-    await expect(usersService.deleteMe(999, 'current-password-123')).rejects.toMatchObject({ statusCode: 404 })
+    await expect(meService.remove(999, 'current-password-123')).rejects.toMatchObject({ statusCode: 404 })
   })
 
   test('現在のパスワードが不一致の場合は401エラーを投げる', async () => {
-    deleteAccount.mockResolvedValue('INVALID_PASSWORD')
+    remove.mockResolvedValue('INVALID_PASSWORD')
 
-    await expect(usersService.deleteMe(1, 'wrong-password')).rejects.toMatchObject({ statusCode: 401 })
+    await expect(meService.remove(1, 'wrong-password')).rejects.toMatchObject({ statusCode: 401 })
   })
 
   test('唯一のOWNERである組織が存在する場合は409エラーを投げる', async () => {
-    deleteAccount.mockResolvedValue('SOLE_OWNER')
+    remove.mockResolvedValue('SOLE_OWNER')
 
-    await expect(usersService.deleteMe(1, 'current-password-123')).rejects.toMatchObject({ statusCode: 409 })
+    await expect(meService.remove(1, 'current-password-123')).rejects.toMatchObject({ statusCode: 409 })
   })
 
   test('未知の結果値はエラー側へ倒れる（fail-closed）', async () => {
-    deleteAccount.mockResolvedValue('UNKNOWN')
+    remove.mockResolvedValue('UNKNOWN')
 
-    await expect(usersService.deleteMe(1, 'current-password-123')).rejects.toMatchObject({ statusCode: 409 })
+    await expect(meService.remove(1, 'current-password-123')).rejects.toMatchObject({ statusCode: 409 })
   })
 })
