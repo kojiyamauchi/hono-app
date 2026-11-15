@@ -8,7 +8,7 @@ import { errorResponseDto } from '@/shared/openApi/dtos'
 import { SECURITY_SCHEME } from '@/shared/openApi/schemes'
 import { openApiDefaultHook } from '@/utils/validation'
 
-import { organizationsProjectsController } from '../controllers/projects'
+import { projectsController } from '../controllers/projects'
 import { itemDto as projectDto, listDto as projectListDto } from '../dtos/projects'
 import { collectionParamSchema, createBodySchema, itemParamSchema, listQuerySchema, updateBodySchema } from '../schemas/projects'
 
@@ -172,10 +172,10 @@ const removeProjectRoute = createRoute({
  * トランザクション内の最新所属・ロールの再判定は、serviceとrepositoryが行う。
  */
 export const organizationsProjectsRoutes = new OpenAPIHono({ defaultHook: openApiDefaultHook })
-  .openapi(listProjectsRoute, (c) => organizationsProjectsController.list(c, c.req.valid('param').id, c.req.valid('query')))
-  .openapi(createProjectRoute, (c) => organizationsProjectsController.create(c, c.req.valid('param').id, c.get('userId'), c.req.valid('json')))
-  .openapi(getProjectRoute, (c) => organizationsProjectsController.getById(c, c.req.valid('param').id, c.req.valid('param').projectId))
+  .openapi(listProjectsRoute, (c) => projectsController.list(c, c.req.valid('param').id, c.req.valid('query')))
+  .openapi(createProjectRoute, (c) => projectsController.create(c, c.req.valid('param').id, c.get('userId'), c.req.valid('json')))
+  .openapi(getProjectRoute, (c) => projectsController.getById(c, c.req.valid('param').id, c.req.valid('param').projectId))
   .openapi(updateProjectRoute, (c) =>
-    organizationsProjectsController.update(c, c.req.valid('param').id, c.req.valid('param').projectId, c.get('userId'), c.req.valid('json')),
+    projectsController.update(c, c.req.valid('param').id, c.req.valid('param').projectId, c.get('userId'), c.req.valid('json')),
   )
-  .openapi(removeProjectRoute, (c) => organizationsProjectsController.remove(c, c.req.valid('param').id, c.req.valid('param').projectId, c.get('userId')))
+  .openapi(removeProjectRoute, (c) => projectsController.remove(c, c.req.valid('param').id, c.req.valid('param').projectId, c.get('userId')))

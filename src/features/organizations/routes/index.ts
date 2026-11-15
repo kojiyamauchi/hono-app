@@ -11,7 +11,11 @@ import { SECURITY_SCHEME } from '@/shared/openApi/schemes'
 import { organizationDto } from '@/shared/organization/dtos'
 import { openApiDefaultHook } from '@/utils/validation'
 
-import { organizationsAuditLogsController, organizationsController, organizationsInvitationsController, organizationsMembersController } from '../controllers'
+import { controller } from '../controllers'
+import { auditLogsController } from '../controllers/auditLogs'
+import { invitationsController } from '../controllers/invitations'
+import { membersController } from '../controllers/members'
+import { transferOwnershipController } from '../controllers/transferOwnership'
 import { listDto as organizationListDto } from '../dtos'
 import { listDto as auditLogListDto } from '../dtos/auditLogs'
 import { listDto as memberListDto } from '../dtos/members'
@@ -472,39 +476,24 @@ const resendInvitationEmailRoute = createRoute({
  * 最後に `/{id}/projects` 系（`routes/projects.ts`）をmountする。
  */
 export const organizationsRoutes = new OpenAPIHono({ defaultHook: openApiDefaultHook })
-  .openapi(createRouteDef, (c) => organizationsController.create(c, c.get('userId'), c.req.valid('json')))
-  .openapi(listMineRoute, (c) => organizationsController.listMine(c, c.get('userId'), c.req.valid('query')))
-  .openapi(getByIdRoute, (c) => organizationsController.getById(c, c.req.valid('param').id))
-  .openapi(updateRoute, (c) => organizationsController.update(c, c.req.valid('param').id, c.req.valid('json'), c.get('membership').role))
-  .openapi(removeRoute, (c) => organizationsController.remove(c, c.req.valid('param').id, c.get('membership').role))
+  .openapi(createRouteDef, (c) => controller.create(c, c.get('userId'), c.req.valid('json')))
+  .openapi(listMineRoute, (c) => controller.listMine(c, c.get('userId'), c.req.valid('query')))
+  .openapi(getByIdRoute, (c) => controller.getById(c, c.req.valid('param').id))
+  .openapi(updateRoute, (c) => controller.update(c, c.req.valid('param').id, c.req.valid('json'), c.get('membership').role))
+  .openapi(removeRoute, (c) => controller.remove(c, c.req.valid('param').id, c.get('membership').role))
   .openapi(transferOwnershipRoute, (c) =>
-    organizationsController.transferOwnership(c, c.req.valid('param').id, c.get('userId'), c.get('membership').role, c.req.valid('json')),
+    transferOwnershipController.execute(c, c.req.valid('param').id, c.get('userId'), c.get('membership').role, c.req.valid('json')),
   )
-  .openapi(listMembersRoute, (c) => organizationsMembersController.listMembers(c, c.req.valid('param').id, c.req.valid('query')))
-  .openapi(addMemberRoute, (c) => organizationsMembersController.addMember(c, c.req.valid('param').id, c.get('membership').role, c.req.valid('json')))
-  .openapi(leaveOrganizationRoute, (c) => organizationsMembersController.leave(c, c.req.valid('param').id, c.get('userId')))
+  .openapi(listMembersRoute, (c) => membersController.list(c, c.req.valid('param').id, c.req.valid('query')))
+  .openapi(addMemberRoute, (c) => membersController.add(c, c.req.valid('param').id, c.get('membership').role, c.req.valid('json')))
+  .openapi(leaveOrganizationRoute, (c) => membersController.leave(c, c.req.valid('param').id, c.get('userId')))
   .openapi(updateMemberRoleRoute, (c) =>
-    organizationsMembersController.updateMemberRole(
-      c,
-      c.req.valid('param').id,
-      c.req.valid('param').membershipId,
-      c.get('userId'),
-      c.get('membership').role,
-      c.req.valid('json'),
-    ),
+    membersController.updateRole(c, c.req.valid('param').id, c.req.valid('param').membershipId, c.get('userId'), c.get('membership').role, c.req.valid('json')),
   )
-  .openapi(removeMemberRoute, (c) =>
-    organizationsMembersController.removeMember(c, c.req.valid('param').id, c.req.valid('param').membershipId, c.get('userId')),
-  )
-  .openapi(listAuditLogsRoute, (c) => organizationsAuditLogsController.listAuditLogs(c, c.req.valid('param').id, c.req.valid('query')))
-  .openapi(listInvitationsRoute, (c) => organizationsInvitationsController.listInvitations(c, c.req.valid('param').id, c.get('membership').role))
-  .openapi(createInvitationRoute, (c) =>
-    organizationsInvitationsController.createInvitation(c, c.req.valid('param').id, c.get('membership').role, c.req.valid('json')),
-  )
-  .openapi(cancelInvitationRoute, (c) =>
-    organizationsInvitationsController.cancelInvitation(c, c.req.valid('param').id, c.req.valid('param').invitationId, c.get('membership').role),
-  )
-  .openapi(resendInvitationEmailRoute, (c) =>
-    organizationsInvitationsController.resendInvitationEmail(c, c.req.valid('param').id, c.req.valid('param').invitationId, c.get('userId')),
-  )
+  .openapi(removeMemberRoute, (c) => membersController.remove(c, c.req.valid('param').id, c.req.valid('param').membershipId, c.get('userId')))
+  .openapi(listAuditLogsRoute, (c) => auditLogsController.list(c, c.req.valid('param').id, c.req.valid('query')))
+  .openapi(listInvitationsRoute, (c) => invitationsController.list(c, c.req.valid('param').id, c.get('membership').role))
+  .openapi(createInvitationRoute, (c) => invitationsController.create(c, c.req.valid('param').id, c.get('membership').role, c.req.valid('json')))
+  .openapi(cancelInvitationRoute, (c) => invitationsController.cancel(c, c.req.valid('param').id, c.req.valid('param').invitationId, c.get('membership').role))
+  .openapi(resendInvitationEmailRoute, (c) => invitationsController.resendEmail(c, c.req.valid('param').id, c.req.valid('param').invitationId, c.get('userId')))
   .route('/', organizationsProjectsRoutes)
