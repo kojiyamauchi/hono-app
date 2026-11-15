@@ -5,7 +5,8 @@ import type { Organization } from '@/shared/organization/entities'
 import type { AppError } from '@/utils/errors'
 
 import type { AuditLog } from '../entities/auditLogs'
-import { encodeAuditLogCursor, encodeMemberListCursor } from '../mappers'
+import { encodeCursor as encodeAuditLogCursor } from '../mappers/auditLogs'
+import { encodeCursor as encodeMemberListCursor } from '../mappers/members'
 
 const createWithOwner = mock()
 const findPageByUserId = mock()
