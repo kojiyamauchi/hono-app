@@ -24,13 +24,13 @@ type LockedIdRow = {
 type VerifyPassword = (passwordHash: string) => Promise<boolean>
 
 /**
- * users feature固有のアカウント削除データアクセスを提供するリポジトリ。
+ * users feature固有の認証済みユーザー自身（me）に対するデータアクセスを提供するリポジトリ。
  */
-export const accountDeletionRepository = {
+export const meRepository = {
   /**
    * User行を最初にロックし、本人確認・OWNER判定・関連データ失効・User削除を原子的に行う。
    */
-  deleteAccount: async (userId: number, verifyPassword: VerifyPassword): Promise<AccountDeletionResult> => {
+  remove: async (userId: number, verifyPassword: VerifyPassword): Promise<AccountDeletionResult> => {
     return prisma.$transaction(async (tx) => {
       // OWNERを成立・消滅させ得る処理の共通規約として、対象User行を最初にロックする。
       const lockedUsers = await tx.$queryRaw<LockedUserRow[]>`
