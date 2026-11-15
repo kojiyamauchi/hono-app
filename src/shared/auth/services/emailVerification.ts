@@ -2,7 +2,7 @@ import { createHmac, randomBytes } from 'node:crypto'
 
 import { sendResendEmail } from '@/libs/resend'
 import { resolveExternalApiErrorType, resolveExternalApiStatusCode, traceExternalApiCall } from '@/libs/telemetry/external'
-import { emailVerificationTokenRepository } from '@/shared/auth/repositories'
+import { emailVerificationTokenRepository } from '@/shared/auth/repositories/emailVerification'
 import { AppError } from '@/utils/errors'
 
 import { createScalarAuthEmail } from './scalarEmail'

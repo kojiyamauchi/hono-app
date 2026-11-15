@@ -1,4 +1,4 @@
-import { authCredentialRepository } from '@/shared/auth/repositories'
+import { authCredentialRepository } from '@/shared/auth/repositories/credential'
 import { userRepository } from '@/shared/user/repositories'
 import { AppError } from '@/utils/errors'
 

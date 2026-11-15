@@ -1,6 +1,6 @@
 import type { SessionDtoType } from '@/shared/auth/dtos'
 import { toSessionResponse } from '@/shared/auth/mappers'
-import { refreshTokenRepository } from '@/shared/auth/repositories'
+import { refreshTokenRepository } from '@/shared/auth/repositories/refreshToken'
 import { AppError } from '@/utils/errors'
 
 /**

@@ -1,4 +1,4 @@
-import { refreshTokenRepository } from '@/shared/auth/repositories'
+import { refreshTokenRepository } from '@/shared/auth/repositories/refreshToken'
 
 /**
  * 全セッションログアウトのビジネスロジック。

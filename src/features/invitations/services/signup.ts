@@ -1,5 +1,5 @@
 import type { IssuedAuthTokens } from '@/shared/auth/dtos'
-import { refreshTokenRepository } from '@/shared/auth/repositories'
+import { refreshTokenRepository } from '@/shared/auth/repositories/refreshToken'
 import { issueAuthToken, issueRefreshToken, sendEmailVerificationBestEffort } from '@/shared/auth/services'
 import { invitationRepository } from '@/shared/invitation/repositories'
 import { toUserResponse } from '@/shared/user/mappers'

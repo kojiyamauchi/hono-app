@@ -1,4 +1,4 @@
-import { emailVerificationTokenRepository } from '@/shared/auth/repositories'
+import { emailVerificationTokenRepository } from '@/shared/auth/repositories/emailVerification'
 import { hashEmailVerificationToken, sendEmailVerificationBestEffort } from '@/shared/auth/services'
 import { userRepository } from '@/shared/user/repositories'
 import { AppError } from '@/utils/errors'

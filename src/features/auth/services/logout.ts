@@ -1,4 +1,4 @@
-import { refreshTokenRepository } from '@/shared/auth/repositories'
+import { refreshTokenRepository } from '@/shared/auth/repositories/refreshToken'
 import { hashRefreshToken } from '@/shared/auth/services'
 
 /**

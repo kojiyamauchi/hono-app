@@ -1,4 +1,4 @@
-import { passwordResetTokenRepository } from '@/shared/auth/repositories'
+import { passwordResetTokenRepository } from '@/shared/auth/repositories/passwordReset'
 import { hashPasswordResetToken, issuePasswordResetToken, passwordResetNotifier } from '@/shared/auth/services'
 import { userRepository } from '@/shared/user/repositories'
 import { AppError } from '@/utils/errors'
