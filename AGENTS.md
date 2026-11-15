@@ -31,7 +31,7 @@ Bun上で動作するHono.js APIアプリケーションです。TypeScriptを�
 ### Controller / Service / Repositoryの責務
 
 - `Controller`: HTTPリクエストとレスポンスの変換を担当する。routesで検証済みの入力とmiddlewareが設定した値を受け取り、Serviceへ引数として渡す。業務ルールを実装しないこと
-- `Service`: ユースケースと業務ルールを担当する。原則としてHonoの `Context` に依存せず、Repositoryやshared以下の層を利用して処理結果をControllerへ返すこと。例外として、Cookie入出力を担う `src/shared/auth/services/` のcookieヘルパーは、Controllerから `Context` を受け取って操作する
+- `Service`: ユースケースと業務ルールを担当する。原則としてHonoの `Context` に依存せず、Repositoryやshared以下の層を利用して処理結果をControllerへ返すこと。例外として、Cookie入出力を担う `src/shared/auth/services/cookie.ts` のcookieヘルパーは、Controllerから `Context` を受け取って操作する
 - `Repository`: データの取得・更新と、必要なtransaction境界を担当する。HTTPリクエスト・レスポンスの関心事を持ち込まないこと
 
 ### features設計
@@ -143,7 +143,7 @@ types                          （型宣言のみ・最下層）
 - `types/`: アプリ全体で使う型宣言専用（Honoの型拡張、環境変数の型など）。ランタイムコードは置かないこと
 - `utils/`: 特定サービスのクライアント実体に依存しない汎用ユーティリティ（errors / rateLimit / timing / validation / prisma判定ヘルパーなど）。外部パッケージや生成物の型（例: `@/generated/prisma/client` の `Prisma` 型）の利用は可だが、`libs` のクライアント実体へのimportは禁止する
 - `libs/`: 外部サービス・インフラのクライアント（prisma / resend / supabase / telemetry）。`utils` のimportは許可する
-- `shared/`: 複数featureで使う共有ドメイン（前述の定義どおり）。`middlewares`・`features` へのimportは禁止する（HTTP層の関心事をsharedへ持ち込まない。ミドルウェアが設定した値はcontroller/feature側で取り出して引数として渡すこと）。ただし、`src/shared/auth/services/` のcookieヘルパーはCookie入出力に責務を限定し、Controllerから受け取った `Context` を操作する例外とする
+- `shared/`: 複数featureで使う共有ドメイン（前述の定義どおり）。`middlewares`・`features` へのimportは禁止する（HTTP層の関心事をsharedへ持ち込まない。ミドルウェアが設定した値はcontroller/feature側で取り出して引数として渡すこと）。ただし、`src/shared/auth/services/cookie.ts` のcookieヘルパーはCookie入出力に責務を限定し、Controllerから受け取った `Context` を操作する例外とする
 - `middlewares/`: Hono横断ミドルウェア。`shared` のrepositoryの利用は許可する。`features` へのimportは禁止する
 - `features/`: `shared` 以下の層に加え `middlewares` もimport可（feature内routesでのミドルウェア適用）。feature間の相互importは前述のとおり禁止する
 - `routes/` / `app.ts` / `server.ts` / `invitationEmailWorker.ts`: 配線層。全層をimport可（例: `app.ts` でのグローバルミドルウェア適用・CORS設定・telemetry初期化）
