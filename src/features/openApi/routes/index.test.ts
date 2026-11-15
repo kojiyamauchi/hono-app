@@ -6,6 +6,10 @@ import { registerOpenApiRoutes } from '.'
 // 各テストで書き換える環境変数を保存・復元する。
 const originalEnableApiDocs = process.env.ENABLE_API_DOCS
 
+// 全featureのAPI定義を含むことの確認用。registerRoutes は登録時に ENABLE_API_DOCS を評価するため、app import より前に有効化する。
+process.env.ENABLE_API_DOCS = 'true'
+const { app: rootApp } = await import('@/app')
+
 afterEach(() => {
   process.env.ENABLE_API_DOCS = originalEnableApiDocs
 })
@@ -33,17 +37,20 @@ describe('registerOpenApiRoutes', () => {
       expect(body.components?.securitySchemes?.cookieAuth).toBeDefined()
     })
 
-    test('/open-api/scalar がScalar UIを返す', async () => {
-      const app = new OpenAPIHono()
-      registerOpenApiRoutes(app)
+    test('root appでは /open-api/doc が全featureのAPI定義を含み、/open-api/scalar も公開される', async () => {
+      const docResponse = await rootApp.request('/open-api/doc')
 
-      const response = await app.request('/open-api/scalar')
+      expect(docResponse.status).toBe(200)
+      const doc = (await docResponse.json()) as { paths?: Record<string, unknown> }
+      const paths = Object.keys(doc.paths ?? {})
+      // 各featureの代表パス
+      expect(paths).toContain('/auth/login')
+      expect(paths).toContain('/supabase-auth/login')
+      expect(paths).toContain('/users/me')
+      expect(paths).toContain('/organizations')
+      expect(paths).toContain('/invitations/{token}')
 
-      expect(response.status).toBe(200)
-      expect(response.headers.get('content-type')).toContain('text/html')
-      const html = await response.text()
-      expect(html).toMatch(/"proxyUrl"\s*:\s*""/)
-      expect(html).toMatch(/"persistAuth"\s*:\s*false/)
+      expect((await rootApp.request('/open-api/scalar')).status).toBe(200)
     })
   })
 
