@@ -9,7 +9,7 @@ import { membershipRepository } from '@/shared/membership/repositories'
 import { userRepository } from '@/shared/user/repositories'
 import { AppError } from '@/utils/errors'
 
-import type { CreateInvitationBodySchemaType } from '../schemas'
+import type { CreateBodySchemaType } from '../schemas/invitations'
 
 /**
  * 招待メールを再送できる、操作者のロールごとの宛先ロール。
@@ -30,7 +30,7 @@ export const invitationsService = {
    * OWNERはADMIN/MEMBERを招待可。ADMINはMEMBERのみ招待可。MEMBERは操作不可。
    * 既にPENDINGの招待がある場合、または対象メールが既にメンバーの場合は409。
    */
-  create: async (organizationId: number, operatorRole: Role, input: CreateInvitationBodySchemaType): Promise<InvitationDtoType> => {
+  create: async (organizationId: number, operatorRole: Role, input: CreateBodySchemaType): Promise<InvitationDtoType> => {
     if (operatorRole === 'MEMBER') {
       throw new AppError(403, 'この操作には管理者以上の権限が必要です')
     }

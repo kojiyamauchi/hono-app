@@ -10,13 +10,7 @@ import { openApiDefaultHook } from '@/utils/validation'
 
 import { organizationsProjectsController } from '../controllers/projects'
 import { itemDto as projectDto, listDto as projectListDto } from '../dtos/projects'
-import {
-  createProjectBodySchema,
-  listProjectsQuerySchema,
-  projectRouteParamSchema,
-  projectsRouteParamSchema,
-  updateProjectBodySchema,
-} from '../schemas/projects'
+import { collectionParamSchema, createBodySchema, itemParamSchema, listQuerySchema, updateBodySchema } from '../schemas/projects'
 
 /** JSONエラーレスポンス（`{ error: { message } }`）の共通定義を生成する。 */
 const errorResponse = (description: string): { content: { 'application/json': { schema: typeof errorResponseDto } }; description: string } => ({
@@ -38,11 +32,11 @@ const listProjectsRoute = createRoute({
   summary: '指定した組織のプロジェクト一覧を取得する',
   description:
     '作成日時・IDの新しい順（createdAt DESC, id DESC）で返す。カーソル式ページネーションで、nextCursorは後続がある場合のみ返す。ページ間のスナップショット一貫性は保証しない。',
-  middleware: [authMiddleware, paramValidationMiddleware(projectsRouteParamSchema), organizationMembershipMiddleware],
+  middleware: [authMiddleware, paramValidationMiddleware(collectionParamSchema), organizationMembershipMiddleware],
   security: bearerSecurity,
   request: {
-    params: projectsRouteParamSchema,
-    query: listProjectsQuerySchema,
+    params: collectionParamSchema,
+    query: listQuerySchema,
   },
   responses: {
     200: {
@@ -65,15 +59,15 @@ const createProjectRoute = createRoute({
   path: '/{id}/projects',
   tags: ['Organization Projects'],
   summary: '指定した組織にプロジェクトを作成する',
-  middleware: [authMiddleware, paramValidationMiddleware(projectsRouteParamSchema), organizationMembershipMiddleware, organizationAdminMiddleware],
+  middleware: [authMiddleware, paramValidationMiddleware(collectionParamSchema), organizationMembershipMiddleware, organizationAdminMiddleware],
   security: bearerSecurity,
   request: {
-    params: projectsRouteParamSchema,
+    params: collectionParamSchema,
     body: {
       // required: true を付けないと、Content-Typeなし/bodyなしのPOSTが任意bodyとして
       // 検証スキップされ c.req.valid('json') が {} になり必須body検証（400）を維持できない。
       required: true,
-      content: { 'application/json': { schema: createProjectBodySchema } },
+      content: { 'application/json': { schema: createBodySchema } },
     },
   },
   responses: {
@@ -95,10 +89,10 @@ const getProjectRoute = createRoute({
   path: '/{id}/projects/{projectId}',
   tags: ['Organization Projects'],
   summary: '指定したプロジェクトを取得する',
-  middleware: [authMiddleware, paramValidationMiddleware(projectRouteParamSchema), organizationMembershipMiddleware],
+  middleware: [authMiddleware, paramValidationMiddleware(itemParamSchema), organizationMembershipMiddleware],
   security: bearerSecurity,
   request: {
-    params: projectRouteParamSchema,
+    params: itemParamSchema,
   },
   responses: {
     200: {
@@ -122,15 +116,15 @@ const updateProjectRoute = createRoute({
   tags: ['Organization Projects'],
   summary: '指定したプロジェクトを部分更新する',
   description: 'name / description のうち指定した項目だけを更新する。description: null は説明の削除。同値の指定でも updatedAt は更新される。',
-  middleware: [authMiddleware, paramValidationMiddleware(projectRouteParamSchema), organizationMembershipMiddleware, organizationAdminMiddleware],
+  middleware: [authMiddleware, paramValidationMiddleware(itemParamSchema), organizationMembershipMiddleware, organizationAdminMiddleware],
   security: bearerSecurity,
   request: {
-    params: projectRouteParamSchema,
+    params: itemParamSchema,
     body: {
       // required: true を付けないと、Content-Typeなし/bodyなしのPATCHが任意bodyとして
       // 検証スキップされ c.req.valid('json') が {} になり必須body検証（400）を維持できない。
       required: true,
-      content: { 'application/json': { schema: updateProjectBodySchema } },
+      content: { 'application/json': { schema: updateBodySchema } },
     },
   },
   responses: {
@@ -155,10 +149,10 @@ const removeProjectRoute = createRoute({
   path: '/{id}/projects/{projectId}',
   tags: ['Organization Projects'],
   summary: '指定したプロジェクトを完全削除する',
-  middleware: [authMiddleware, paramValidationMiddleware(projectRouteParamSchema), organizationMembershipMiddleware, organizationAdminMiddleware],
+  middleware: [authMiddleware, paramValidationMiddleware(itemParamSchema), organizationMembershipMiddleware, organizationAdminMiddleware],
   security: bearerSecurity,
   request: {
-    params: projectRouteParamSchema,
+    params: itemParamSchema,
   },
   responses: {
     204: {

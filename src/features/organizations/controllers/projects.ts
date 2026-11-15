@@ -1,7 +1,7 @@
 import type { Context, TypedResponse } from 'hono'
 
 import type { ItemDtoType as ProjectDtoType, ListDtoType as ProjectListDtoType } from '../dtos/projects'
-import type { CreateProjectBodySchemaType, ListProjectsQuerySchemaType, UpdateProjectBodySchemaType } from '../schemas/projects'
+import type { CreateBodySchemaType, ListQuerySchemaType, UpdateBodySchemaType } from '../schemas/projects'
 import { projectsService } from '../services/projects'
 
 /**
@@ -12,7 +12,7 @@ export const organizationsProjectsController = {
   /**
    * 組織のプロジェクト一覧を、検証済みqueryのlimit・cursorで1ページ分返す。
    */
-  list: async (c: Context, organizationId: number, query: ListProjectsQuerySchemaType): Promise<TypedResponse<ProjectListDtoType, 200, 'json'>> => {
+  list: async (c: Context, organizationId: number, query: ListQuerySchemaType): Promise<TypedResponse<ProjectListDtoType, 200, 'json'>> => {
     const result = await projectsService.list(organizationId, query.limit, query.cursor)
     return c.json(result, 200)
   },
@@ -28,12 +28,7 @@ export const organizationsProjectsController = {
   /**
    * プロジェクトを作成する。201で作成結果を返す。
    */
-  create: async (
-    c: Context,
-    organizationId: number,
-    actorUserId: number,
-    input: CreateProjectBodySchemaType,
-  ): Promise<TypedResponse<ProjectDtoType, 201, 'json'>> => {
+  create: async (c: Context, organizationId: number, actorUserId: number, input: CreateBodySchemaType): Promise<TypedResponse<ProjectDtoType, 201, 'json'>> => {
     const result = await projectsService.create(organizationId, actorUserId, input)
     return c.json(result, 201)
   },
@@ -46,7 +41,7 @@ export const organizationsProjectsController = {
     organizationId: number,
     projectId: number,
     actorUserId: number,
-    input: UpdateProjectBodySchemaType,
+    input: UpdateBodySchemaType,
   ): Promise<TypedResponse<ProjectDtoType, 200, 'json'>> => {
     const result = await projectsService.update(organizationId, projectId, actorUserId, input)
     return c.json(result, 200)

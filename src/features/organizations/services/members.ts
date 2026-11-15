@@ -8,7 +8,7 @@ import { AppError } from '@/utils/errors'
 import type { ListDtoType } from '../dtos/members'
 import { decodeCursor, encodeCursor, toListResponse } from '../mappers/members'
 import { leaveOrganizationResults, memberRemovalResults, memberRoleChangeResults, membersRepository } from '../repositories/members'
-import type { AddMemberBodySchemaType, UpdateMemberRoleBodySchemaType } from '../schemas'
+import type { AddBodySchemaType, UpdateRoleBodySchemaType } from '../schemas/members'
 
 /**
  * ロック後に確定した操作者・対象のロールに対して、ロール変更の認可規則を適用する。
@@ -86,7 +86,7 @@ export const membersService = {
    * メンバーを追加する。
    * OWNERはMEMBER/ADMINを追加可。ADMINはMEMBERのみ追加可。MEMBERは操作不可。
    */
-  add: async (organizationId: number, operatorRole: Role, input: AddMemberBodySchemaType): Promise<MemberDtoType> => {
+  add: async (organizationId: number, operatorRole: Role, input: AddBodySchemaType): Promise<MemberDtoType> => {
     if (input.role === 'OWNER') {
       throw new AppError(422, 'OWNERは追加できません')
     }
@@ -125,7 +125,7 @@ export const membersService = {
     membershipId: number,
     actorUserId: number,
     operatorRole: Role,
-    input: UpdateMemberRoleBodySchemaType,
+    input: UpdateRoleBodySchemaType,
   ): Promise<MemberDtoType> => {
     if (input.role === 'OWNER') {
       throw new AppError(422, 'OWNERへの変更はできません')

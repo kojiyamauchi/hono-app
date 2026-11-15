@@ -2,7 +2,7 @@ import type { Membership } from '@/shared/membership/entities'
 import { toMemberResponse } from '@/shared/membership/mappers'
 
 import type { ListDtoType } from '../dtos/members'
-import { MEMBER_LIST_CURSOR_VERSION, memberListCursorPayloadSchema } from '../schemas'
+import { cursorPayloadSchema, MEMBER_LIST_CURSOR_VERSION } from '../schemas/members'
 
 /**
  * メンバー一覧カーソルが指す境界値（この行より後ろを取得する）。
@@ -37,7 +37,7 @@ export const decodeCursor = (raw: string): MemberListCursorBoundary | null => {
     return null
   }
 
-  const result = memberListCursorPayloadSchema.safeParse(parsed)
+  const result = cursorPayloadSchema.safeParse(parsed)
   if (!result.success) {
     return null
   }

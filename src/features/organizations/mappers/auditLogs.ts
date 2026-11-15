@@ -2,7 +2,7 @@ import type { Role } from '@/shared/membership/entities'
 
 import type { ItemDtoType, ListDtoType } from '../dtos/auditLogs'
 import type { AuditLog, MemberRemovedAuditLog, MemberRoleChangedAuditLog, OwnershipTransferredAuditLog, ProjectSnapshot } from '../entities/auditLogs'
-import { AUDIT_LOG_CURSOR_KIND, AUDIT_LOG_CURSOR_VERSION, auditLogCursorPayloadSchema } from '../schemas'
+import { AUDIT_LOG_CURSOR_KIND, AUDIT_LOG_CURSOR_VERSION, cursorPayloadSchema } from '../schemas/auditLogs'
 
 /**
  * 監査ログ一覧カーソルが指す境界値（この行より後ろ、つまりより古い行を取得する）。
@@ -46,7 +46,7 @@ export const decodeCursor = (raw: string): AuditLogCursorBoundary | null => {
     return null
   }
 
-  const result = auditLogCursorPayloadSchema.safeParse(parsed)
+  const result = cursorPayloadSchema.safeParse(parsed)
   if (!result.success) {
     return null
   }

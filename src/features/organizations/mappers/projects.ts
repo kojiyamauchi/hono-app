@@ -1,6 +1,6 @@
 import type { ItemDtoType, ListDtoType } from '../dtos/projects'
 import type { Project } from '../entities/projects'
-import { PROJECT_CURSOR_KIND, PROJECT_CURSOR_VERSION, projectCursorPayloadSchema } from '../schemas/projects'
+import { cursorPayloadSchema, PROJECT_CURSOR_KIND, PROJECT_CURSOR_VERSION } from '../schemas/projects'
 
 /**
  * プロジェクト一覧カーソルが指す境界値（この行より後ろ、つまりより古い行を取得する）。
@@ -44,7 +44,7 @@ export const decodeCursor = (raw: string): ProjectCursorBoundary | null => {
     return null
   }
 
-  const result = projectCursorPayloadSchema.safeParse(parsed)
+  const result = cursorPayloadSchema.safeParse(parsed)
   if (!result.success) {
     return null
   }

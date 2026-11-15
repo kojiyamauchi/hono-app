@@ -8,17 +8,11 @@ import type { OrganizationDtoType } from '@/shared/organization/dtos'
 import type { ListDtoType as OrganizationListDtoType } from '../dtos'
 import type { ListDtoType as AuditLogListDtoType } from '../dtos/auditLogs'
 import type { ListDtoType as MemberListDtoType } from '../dtos/members'
-import type {
-  AddMemberBodySchemaType,
-  CreateInvitationBodySchemaType,
-  CreateOrganizationSchemaType,
-  ListAuditLogsQuerySchemaType,
-  ListMembersQuerySchemaType,
-  ListMineQuerySchemaType,
-  TransferOwnershipBodySchemaType,
-  UpdateMemberRoleBodySchemaType,
-  UpdateOrganizationSchemaType,
-} from '../schemas'
+import type { CreateSchemaType, ListMineQuerySchemaType, UpdateSchemaType } from '../schemas'
+import type { ListQuerySchemaType as AuditLogListQuerySchemaType } from '../schemas/auditLogs'
+import type { CreateBodySchemaType as CreateInvitationBodySchemaType } from '../schemas/invitations'
+import type { AddBodySchemaType, ListQuerySchemaType as MemberListQuerySchemaType, UpdateRoleBodySchemaType } from '../schemas/members'
+import type { BodySchemaType as TransferOwnershipBodySchemaType } from '../schemas/transferOwnership'
 import { service } from '../services'
 import { auditLogsService } from '../services/auditLogs'
 import { invitationsService } from '../services/invitations'
@@ -35,7 +29,7 @@ export const organizationsController = {
   /**
    * 組織を作成する。201で作成結果を返す。
    */
-  create: async (c: Context, userId: number, input: CreateOrganizationSchemaType): Promise<TypedResponse<OrganizationDtoType, 201, 'json'>> => {
+  create: async (c: Context, userId: number, input: CreateSchemaType): Promise<TypedResponse<OrganizationDtoType, 201, 'json'>> => {
     const result = await service.create(userId, input)
     return c.json(result, 201)
   },
@@ -59,12 +53,7 @@ export const organizationsController = {
   /**
    * 組織を更新する。
    */
-  update: async (
-    c: Context,
-    organizationId: number,
-    input: UpdateOrganizationSchemaType,
-    role: Role,
-  ): Promise<TypedResponse<OrganizationDtoType, 200, 'json'>> => {
+  update: async (c: Context, organizationId: number, input: UpdateSchemaType, role: Role): Promise<TypedResponse<OrganizationDtoType, 200, 'json'>> => {
     const result = await service.update(organizationId, input, role)
     return c.json(result, 200)
   },
@@ -107,7 +96,7 @@ export const organizationsMembersController = {
   /**
    * 組織のメンバー一覧を、検証済みqueryのlimit・cursorで1ページ分返す。
    */
-  listMembers: async (c: Context, organizationId: number, query: ListMembersQuerySchemaType): Promise<TypedResponse<MemberListDtoType, 200, 'json'>> => {
+  listMembers: async (c: Context, organizationId: number, query: MemberListQuerySchemaType): Promise<TypedResponse<MemberListDtoType, 200, 'json'>> => {
     const result = await membersService.list(organizationId, query.limit, query.cursor)
     return c.json(result, 200)
   },
@@ -115,12 +104,7 @@ export const organizationsMembersController = {
   /**
    * メンバーを追加する。201で作成結果を返す。
    */
-  addMember: async (
-    c: Context,
-    organizationId: number,
-    operatorRole: Role,
-    input: AddMemberBodySchemaType,
-  ): Promise<TypedResponse<MemberDtoType, 201, 'json'>> => {
+  addMember: async (c: Context, organizationId: number, operatorRole: Role, input: AddBodySchemaType): Promise<TypedResponse<MemberDtoType, 201, 'json'>> => {
     const result = await membersService.add(organizationId, operatorRole, input)
     return c.json(result, 201)
   },
@@ -134,7 +118,7 @@ export const organizationsMembersController = {
     membershipId: number,
     actorUserId: number,
     operatorRole: Role,
-    input: UpdateMemberRoleBodySchemaType,
+    input: UpdateRoleBodySchemaType,
   ): Promise<TypedResponse<MemberDtoType, 200, 'json'>> => {
     const result = await membersService.updateRole(organizationId, membershipId, actorUserId, operatorRole, input)
     return c.json(result, 200)
@@ -156,7 +140,7 @@ export const organizationsAuditLogsController = {
   /**
    * 組織の監査ログを、検証済みqueryのlimit・cursorで1ページ分返す。
    */
-  listAuditLogs: async (c: Context, organizationId: number, query: ListAuditLogsQuerySchemaType): Promise<TypedResponse<AuditLogListDtoType, 200, 'json'>> => {
+  listAuditLogs: async (c: Context, organizationId: number, query: AuditLogListQuerySchemaType): Promise<TypedResponse<AuditLogListDtoType, 200, 'json'>> => {
     const result = await auditLogsService.list(organizationId, query.limit, query.cursor)
     return c.json(result, 200)
   },

@@ -6,7 +6,7 @@ import { AppError } from '@/utils/errors'
 
 import type { ListDtoType } from '../dtos'
 import { toListResponse } from '../mappers'
-import type { CreateOrganizationSchemaType, UpdateOrganizationSchemaType } from '../schemas'
+import type { CreateSchemaType, UpdateSchemaType } from '../schemas'
 
 /**
  * organizationsの組織本体のユースケースを提供するサービス。
@@ -16,7 +16,7 @@ export const service = {
   /**
    * 組織を作成する。作成者はOWNERとして登録される。
    */
-  create: async (userId: number, input: CreateOrganizationSchemaType): Promise<OrganizationDtoType> => {
+  create: async (userId: number, input: CreateSchemaType): Promise<OrganizationDtoType> => {
     const organization = await organizationRepository.createWithOwner(input.name, userId)
     return toOrganizationResponse(organization)
   },
@@ -45,7 +45,7 @@ export const service = {
   /**
    * 組織を更新する。ADMIN以上のロールが必要。
    */
-  update: async (organizationId: number, input: UpdateOrganizationSchemaType, role: Role): Promise<OrganizationDtoType> => {
+  update: async (organizationId: number, input: UpdateSchemaType, role: Role): Promise<OrganizationDtoType> => {
     if (role !== 'OWNER' && role !== 'ADMIN') {
       throw new AppError(403, 'この操作には管理者以上の権限が必要です')
     }

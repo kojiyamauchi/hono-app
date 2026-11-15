@@ -15,21 +15,17 @@ import { organizationsAuditLogsController, organizationsController, organization
 import { listDto as organizationListDto } from '../dtos'
 import { listDto as auditLogListDto } from '../dtos/auditLogs'
 import { listDto as memberListDto } from '../dtos/members'
+import { createSchema, listMineQuerySchema, updateSchema } from '../schemas'
+import { collectionParamSchema as auditLogCollectionParamSchema, listQuerySchema as auditLogListQuerySchema } from '../schemas/auditLogs'
+import { idParamSchema } from '../schemas/common'
+import { createBodySchema as createInvitationBodySchema, itemParamSchema as invitationItemParamSchema } from '../schemas/invitations'
 import {
-  addMemberBodySchema,
-  auditLogsRouteParamSchema,
-  createInvitationBodySchema,
-  createOrganizationSchema,
-  invitationRouteParamSchema,
-  listAuditLogsQuerySchema,
-  listMembersQuerySchema,
-  listMineQuerySchema,
-  memberRouteParamSchema,
-  organizationIdParamSchema,
-  transferOwnershipBodySchema,
-  updateMemberRoleBodySchema,
-  updateOrganizationSchema,
-} from '../schemas'
+  addBodySchema as addMemberBodySchema,
+  itemParamSchema as memberItemParamSchema,
+  listQuerySchema as memberListQuerySchema,
+  updateRoleBodySchema as updateMemberRoleBodySchema,
+} from '../schemas/members'
+import { bodySchema as transferOwnershipBodySchema } from '../schemas/transferOwnership'
 import { organizationsProjectsRoutes } from './projects'
 
 /** JSONエラーレスポンス（`{ error: { message } }`）の共通定義を生成する。 */
@@ -54,7 +50,7 @@ const createRouteDef = createRoute({
       // required: true を付けないと、Content-Typeなし/bodyなしのPOSTが任意bodyとして
       // 検証スキップされ c.req.valid('json') が {} になり400が返らなくなる。既存の必須body検証を維持する。
       required: true,
-      content: { 'application/json': { schema: createOrganizationSchema } },
+      content: { 'application/json': { schema: createSchema } },
     },
   },
   responses: {
@@ -96,10 +92,10 @@ const getByIdRoute = createRoute({
   path: '/{id}',
   tags: ['Organizations'],
   summary: '指定した組織の情報を取得する',
-  middleware: [authMiddleware, paramValidationMiddleware(organizationIdParamSchema), organizationMembershipMiddleware],
+  middleware: [authMiddleware, paramValidationMiddleware(idParamSchema), organizationMembershipMiddleware],
   security: bearerSecurity,
   request: {
-    params: organizationIdParamSchema,
+    params: idParamSchema,
   },
   responses: {
     200: {
@@ -119,15 +115,15 @@ const updateRoute = createRoute({
   path: '/{id}',
   tags: ['Organizations'],
   summary: '指定した組織を更新する',
-  middleware: [authMiddleware, paramValidationMiddleware(organizationIdParamSchema), organizationMembershipMiddleware],
+  middleware: [authMiddleware, paramValidationMiddleware(idParamSchema), organizationMembershipMiddleware],
   security: bearerSecurity,
   request: {
-    params: organizationIdParamSchema,
+    params: idParamSchema,
     body: {
       // required: true を付けないと、Content-Typeなし/bodyなしのPATCHが任意bodyとして
       // 検証スキップされ c.req.valid('json') が {} になり既存の必須body検証（400）を維持できない。
       required: true,
-      content: { 'application/json': { schema: updateOrganizationSchema } },
+      content: { 'application/json': { schema: updateSchema } },
     },
   },
   responses: {
@@ -149,10 +145,10 @@ const removeRoute = createRoute({
   path: '/{id}',
   tags: ['Organizations'],
   summary: '指定した組織を削除する',
-  middleware: [authMiddleware, paramValidationMiddleware(organizationIdParamSchema), organizationMembershipMiddleware],
+  middleware: [authMiddleware, paramValidationMiddleware(idParamSchema), organizationMembershipMiddleware],
   security: bearerSecurity,
   request: {
-    params: organizationIdParamSchema,
+    params: idParamSchema,
   },
   responses: {
     204: {
@@ -172,10 +168,10 @@ const transferOwnershipRoute = createRoute({
   path: '/{id}/transfer-ownership',
   tags: ['Organizations'],
   summary: '組織の所有権を既存メンバーへ移譲する',
-  middleware: [authMiddleware, paramValidationMiddleware(organizationIdParamSchema), organizationMembershipMiddleware],
+  middleware: [authMiddleware, paramValidationMiddleware(idParamSchema), organizationMembershipMiddleware],
   security: bearerSecurity,
   request: {
-    params: organizationIdParamSchema,
+    params: idParamSchema,
     body: {
       required: true,
       content: { 'application/json': { schema: transferOwnershipBodySchema } },
@@ -201,11 +197,11 @@ const listMembersRoute = createRoute({
   path: '/{id}/members',
   tags: ['Organization Members'],
   summary: '指定した組織のメンバー一覧を取得する',
-  middleware: [authMiddleware, paramValidationMiddleware(organizationIdParamSchema), organizationMembershipMiddleware],
+  middleware: [authMiddleware, paramValidationMiddleware(idParamSchema), organizationMembershipMiddleware],
   security: bearerSecurity,
   request: {
-    params: organizationIdParamSchema,
-    query: listMembersQuerySchema,
+    params: idParamSchema,
+    query: memberListQuerySchema,
   },
   responses: {
     200: {
@@ -225,10 +221,10 @@ const addMemberRoute = createRoute({
   path: '/{id}/members',
   tags: ['Organization Members'],
   summary: '指定した組織へメンバーを追加する',
-  middleware: [authMiddleware, paramValidationMiddleware(organizationIdParamSchema), organizationMembershipMiddleware],
+  middleware: [authMiddleware, paramValidationMiddleware(idParamSchema), organizationMembershipMiddleware],
   security: bearerSecurity,
   request: {
-    params: organizationIdParamSchema,
+    params: idParamSchema,
     body: {
       // required: true を付けないと、Content-Typeなし/bodyなしのPOSTが任意bodyとして
       // 検証スキップされ c.req.valid('json') が {} になり既存の必須body検証（400）を維持できない。
@@ -257,10 +253,10 @@ const leaveOrganizationRoute = createRoute({
   path: '/{id}/members/me',
   tags: ['Organization Members'],
   summary: '認証ユーザー自身を指定した組織から脱退させる',
-  middleware: [authMiddleware, paramValidationMiddleware(organizationIdParamSchema), organizationMembershipMiddleware],
+  middleware: [authMiddleware, paramValidationMiddleware(idParamSchema), organizationMembershipMiddleware],
   security: bearerSecurity,
   request: {
-    params: organizationIdParamSchema,
+    params: idParamSchema,
   },
   responses: {
     204: {
@@ -280,10 +276,10 @@ const updateMemberRoleRoute = createRoute({
   path: '/{id}/members/{membershipId}',
   tags: ['Organization Members'],
   summary: '指定したメンバーのロールを変更する',
-  middleware: [authMiddleware, paramValidationMiddleware(memberRouteParamSchema), organizationMembershipMiddleware],
+  middleware: [authMiddleware, paramValidationMiddleware(memberItemParamSchema), organizationMembershipMiddleware],
   security: bearerSecurity,
   request: {
-    params: memberRouteParamSchema,
+    params: memberItemParamSchema,
     body: {
       // required: true を付けないと、Content-Typeなし/bodyなしのPATCHが任意bodyとして
       // 検証スキップされ c.req.valid('json') が {} になり既存の必須body検証（400）を維持できない。
@@ -312,10 +308,10 @@ const removeMemberRoute = createRoute({
   path: '/{id}/members/{membershipId}',
   tags: ['Organization Members'],
   summary: '指定したメンバーを削除し、監査ログ（MEMBER_REMOVED）に記録する',
-  middleware: [authMiddleware, paramValidationMiddleware(memberRouteParamSchema), organizationMembershipMiddleware],
+  middleware: [authMiddleware, paramValidationMiddleware(memberItemParamSchema), organizationMembershipMiddleware],
   security: bearerSecurity,
   request: {
-    params: memberRouteParamSchema,
+    params: memberItemParamSchema,
   },
   responses: {
     204: {
@@ -342,11 +338,11 @@ const listAuditLogsRoute = createRoute({
   summary: '指定した組織の監査ログ一覧を取得する',
   description:
     'MEMBER_ROLE_CHANGED（ロール変更）、OWNERSHIP_TRANSFERRED（所有権移譲）、MEMBER_REMOVED（管理者によるメンバー削除）、PROJECT_CREATED / PROJECT_UPDATED / PROJECT_DELETED（プロジェクトの作成・更新・削除）を同じ一覧に新しい順（createdAt DESC, id DESC）で返す。AuditLogは action で区別できる6イベントのunionで、必須項目はイベント種別ごとに異なる（メンバー向け項目とプロジェクト向け項目は互いに持たない）。createdAt は記録日時（トランザクション開始時刻）で、一覧順は操作の確定順を保証しない。',
-  middleware: [authMiddleware, paramValidationMiddleware(auditLogsRouteParamSchema), organizationMembershipMiddleware, organizationAdminMiddleware],
+  middleware: [authMiddleware, paramValidationMiddleware(auditLogCollectionParamSchema), organizationMembershipMiddleware, organizationAdminMiddleware],
   security: bearerSecurity,
   request: {
-    params: auditLogsRouteParamSchema,
-    query: listAuditLogsQuerySchema,
+    params: auditLogCollectionParamSchema,
+    query: auditLogListQuerySchema,
   },
   responses: {
     200: {
@@ -367,10 +363,10 @@ const listInvitationsRoute = createRoute({
   path: '/{id}/invitations',
   tags: ['Organization Invitations'],
   summary: '指定した組織の招待一覧を取得する',
-  middleware: [authMiddleware, paramValidationMiddleware(organizationIdParamSchema), organizationMembershipMiddleware],
+  middleware: [authMiddleware, paramValidationMiddleware(idParamSchema), organizationMembershipMiddleware],
   security: bearerSecurity,
   request: {
-    params: organizationIdParamSchema,
+    params: idParamSchema,
   },
   responses: {
     200: {
@@ -391,10 +387,10 @@ const createInvitationRoute = createRoute({
   path: '/{id}/invitations',
   tags: ['Organization Invitations'],
   summary: '指定した組織への招待を作成する',
-  middleware: [authMiddleware, paramValidationMiddleware(organizationIdParamSchema), organizationMembershipMiddleware],
+  middleware: [authMiddleware, paramValidationMiddleware(idParamSchema), organizationMembershipMiddleware],
   security: bearerSecurity,
   request: {
-    params: organizationIdParamSchema,
+    params: idParamSchema,
     body: {
       // required: true を付けないと、Content-Typeなし/bodyなしのPOSTが任意bodyとして
       // 検証スキップされ c.req.valid('json') が {} になり既存の必須body検証（400）を維持できない。
@@ -423,10 +419,10 @@ const cancelInvitationRoute = createRoute({
   path: '/{id}/invitations/{invitationId}',
   tags: ['Organization Invitations'],
   summary: '指定した招待をキャンセルする',
-  middleware: [authMiddleware, paramValidationMiddleware(invitationRouteParamSchema), organizationMembershipMiddleware],
+  middleware: [authMiddleware, paramValidationMiddleware(invitationItemParamSchema), organizationMembershipMiddleware],
   security: bearerSecurity,
   request: {
-    params: invitationRouteParamSchema,
+    params: invitationItemParamSchema,
   },
   responses: {
     204: {
@@ -450,10 +446,10 @@ const resendInvitationEmailRoute = createRoute({
   description:
     '再送できるのは、ENABLE_INVITATION_EMAIL=true で配信設定が有効な環境で、DB上のPENDINGの招待かつ有効期限が判定時刻より後（同時刻は期限切れ）であり、初回の配信がResendに明示的に拒否された（REJECTED かつ受付結果不明でなく、原因が client または rate_limited の）場合に限る。受け付けは招待ごとに1回だけ。権限は OWNER が ADMIN／MEMBER 宛て、ADMIN が MEMBER 宛てで、MEMBER は不可（OWNER 宛ては不可）。所属・ロール・招待・配信の状態はロックを取得した後の最新の値で判定する。202は配信待ちの保存までを示し、Resendの受付や受信者への配達を保証しない。GCP devでは既存の手動Jobを実行した後に、招待一覧の emailDeliveryStatus で状態を確認する。応答を受け取れなかった場合は同じ依頼を再送し、202または「再送は既に受け付けています」の409で受付を確認する。',
   // 所属・ロールの認可は、Serviceがrepositoryのロック後に読み直した値で行うため、organizationMembershipMiddlewareは使わない。
-  middleware: [authMiddleware, paramValidationMiddleware(invitationRouteParamSchema)],
+  middleware: [authMiddleware, paramValidationMiddleware(invitationItemParamSchema)],
   security: bearerSecurity,
   request: {
-    params: invitationRouteParamSchema,
+    params: invitationItemParamSchema,
   },
   responses: {
     202: {
