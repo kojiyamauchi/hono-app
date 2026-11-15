@@ -17,7 +17,16 @@ import type {
   RequestPasswordResetSchemaType,
   SignupSchemaType,
 } from '../schemas'
-import { authService } from '../services'
+import { changePasswordService } from '../services/changePassword'
+import { emailVerificationService } from '../services/emailVerification'
+import { loginService } from '../services/login'
+import { logoutService } from '../services/logout'
+import { logoutAllService } from '../services/logoutAll'
+import { meService } from '../services/me'
+import { passwordResetService } from '../services/passwordReset'
+import { refreshService } from '../services/refresh'
+import { sessionsService } from '../services/sessions'
+import { signupService } from '../services/signup'
 
 /**
  * レート制限に使うクライアントIPを取得する。
@@ -51,7 +60,7 @@ export const authController = {
    * IP単位のレート制限超過時は429を返す。
    */
   signup: async (c: Context, input: SignupSchemaType): Promise<TypedResponse<AuthResultDtoType, 201, 'json'>> => {
-    const result = await authService.signup(input, getClientIp(c))
+    const result = await signupService.execute(input, getClientIp(c))
     setRefreshTokenCookie(c, result.refreshToken)
     return c.json({ token: result.token, user: result.user }, 201)
   },
@@ -62,7 +71,7 @@ export const authController = {
    * IP単位・email単位のレート制限超過時は429を返す。
    */
   login: async (c: Context, input: LoginSchemaType): Promise<TypedResponse<AuthResultDtoType, 200, 'json'>> => {
-    const result = await authService.login(input, getClientIp(c))
+    const result = await loginService.execute(input, getClientIp(c))
     setRefreshTokenCookie(c, result.refreshToken)
     return c.json({ token: result.token, user: result.user }, 200)
   },
@@ -76,7 +85,7 @@ export const authController = {
     if (!cookieToken) {
       throw new AppError(401, 'リフレッシュトークンが見つかりません')
     }
-    const result = await authService.refresh(cookieToken)
+    const result = await refreshService.execute(cookieToken)
     setRefreshTokenCookie(c, result.refreshToken)
     return c.json({ token: result.token, user: result.user }, 200)
   },
@@ -88,7 +97,7 @@ export const authController = {
   logout: async (c: Context): Promise<Response> => {
     const cookieToken = getRefreshTokenCookie(c)
     if (cookieToken) {
-      await authService.logout(cookieToken)
+      await logoutService.execute(cookieToken)
     }
     clearRefreshTokenCookie(c)
     return c.body(null, 204)
@@ -98,7 +107,7 @@ export const authController = {
    * 認証済みユーザー自身の情報を返す。
    */
   me: async (c: Context, userId: number): Promise<TypedResponse<UserDtoType, 200, 'json'>> => {
-    const user = await authService.getById(userId)
+    const user = await meService.get(userId)
     return c.json(user, 200)
   },
 
@@ -107,7 +116,7 @@ export const authController = {
    * 成功時は全リフレッシュトークンが失効するため、Cookieをクリアして204を返す。
    */
   changePassword: async (c: Context, userId: number, input: ChangePasswordSchemaType): Promise<Response> => {
-    await authService.changePassword(userId, input.currentPassword, input.newPassword)
+    await changePasswordService.execute(userId, input.currentPassword, input.newPassword)
     clearRefreshTokenCookie(c)
     return c.body(null, 204)
   },
@@ -118,7 +127,7 @@ export const authController = {
    * IP単位のレート制限超過時のみ429を返す。
    */
   requestPasswordReset: async (c: Context, input: RequestPasswordResetSchemaType): Promise<Response> => {
-    await authService.requestPasswordReset(input.email, getClientIp(c))
+    await passwordResetService.request(input.email, getClientIp(c))
     return c.body(null, 202)
   },
 
@@ -127,7 +136,7 @@ export const authController = {
    * トークン検証・パスワード更新成功時に204を返す。
    */
   confirmPasswordReset: async (c: Context, input: ConfirmPasswordResetSchemaType): Promise<Response> => {
-    await authService.confirmPasswordReset(input.token, input.password)
+    await passwordResetService.confirm(input.token, input.password)
     return c.body(null, 204)
   },
 
@@ -135,7 +144,7 @@ export const authController = {
    * 認証済みユーザーへメールアドレス検証メールを再送し、202を返す。
    */
   requestEmailVerification: async (c: Context, userId: number): Promise<Response> => {
-    await authService.requestEmailVerification(userId)
+    await emailVerificationService.request(userId)
     return c.body(null, 202)
   },
 
@@ -143,7 +152,7 @@ export const authController = {
    * メールアドレス検証トークンを確認し、204を返す。
    */
   confirmEmailVerification: async (c: Context, input: ConfirmEmailVerificationSchemaType): Promise<Response> => {
-    await authService.confirmEmailVerification(input.token)
+    await emailVerificationService.confirm(input.token)
     return c.body(null, 204)
   },
 
@@ -152,7 +161,7 @@ export const authController = {
    * 成功時はrefresh cookieをクリアして204を返す。
    */
   logoutAll: async (c: Context, userId: number): Promise<Response> => {
-    await authService.logoutAll(userId)
+    await logoutAllService.execute(userId)
     clearRefreshTokenCookie(c)
     return c.body(null, 204)
   },
@@ -161,7 +170,7 @@ export const authController = {
    * 認証済みユーザーのactiveなリフレッシュセッション一覧を返す。
    */
   listSessions: async (c: Context, userId: number): Promise<TypedResponse<SessionListDtoType, 200, 'json'>> => {
-    const sessions = await authService.listSessions(userId)
+    const sessions = await sessionsService.list(userId)
     return c.json({ sessions }, 200)
   },
 
@@ -169,7 +178,7 @@ export const authController = {
    * 認証済みユーザー自身の指定リフレッシュセッションを失効させる。
    */
   logoutSession: async (c: Context, userId: number, params: DeleteSessionParamSchemaType): Promise<Response> => {
-    await authService.logoutSession(userId, params.id)
+    await sessionsService.revoke(userId, params.id)
     return c.body(null, 204)
   },
 }
