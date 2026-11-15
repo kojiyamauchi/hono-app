@@ -1,4 +1,4 @@
-import type { ItemDtoType as ProjectDtoType, ListDtoType as ProjectListDtoType } from '../dtos/projects'
+import type { ItemDtoType, ListDtoType } from '../dtos/projects'
 import type { Project } from '../entities/projects'
 import { PROJECT_CURSOR_KIND, PROJECT_CURSOR_VERSION, projectCursorPayloadSchema } from '../schemas/projects'
 
@@ -13,7 +13,7 @@ export type ProjectCursorBoundary = { organizationId: number; createdAt: Date; i
  * 他APIのカーソルと区別するため `kind` を含める。
  * 署名・暗号化は行わない。デコードすれば内容を読めて改変もできる前提のため、機密情報を含めないこと。
  */
-export const encodeProjectCursor = (boundary: ProjectCursorBoundary): string => {
+export const encodeCursor = (boundary: ProjectCursorBoundary): string => {
   const json = JSON.stringify({
     kind: PROJECT_CURSOR_KIND,
     version: PROJECT_CURSOR_VERSION,
@@ -30,7 +30,7 @@ export const encodeProjectCursor = (boundary: ProjectCursorBoundary): string => 
  * 発行時と同じ正規のbase64url文字列だけを受け付ける（不正な文字の付加や `=` パディングは不正として扱う）。
  * 対象組織の一致はservice層が認可済みのorganizationIdと突き合わせて確認する。
  */
-export const decodeProjectCursor = (raw: string): ProjectCursorBoundary | null => {
+export const decodeCursor = (raw: string): ProjectCursorBoundary | null => {
   let parsed: unknown
   try {
     const decoded = Buffer.from(raw, 'base64url')
@@ -59,7 +59,7 @@ export const decodeProjectCursor = (raw: string): ProjectCursorBoundary | null =
 /**
  * プロジェクトをレスポンス用DTOへ変換する。`description` は未設定でもnullで返し、日時はISO 8601文字列にする。
  */
-export const toProjectResponse = (project: Project): ProjectDtoType => {
+export const toResponse = (project: Project): ItemDtoType => {
   return {
     id: project.id,
     organizationId: project.organizationId,
@@ -74,9 +74,9 @@ export const toProjectResponse = (project: Project): ProjectDtoType => {
  * プロジェクトのページをカーソル式ページネーションの応答DTOへ変換する。
  * `nextCursor` が `null` なら後続のページは存在しない。
  */
-export const toProjectListResponse = (projects: Project[], nextCursor: string | null): ProjectListDtoType => {
+export const toListResponse = (projects: Project[], nextCursor: string | null): ListDtoType => {
   return {
-    items: projects.map(toProjectResponse),
+    items: projects.map(toResponse),
     nextCursor,
   }
 }

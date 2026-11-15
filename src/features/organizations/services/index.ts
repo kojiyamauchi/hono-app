@@ -17,15 +17,9 @@ import { AppError } from '@/utils/errors'
 import type { ListDtoType as OrganizationListDtoType } from '../dtos'
 import type { ListDtoType as AuditLogListDtoType } from '../dtos/auditLogs'
 import type { ListDtoType as MemberListDtoType } from '../dtos/members'
-import {
-  decodeAuditLogCursor,
-  decodeMemberListCursor,
-  encodeAuditLogCursor,
-  encodeMemberListCursor,
-  toAuditLogListResponse,
-  toMemberListResponse,
-  toOrganizationListResponse,
-} from '../mappers'
+import { toListResponse as toOrganizationListResponse } from '../mappers'
+import { decodeCursor as decodeAuditLogCursor, encodeCursor as encodeAuditLogCursor, toListResponse as toAuditLogListResponse } from '../mappers/auditLogs'
+import { decodeCursor as decodeMemberListCursor, encodeCursor as encodeMemberListCursor, toListResponse as toMemberListResponse } from '../mappers/members'
 import {
   type AuditLogPageBoundary,
   leaveOrganizationResults,
