@@ -9,15 +9,15 @@ const findById = mock()
 const updateById = mock()
 const findByEmail = mock()
 const create = mock()
-const deleteAccount = mock()
+const remove = mock()
 const existsById = mock()
 
 await mock.module('@/shared/user/repositories', () => ({
   userRepository: { findById, updateById, findByEmail, create, existsById },
 }))
 
-await mock.module('@/features/users/repositories', () => ({
-  accountDeletionRepository: { deleteAccount },
+await mock.module('@/features/users/repositories/me', () => ({
+  meRepository: { remove },
   accountDeletionResults: {
     deleted: 'DELETED',
     notFound: 'NOT_FOUND',
@@ -48,13 +48,13 @@ const createToken = async (userId: number): Promise<string> => {
   )
 }
 
-describe('users routes', () => {
+describe('users me routes', () => {
   beforeEach(() => {
     findById.mockReset()
     updateById.mockReset()
     findByEmail.mockReset()
     create.mockReset()
-    deleteAccount.mockReset()
+    remove.mockReset()
     existsById.mockReset()
     existsById.mockResolvedValue(true)
   })
@@ -135,7 +135,7 @@ describe('users routes', () => {
   })
 
   test('DELETE /users/me は本人確認後にアカウントを削除しCookieをクリアする', async () => {
-    deleteAccount.mockResolvedValue('DELETED')
+    remove.mockResolvedValue('DELETED')
     const token = await createToken(1)
 
     const response = await app.request('/users/me', {
@@ -148,13 +148,13 @@ describe('users routes', () => {
     })
 
     expect(response.status).toBe(204)
-    expect(deleteAccount).toHaveBeenCalledTimes(1)
+    expect(remove).toHaveBeenCalledTimes(1)
     expect(response.headers.get('set-cookie')).toContain('refreshToken=')
     expect(response.headers.get('set-cookie')).toContain('Max-Age=0')
   })
 
   test('DELETE /users/me は現在のパスワードが不一致なら401を返す', async () => {
-    deleteAccount.mockResolvedValue('INVALID_PASSWORD')
+    remove.mockResolvedValue('INVALID_PASSWORD')
     const token = await createToken(1)
 
     const response = await app.request('/users/me', {
@@ -171,7 +171,7 @@ describe('users routes', () => {
   })
 
   test('DELETE /users/me は唯一のOWNERである組織が存在する場合に409を返す', async () => {
-    deleteAccount.mockResolvedValue('SOLE_OWNER')
+    remove.mockResolvedValue('SOLE_OWNER')
     const token = await createToken(1)
 
     const response = await app.request('/users/me', {
@@ -187,7 +187,7 @@ describe('users routes', () => {
   })
 
   test('DELETE /users/me は処理中にユーザーが存在しなくなったら404を返す', async () => {
-    deleteAccount.mockResolvedValue('NOT_FOUND')
+    remove.mockResolvedValue('NOT_FOUND')
     const token = await createToken(1)
 
     const response = await app.request('/users/me', {
@@ -211,35 +211,7 @@ describe('users routes', () => {
     })
 
     expect(response.status).toBe(400)
-    expect(deleteAccount).not.toHaveBeenCalled()
-  })
-
-  test('GET /users/:id は指定ユーザーの公開情報だけを返す', async () => {
-    findById.mockResolvedValue({ ...user, id: 2, name: 'Public User', email: 'public@example.com' })
-    const token = await createToken(1)
-
-    const response = await app.request('/users/2', {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-
-    expect(response.status).toBe(200)
-    const body = (await response.json()) as Record<string, unknown>
-    expect(body).toEqual({
-      id: 2,
-      name: 'Public User',
-    })
-    expect(body).not.toHaveProperty('email')
-    expect(body).not.toHaveProperty('password')
-  })
-
-  test('GET /users/:id は不正なIDなら400を返す', async () => {
-    const token = await createToken(1)
-
-    const response = await app.request('/users/me-invalid', {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-
-    expect(response.status).toBe(400)
+    expect(remove).not.toHaveBeenCalled()
   })
 
   test('GET /users/me はトークンがなければ401を返す', async () => {
