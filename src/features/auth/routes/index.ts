@@ -8,7 +8,16 @@ import { SECURITY_SCHEME } from '@/shared/openApi/schemes'
 import { userDto } from '@/shared/user/dtos'
 import { openApiDefaultHook } from '@/utils/validation'
 
-import { authController } from '../controllers'
+import { changePasswordController } from '../controllers/changePassword'
+import { emailVerificationController } from '../controllers/emailVerification'
+import { loginController } from '../controllers/login'
+import { logoutController } from '../controllers/logout'
+import { logoutAllController } from '../controllers/logoutAll'
+import { meController } from '../controllers/me'
+import { passwordResetController } from '../controllers/passwordReset'
+import { refreshController } from '../controllers/refresh'
+import { sessionsController } from '../controllers/sessions'
+import { signupController } from '../controllers/signup'
 import { listDto as sessionListDto } from '../dtos/sessions'
 import { bodySchema as changePasswordSchema } from '../schemas/changePassword'
 import { confirmBodySchema as confirmEmailVerificationSchema } from '../schemas/emailVerification'
@@ -327,16 +336,16 @@ const logoutSessionRoute = createRoute({
  * `/sessions` を `/sessions/{id}` より先に登録し、静的パスを優先する。
  */
 export const authRoutes = new OpenAPIHono({ defaultHook: openApiDefaultHook })
-  .openapi(signupRoute, (c) => authController.signup(c, c.req.valid('json')))
-  .openapi(loginRoute, (c) => authController.login(c, c.req.valid('json')))
-  .openapi(refreshRoute, (c) => authController.refresh(c))
-  .openapi(logoutRoute, (c) => authController.logout(c))
-  .openapi(meRoute, (c) => authController.me(c, c.get('userId')))
-  .openapi(changePasswordRoute, (c) => authController.changePassword(c, c.get('userId'), c.req.valid('json')))
-  .openapi(requestPasswordResetRoute, (c) => authController.requestPasswordReset(c, c.req.valid('json')))
-  .openapi(confirmPasswordResetRoute, (c) => authController.confirmPasswordReset(c, c.req.valid('json')))
-  .openapi(requestEmailVerificationRoute, (c) => authController.requestEmailVerification(c, c.get('userId')))
-  .openapi(confirmEmailVerificationRoute, (c) => authController.confirmEmailVerification(c, c.req.valid('json')))
-  .openapi(logoutAllRoute, (c) => authController.logoutAll(c, c.get('userId')))
-  .openapi(listSessionsRoute, (c) => authController.listSessions(c, c.get('userId')))
-  .openapi(logoutSessionRoute, (c) => authController.logoutSession(c, c.get('userId'), c.req.valid('param')))
+  .openapi(signupRoute, (c) => signupController.execute(c, c.req.valid('json')))
+  .openapi(loginRoute, (c) => loginController.execute(c, c.req.valid('json')))
+  .openapi(refreshRoute, (c) => refreshController.execute(c))
+  .openapi(logoutRoute, (c) => logoutController.execute(c))
+  .openapi(meRoute, (c) => meController.get(c, c.get('userId')))
+  .openapi(changePasswordRoute, (c) => changePasswordController.execute(c, c.get('userId'), c.req.valid('json')))
+  .openapi(requestPasswordResetRoute, (c) => passwordResetController.request(c, c.req.valid('json')))
+  .openapi(confirmPasswordResetRoute, (c) => passwordResetController.confirm(c, c.req.valid('json')))
+  .openapi(requestEmailVerificationRoute, (c) => emailVerificationController.request(c, c.get('userId')))
+  .openapi(confirmEmailVerificationRoute, (c) => emailVerificationController.confirm(c, c.req.valid('json')))
+  .openapi(logoutAllRoute, (c) => logoutAllController.execute(c, c.get('userId')))
+  .openapi(listSessionsRoute, (c) => sessionsController.list(c, c.get('userId')))
+  .openapi(logoutSessionRoute, (c) => sessionsController.revoke(c, c.get('userId'), c.req.valid('param')))
