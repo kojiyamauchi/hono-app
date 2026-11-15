@@ -15,9 +15,9 @@ await mock.module('@/libs/prisma', () => ({
   prisma: { $transaction: transaction },
 }))
 
-const { accountDeletionRepository, accountDeletionResults } = await import('.')
+const { meRepository, accountDeletionResults } = await import('./me')
 
-describe('accountDeletionRepository.deleteAccount', () => {
+describe('meRepository.remove', () => {
   beforeEach(() => {
     queryRaw.mockReset()
     updateManyInvitations.mockReset()
@@ -31,7 +31,7 @@ describe('accountDeletionRepository.deleteAccount', () => {
     deleteUser.mockResolvedValue({ id: 1 })
     const verifyPassword = mock(async (passwordHash: string) => passwordHash === 'hashed-password')
 
-    const result = await accountDeletionRepository.deleteAccount(1, verifyPassword)
+    const result = await meRepository.remove(1, verifyPassword)
 
     expect(result).toBe(accountDeletionResults.deleted)
     expect(verifyPassword).toHaveBeenCalledWith('hashed-password')
@@ -46,7 +46,7 @@ describe('accountDeletionRepository.deleteAccount', () => {
     queryRaw.mockResolvedValueOnce([])
     const verifyPassword = mock(async () => true)
 
-    const result = await accountDeletionRepository.deleteAccount(999, verifyPassword)
+    const result = await meRepository.remove(999, verifyPassword)
 
     expect(result).toBe(accountDeletionResults.notFound)
     expect(verifyPassword).not.toHaveBeenCalled()
@@ -58,7 +58,7 @@ describe('accountDeletionRepository.deleteAccount', () => {
     queryRaw.mockResolvedValueOnce([{ id: 1, email: 'taro@example.com', password: 'hashed-password' }])
     const verifyPassword = mock(async () => false)
 
-    const result = await accountDeletionRepository.deleteAccount(1, verifyPassword)
+    const result = await meRepository.remove(1, verifyPassword)
 
     expect(result).toBe(accountDeletionResults.invalidPassword)
     expect(updateManyInvitations).not.toHaveBeenCalled()
@@ -69,7 +69,7 @@ describe('accountDeletionRepository.deleteAccount', () => {
     queryRaw.mockResolvedValueOnce([{ id: 1, email: 'taro@example.com', password: 'hashed-password' }]).mockResolvedValueOnce([{ id: 10 }])
     const verifyPassword = mock(async () => true)
 
-    const result = await accountDeletionRepository.deleteAccount(1, verifyPassword)
+    const result = await meRepository.remove(1, verifyPassword)
 
     expect(result).toBe(accountDeletionResults.soleOwner)
     expect(updateManyInvitations).not.toHaveBeenCalled()
@@ -81,6 +81,6 @@ describe('accountDeletionRepository.deleteAccount', () => {
     updateManyInvitations.mockResolvedValue({ count: 1 })
     deleteUser.mockRejectedValue(new Error('削除エラー'))
 
-    await expect(accountDeletionRepository.deleteAccount(1, async () => true)).rejects.toThrow('削除エラー')
+    await expect(meRepository.remove(1, async () => true)).rejects.toThrow('削除エラー')
   })
 })
