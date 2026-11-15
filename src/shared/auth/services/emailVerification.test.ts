@@ -8,7 +8,7 @@ process.env.EMAIL_VERIFICATION_URL_BASE = 'https://example.com/verify-email'
 const create = mock()
 const deleteByIdAndTokenHash = mock()
 
-await mock.module('@/shared/auth/repositories', () => ({
+await mock.module('@/shared/auth/repositories/emailVerification', () => ({
   emailVerificationTokenRepository: {
     create,
     deleteByIdAndTokenHash,

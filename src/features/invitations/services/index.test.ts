@@ -7,8 +7,11 @@ process.env.REFRESH_TOKEN_SECRET = 'test-refresh-secret'
 
 const createRefreshToken = mock()
 
-await mock.module('@/shared/auth/repositories', () => ({
+await mock.module('@/shared/auth/repositories/emailVerification', () => ({
   emailVerificationTokenRepository: { create: mock(), deleteByIdAndTokenHash: mock() },
+}))
+
+await mock.module('@/shared/auth/repositories/refreshToken', () => ({
   refreshTokenRepository: { create: createRefreshToken },
 }))
 

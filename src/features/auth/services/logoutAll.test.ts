@@ -23,10 +23,13 @@ const prtConfirm = mock()
 const evtFindByTokenHash = mock()
 const evtConfirm = mock()
 
-await mock.module('@/shared/auth/repositories', () => ({
+await mock.module('@/shared/auth/repositories/credential', () => ({
   authCredentialRepository: {
     changePassword,
   },
+}))
+
+await mock.module('@/shared/auth/repositories/refreshToken', () => ({
   refreshTokenRepository: {
     create: createRefreshToken,
     findByTokenHash,
@@ -37,12 +40,18 @@ await mock.module('@/shared/auth/repositories', () => ({
     revokeByUserIdAndFamilyId,
     findActiveSessionsByUserId,
   },
+}))
+
+await mock.module('@/shared/auth/repositories/passwordReset', () => ({
   passwordResetTokenRepository: {
     create: prtCreate,
     findByTokenHash: prtFindByTokenHash,
     deleteByIdAndTokenHash: prtDeleteByIdAndTokenHash,
     confirm: prtConfirm,
   },
+}))
+
+await mock.module('@/shared/auth/repositories/emailVerification', () => ({
   emailVerificationTokenRepository: {
     findByTokenHash: evtFindByTokenHash,
     confirm: evtConfirm,

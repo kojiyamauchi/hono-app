@@ -11,10 +11,19 @@ process.env.ALLOWED_ORIGINS = 'http://localhost:3000'
 
 const createRefreshToken = mock()
 
-await mock.module('@/shared/auth/repositories', () => ({
+await mock.module('@/shared/auth/repositories/credential', () => ({
   authCredentialRepository: {},
+}))
+
+await mock.module('@/shared/auth/repositories/refreshToken', () => ({
   refreshTokenRepository: { create: createRefreshToken },
+}))
+
+await mock.module('@/shared/auth/repositories/passwordReset', () => ({
   passwordResetTokenRepository: {},
+}))
+
+await mock.module('@/shared/auth/repositories/emailVerification', () => ({
   emailVerificationTokenRepository: { create: mock(), deleteByIdAndTokenHash: mock() },
 }))
 
