@@ -7,7 +7,7 @@ import { clearRefreshTokenCookie, getRefreshTokenCookie, setRefreshTokenCookie }
 import type { UserDtoType } from '@/shared/user/dtos'
 import { AppError } from '@/utils/errors'
 
-import type { SessionListDtoType } from '../dtos'
+import type { ListDtoType as SessionListDtoType } from '../dtos/sessions'
 import type {
   ChangePasswordSchemaType,
   ConfirmEmailVerificationSchemaType,

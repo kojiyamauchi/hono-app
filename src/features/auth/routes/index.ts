@@ -9,7 +9,7 @@ import { userDto } from '@/shared/user/dtos'
 import { openApiDefaultHook } from '@/utils/validation'
 
 import { authController } from '../controllers'
-import { sessionListDto } from '../dtos'
+import { listDto as sessionListDto } from '../dtos/sessions'
 import {
   changePasswordSchema,
   confirmEmailVerificationSchema,
