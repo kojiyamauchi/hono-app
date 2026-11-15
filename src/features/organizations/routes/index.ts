@@ -2,44 +2,20 @@ import { createRoute, OpenAPIHono } from '@hono/zod-openapi'
 
 import { authMiddleware } from '@/middlewares/auth'
 import { organizationMembershipMiddleware } from '@/middlewares/organizationMembership'
-import { organizationAdminMiddleware } from '@/middlewares/organizationRole'
 import { paramValidationMiddleware } from '@/middlewares/paramValidation'
-import { invitationDto, invitationListItemDto } from '@/shared/invitation/dtos'
-import { memberDto } from '@/shared/membership/dtos'
-import { errorResponseDto } from '@/shared/openApi/dtos'
-import { SECURITY_SCHEME } from '@/shared/openApi/schemes'
 import { organizationDto } from '@/shared/organization/dtos'
 import { openApiDefaultHook } from '@/utils/validation'
 
 import { controller } from '../controllers'
-import { auditLogsController } from '../controllers/auditLogs'
-import { invitationsController } from '../controllers/invitations'
-import { membersController } from '../controllers/members'
-import { transferOwnershipController } from '../controllers/transferOwnership'
-import { listDto as organizationListDto } from '../dtos'
-import { listDto as auditLogListDto } from '../dtos/auditLogs'
-import { listDto as memberListDto } from '../dtos/members'
+import { listDto } from '../dtos'
 import { createSchema, listMineQuerySchema, updateSchema } from '../schemas'
-import { collectionParamSchema as auditLogCollectionParamSchema, listQuerySchema as auditLogListQuerySchema } from '../schemas/auditLogs'
 import { idParamSchema } from '../schemas/common'
-import { createBodySchema as createInvitationBodySchema, itemParamSchema as invitationItemParamSchema } from '../schemas/invitations'
-import {
-  addBodySchema as addMemberBodySchema,
-  itemParamSchema as memberItemParamSchema,
-  listQuerySchema as memberListQuerySchema,
-  updateRoleBodySchema as updateMemberRoleBodySchema,
-} from '../schemas/members'
-import { bodySchema as transferOwnershipBodySchema } from '../schemas/transferOwnership'
-import { organizationsProjectsRoutes } from './projects'
-
-/** JSONエラーレスポンス（`{ error: { message } }`）の共通定義を生成する。 */
-const errorResponse = (description: string): { content: { 'application/json': { schema: typeof errorResponseDto } }; description: string } => ({
-  content: { 'application/json': { schema: errorResponseDto } },
-  description,
-})
-
-/** organizations featureの全ルートに共通するsecurity（Bearerアクセストークン）。 */
-const bearerSecurity = [{ [SECURITY_SCHEME.bearer]: [] }]
+import { auditLogsRoutes } from './auditLogs'
+import { bearerSecurity, errorResponse } from './common'
+import { invitationsRoutes } from './invitations'
+import { membersRoutes } from './members'
+import { projectsRoutes } from './projects'
+import { transferOwnershipRoutes } from './transferOwnership'
 
 /** POST /organizations: 組織を作成する。 */
 const createRouteDef = createRoute({
@@ -81,7 +57,7 @@ const listMineRoute = createRoute({
   },
   responses: {
     200: {
-      content: { 'application/json': { schema: organizationListDto } },
+      content: { 'application/json': { schema: listDto } },
       description: '所属組織の一覧（オフセット式ページネーション）',
     },
     400: errorResponse('queryが不正'),
@@ -166,314 +142,13 @@ const removeRoute = createRoute({
   },
 })
 
-/** POST /organizations/{id}/transfer-ownership: 組織の所有権を既存メンバーへ移譲する。 */
-const transferOwnershipRoute = createRoute({
-  method: 'post',
-  path: '/{id}/transfer-ownership',
-  tags: ['Organizations'],
-  summary: '組織の所有権を既存メンバーへ移譲する',
-  middleware: [authMiddleware, paramValidationMiddleware(idParamSchema), organizationMembershipMiddleware],
-  security: bearerSecurity,
-  request: {
-    params: idParamSchema,
-    body: {
-      required: true,
-      content: { 'application/json': { schema: transferOwnershipBodySchema } },
-    },
-  },
-  responses: {
-    204: {
-      description: '所有権の移譲に成功',
-    },
-    400: errorResponse('入力値が不正'),
-    401: errorResponse('認証が必要、またはトークンが無効'),
-    403: errorResponse('OWNER権限が必要'),
-    404: errorResponse('組織または移譲先メンバーが見つからない'),
-    409: errorResponse('競合により移譲できない'),
-    422: errorResponse('自分自身への移譲など意味的に不正な入力'),
-    500: errorResponse('サーバーエラー'),
-  },
-})
-
-/** GET /organizations/{id}/members: 組織のメンバー一覧を返す。 */
-const listMembersRoute = createRoute({
-  method: 'get',
-  path: '/{id}/members',
-  tags: ['Organization Members'],
-  summary: '指定した組織のメンバー一覧を取得する',
-  middleware: [authMiddleware, paramValidationMiddleware(idParamSchema), organizationMembershipMiddleware],
-  security: bearerSecurity,
-  request: {
-    params: idParamSchema,
-    query: memberListQuerySchema,
-  },
-  responses: {
-    200: {
-      content: { 'application/json': { schema: memberListDto } },
-      description: '組織のメンバー一覧（カーソル式ページネーション）',
-    },
-    400: errorResponse('組織IDまたはqueryが不正'),
-    401: errorResponse('認証が必要、またはトークンが無効'),
-    404: errorResponse('組織が見つからない'),
-    500: errorResponse('サーバーエラー'),
-  },
-})
-
-/** POST /organizations/{id}/members: メンバーを追加する。 */
-const addMemberRoute = createRoute({
-  method: 'post',
-  path: '/{id}/members',
-  tags: ['Organization Members'],
-  summary: '指定した組織へメンバーを追加する',
-  middleware: [authMiddleware, paramValidationMiddleware(idParamSchema), organizationMembershipMiddleware],
-  security: bearerSecurity,
-  request: {
-    params: idParamSchema,
-    body: {
-      // required: true を付けないと、Content-Typeなし/bodyなしのPOSTが任意bodyとして
-      // 検証スキップされ c.req.valid('json') が {} になり既存の必須body検証（400）を維持できない。
-      required: true,
-      content: { 'application/json': { schema: addMemberBodySchema } },
-    },
-  },
-  responses: {
-    201: {
-      content: { 'application/json': { schema: memberDto } },
-      description: '追加されたメンバー',
-    },
-    400: errorResponse('入力値が不正'),
-    401: errorResponse('認証が必要、またはトークンが無効'),
-    403: errorResponse('権限が不足'),
-    404: errorResponse('組織が見つからない'),
-    409: errorResponse('既にメンバー'),
-    422: errorResponse('意味的に不正な入力（例: OWNERロール指定）'),
-    500: errorResponse('サーバーエラー'),
-  },
-})
-
-/** DELETE /organizations/{id}/members/me: 認証ユーザー自身を組織から脱退させる。 */
-const leaveOrganizationRoute = createRoute({
-  method: 'delete',
-  path: '/{id}/members/me',
-  tags: ['Organization Members'],
-  summary: '認証ユーザー自身を指定した組織から脱退させる',
-  middleware: [authMiddleware, paramValidationMiddleware(idParamSchema), organizationMembershipMiddleware],
-  security: bearerSecurity,
-  request: {
-    params: idParamSchema,
-  },
-  responses: {
-    204: {
-      description: '組織からの脱退に成功',
-    },
-    400: errorResponse('組織IDが不正'),
-    401: errorResponse('認証が必要、またはトークンが無効'),
-    404: errorResponse('組織が見つからない'),
-    409: errorResponse('OWNERのため脱退できない、または競合により脱退できない'),
-    500: errorResponse('サーバーエラー'),
-  },
-})
-
-/** PATCH /organizations/{id}/members/{membershipId}: メンバーのロールを変更する。 */
-const updateMemberRoleRoute = createRoute({
-  method: 'patch',
-  path: '/{id}/members/{membershipId}',
-  tags: ['Organization Members'],
-  summary: '指定したメンバーのロールを変更する',
-  middleware: [authMiddleware, paramValidationMiddleware(memberItemParamSchema), organizationMembershipMiddleware],
-  security: bearerSecurity,
-  request: {
-    params: memberItemParamSchema,
-    body: {
-      // required: true を付けないと、Content-Typeなし/bodyなしのPATCHが任意bodyとして
-      // 検証スキップされ c.req.valid('json') が {} になり既存の必須body検証（400）を維持できない。
-      required: true,
-      content: { 'application/json': { schema: updateMemberRoleBodySchema } },
-    },
-  },
-  responses: {
-    200: {
-      content: { 'application/json': { schema: memberDto } },
-      description: '変更後のメンバー情報',
-    },
-    400: errorResponse('入力値が不正'),
-    401: errorResponse('認証が必要、またはトークンが無効'),
-    403: errorResponse('権限が不足'),
-    404: errorResponse('組織またはメンバーが見つからない'),
-    409: errorResponse('対象がOWNERなど変更不可'),
-    422: errorResponse('意味的に不正な入力（例: OWNERロール指定）'),
-    500: errorResponse('サーバーエラー'),
-  },
-})
-
-/** DELETE /organizations/{id}/members/{membershipId}: メンバーを削除する。 */
-const removeMemberRoute = createRoute({
-  method: 'delete',
-  path: '/{id}/members/{membershipId}',
-  tags: ['Organization Members'],
-  summary: '指定したメンバーを削除し、監査ログ（MEMBER_REMOVED）に記録する',
-  middleware: [authMiddleware, paramValidationMiddleware(memberItemParamSchema), organizationMembershipMiddleware],
-  security: bearerSecurity,
-  request: {
-    params: memberItemParamSchema,
-  },
-  responses: {
-    204: {
-      description: '処理を受理',
-    },
-    400: errorResponse('パスパラメータが不正'),
-    401: errorResponse('認証が必要、またはトークンが無効'),
-    403: errorResponse('権限が不足'),
-    404: errorResponse('組織またはメンバーが見つからない'),
-    409: errorResponse('対象がOWNERなど削除不可'),
-    500: errorResponse('サーバーエラー（監査ログの記録に失敗した場合を含む。その場合は削除もロールバックされる）'),
-  },
-})
-
-/**
- * GET /organizations/{id}/audit-logs: 組織の監査ログを新しい順に返す。OWNER / ADMINのみ。
- * 認証 → パス検証 → 所属確認 → ロール確認 → query検証の順に実行する（MEMBERは不正queryでも403）。
- * パス検証は、PostgreSQL INTEGERの上限（2147483647）も検証する監査ログ専用schemaを使う。
- */
-const listAuditLogsRoute = createRoute({
-  method: 'get',
-  path: '/{id}/audit-logs',
-  tags: ['Organization Audit Logs'],
-  summary: '指定した組織の監査ログ一覧を取得する',
-  description:
-    'MEMBER_ROLE_CHANGED（ロール変更）、OWNERSHIP_TRANSFERRED（所有権移譲）、MEMBER_REMOVED（管理者によるメンバー削除）、PROJECT_CREATED / PROJECT_UPDATED / PROJECT_DELETED（プロジェクトの作成・更新・削除）を同じ一覧に新しい順（createdAt DESC, id DESC）で返す。AuditLogは action で区別できる6イベントのunionで、必須項目はイベント種別ごとに異なる（メンバー向け項目とプロジェクト向け項目は互いに持たない）。createdAt は記録日時（トランザクション開始時刻）で、一覧順は操作の確定順を保証しない。',
-  middleware: [authMiddleware, paramValidationMiddleware(auditLogCollectionParamSchema), organizationMembershipMiddleware, organizationAdminMiddleware],
-  security: bearerSecurity,
-  request: {
-    params: auditLogCollectionParamSchema,
-    query: auditLogListQuerySchema,
-  },
-  responses: {
-    200: {
-      content: { 'application/json': { schema: auditLogListDto } },
-      description: '組織の監査ログ一覧（新しい順、カーソル式ページネーション）',
-    },
-    400: errorResponse('組織IDまたはqueryが不正'),
-    401: errorResponse('認証が必要、またはトークンが無効'),
-    403: errorResponse('権限が不足（OWNER / ADMIN のみ閲覧可）'),
-    404: errorResponse('組織が見つからない'),
-    500: errorResponse('サーバーエラー'),
-  },
-})
-
-/** GET /organizations/{id}/invitations: 招待一覧を返す。 */
-const listInvitationsRoute = createRoute({
-  method: 'get',
-  path: '/{id}/invitations',
-  tags: ['Organization Invitations'],
-  summary: '指定した組織の招待一覧を取得する',
-  middleware: [authMiddleware, paramValidationMiddleware(idParamSchema), organizationMembershipMiddleware],
-  security: bearerSecurity,
-  request: {
-    params: idParamSchema,
-  },
-  responses: {
-    200: {
-      content: { 'application/json': { schema: invitationListItemDto.array() } },
-      description: '招待の一覧（デフォルトはPENDINGのみ）。各要素に招待メール配信状態 emailDeliveryStatus を含む（配信記録なしはnull）',
-    },
-    400: errorResponse('組織IDが不正'),
-    401: errorResponse('認証が必要、またはトークンが無効'),
-    403: errorResponse('権限が不足'),
-    404: errorResponse('組織が見つからない'),
-    500: errorResponse('サーバーエラー'),
-  },
-})
-
-/** POST /organizations/{id}/invitations: 招待を作成する。 */
-const createInvitationRoute = createRoute({
-  method: 'post',
-  path: '/{id}/invitations',
-  tags: ['Organization Invitations'],
-  summary: '指定した組織への招待を作成する',
-  middleware: [authMiddleware, paramValidationMiddleware(idParamSchema), organizationMembershipMiddleware],
-  security: bearerSecurity,
-  request: {
-    params: idParamSchema,
-    body: {
-      // required: true を付けないと、Content-Typeなし/bodyなしのPOSTが任意bodyとして
-      // 検証スキップされ c.req.valid('json') が {} になり既存の必須body検証（400）を維持できない。
-      required: true,
-      content: { 'application/json': { schema: createInvitationBodySchema } },
-    },
-  },
-  responses: {
-    201: {
-      content: { 'application/json': { schema: invitationDto } },
-      description: '作成された招待。メール配信有効時は配信待ちの保存までを示す。',
-    },
-    400: errorResponse('入力値が不正'),
-    401: errorResponse('認証が必要、またはトークンが無効'),
-    403: errorResponse('権限が不足'),
-    404: errorResponse('組織が見つからない'),
-    409: errorResponse('PENDING招待が作成済み、または既に組織のメンバー'),
-    422: errorResponse('意味的に不正な入力（例: OWNERロール指定）'),
-    500: errorResponse('サーバーエラー'),
-  },
-})
-
-/** DELETE /organizations/{id}/invitations/{invitationId}: 招待をキャンセルする。 */
-const cancelInvitationRoute = createRoute({
-  method: 'delete',
-  path: '/{id}/invitations/{invitationId}',
-  tags: ['Organization Invitations'],
-  summary: '指定した招待をキャンセルする',
-  middleware: [authMiddleware, paramValidationMiddleware(invitationItemParamSchema), organizationMembershipMiddleware],
-  security: bearerSecurity,
-  request: {
-    params: invitationItemParamSchema,
-  },
-  responses: {
-    204: {
-      description: '処理を受理',
-    },
-    400: errorResponse('パスパラメータが不正'),
-    401: errorResponse('認証が必要、またはトークンが無効'),
-    403: errorResponse('権限が不足'),
-    404: errorResponse('組織または招待が見つからない'),
-    409: errorResponse('PENDING以外は キャンセル不可'),
-    500: errorResponse('サーバーエラー'),
-  },
-})
-
-/** POST /organizations/{id}/invitations/{invitationId}/resend-email: 招待メールの再送を受け付ける。 */
-const resendInvitationEmailRoute = createRoute({
-  method: 'post',
-  path: '/{id}/invitations/{invitationId}/resend-email',
-  tags: ['Organization Invitations'],
-  summary: '指定した招待のメール再送を受け付ける',
-  description:
-    '再送できるのは、ENABLE_INVITATION_EMAIL=true で配信設定が有効な環境で、DB上のPENDINGの招待かつ有効期限が判定時刻より後（同時刻は期限切れ）であり、初回の配信がResendに明示的に拒否された（REJECTED かつ受付結果不明でなく、原因が client または rate_limited の）場合に限る。受け付けは招待ごとに1回だけ。権限は OWNER が ADMIN／MEMBER 宛て、ADMIN が MEMBER 宛てで、MEMBER は不可（OWNER 宛ては不可）。所属・ロール・招待・配信の状態はロックを取得した後の最新の値で判定する。202は配信待ちの保存までを示し、Resendの受付や受信者への配達を保証しない。GCP devでは既存の手動Jobを実行した後に、招待一覧の emailDeliveryStatus で状態を確認する。応答を受け取れなかった場合は同じ依頼を再送し、202または「再送は既に受け付けています」の409で受付を確認する。',
-  // 所属・ロールの認可は、Serviceがrepositoryのロック後に読み直した値で行うため、organizationMembershipMiddlewareは使わない。
-  middleware: [authMiddleware, paramValidationMiddleware(invitationItemParamSchema)],
-  security: bearerSecurity,
-  request: {
-    params: invitationItemParamSchema,
-  },
-  responses: {
-    202: {
-      description: '再送の配信待ちを保存した（本文なし）',
-    },
-    400: errorResponse('パスパラメータが不正'),
-    401: errorResponse('認証が必要、またはトークンが無効'),
-    403: errorResponse('権限が不足（ロック後のロールがMEMBER、または宛先ロールへの再送権限がない。ADMINによるADMIN宛て、OWNER宛てを含む）'),
-    404: errorResponse('組織・招待が見つからない、または（ロック後に）所属していない'),
-    409: errorResponse('配信設定が無効、招待が無効または期限切れ、配信が再送対象外、または再送済み'),
-    500: errorResponse('サーバーエラー（配信設定の不備、保存失敗など）'),
-  },
-})
-
 /**
  * 組織関連のルート（/organizations配下）。
  * すべて認証が必要。`/:id` 系は組織メンバーシップの確認も行う。
  * バリデーションエラー時は defaultHook で既存と同じ `{ error: { message } }`（400）を返す。
- * 静的パス（`/`）→ `/{id}` → `/{id}/members` 系 → `/{id}/audit-logs` → `/{id}/invitations` 系の順で登録し、
- * 最後に `/{id}/projects` 系（`routes/projects.ts`）をmountする。
+ * 認証・パス検証・所属確認などのmiddlewareは、各ルートの `createRoute` の `middleware` で個別に適用する。
+ * 静的パス（`/`）→ `/{id}` → `/{id}/transfer-ownership` → `/{id}/members` 系 → `/{id}/audit-logs` → `/{id}/invitations` 系の順で登録し、
+ * 最後に `/{id}/projects` 系をmountする。
  */
 export const organizationsRoutes = new OpenAPIHono({ defaultHook: openApiDefaultHook })
   .openapi(createRouteDef, (c) => controller.create(c, c.get('userId'), c.req.valid('json')))
@@ -481,19 +156,8 @@ export const organizationsRoutes = new OpenAPIHono({ defaultHook: openApiDefault
   .openapi(getByIdRoute, (c) => controller.getById(c, c.req.valid('param').id))
   .openapi(updateRoute, (c) => controller.update(c, c.req.valid('param').id, c.req.valid('json'), c.get('membership').role))
   .openapi(removeRoute, (c) => controller.remove(c, c.req.valid('param').id, c.get('membership').role))
-  .openapi(transferOwnershipRoute, (c) =>
-    transferOwnershipController.execute(c, c.req.valid('param').id, c.get('userId'), c.get('membership').role, c.req.valid('json')),
-  )
-  .openapi(listMembersRoute, (c) => membersController.list(c, c.req.valid('param').id, c.req.valid('query')))
-  .openapi(addMemberRoute, (c) => membersController.add(c, c.req.valid('param').id, c.get('membership').role, c.req.valid('json')))
-  .openapi(leaveOrganizationRoute, (c) => membersController.leave(c, c.req.valid('param').id, c.get('userId')))
-  .openapi(updateMemberRoleRoute, (c) =>
-    membersController.updateRole(c, c.req.valid('param').id, c.req.valid('param').membershipId, c.get('userId'), c.get('membership').role, c.req.valid('json')),
-  )
-  .openapi(removeMemberRoute, (c) => membersController.remove(c, c.req.valid('param').id, c.req.valid('param').membershipId, c.get('userId')))
-  .openapi(listAuditLogsRoute, (c) => auditLogsController.list(c, c.req.valid('param').id, c.req.valid('query')))
-  .openapi(listInvitationsRoute, (c) => invitationsController.list(c, c.req.valid('param').id, c.get('membership').role))
-  .openapi(createInvitationRoute, (c) => invitationsController.create(c, c.req.valid('param').id, c.get('membership').role, c.req.valid('json')))
-  .openapi(cancelInvitationRoute, (c) => invitationsController.cancel(c, c.req.valid('param').id, c.req.valid('param').invitationId, c.get('membership').role))
-  .openapi(resendInvitationEmailRoute, (c) => invitationsController.resendEmail(c, c.req.valid('param').id, c.req.valid('param').invitationId, c.get('userId')))
-  .route('/', organizationsProjectsRoutes)
+  .route('/', transferOwnershipRoutes)
+  .route('/', membersRoutes)
+  .route('/', auditLogsRoutes)
+  .route('/', invitationsRoutes)
+  .route('/', projectsRoutes)

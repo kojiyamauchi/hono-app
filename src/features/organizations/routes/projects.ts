@@ -4,22 +4,12 @@ import { authMiddleware } from '@/middlewares/auth'
 import { organizationMembershipMiddleware } from '@/middlewares/organizationMembership'
 import { organizationAdminMiddleware } from '@/middlewares/organizationRole'
 import { paramValidationMiddleware } from '@/middlewares/paramValidation'
-import { errorResponseDto } from '@/shared/openApi/dtos'
-import { SECURITY_SCHEME } from '@/shared/openApi/schemes'
 import { openApiDefaultHook } from '@/utils/validation'
 
 import { projectsController } from '../controllers/projects'
-import { itemDto as projectDto, listDto as projectListDto } from '../dtos/projects'
+import { itemDto, listDto } from '../dtos/projects'
 import { collectionParamSchema, createBodySchema, itemParamSchema, listQuerySchema, updateBodySchema } from '../schemas/projects'
-
-/** JSONエラーレスポンス（`{ error: { message } }`）の共通定義を生成する。 */
-const errorResponse = (description: string): { content: { 'application/json': { schema: typeof errorResponseDto } }; description: string } => ({
-  content: { 'application/json': { schema: errorResponseDto } },
-  description,
-})
-
-/** プロジェクトAPIに共通するsecurity（Bearerアクセストークン）。 */
-const bearerSecurity = [{ [SECURITY_SCHEME.bearer]: [] }]
+import { bearerSecurity, errorResponse } from './common'
 
 /**
  * GET /organizations/{id}/projects: 組織のプロジェクト一覧を新しい順に返す。組織メンバーなら閲覧可。
@@ -40,7 +30,7 @@ const listProjectsRoute = createRoute({
   },
   responses: {
     200: {
-      content: { 'application/json': { schema: projectListDto } },
+      content: { 'application/json': { schema: listDto } },
       description: '組織のプロジェクト一覧（新しい順、カーソル式ページネーション）',
     },
     400: errorResponse('組織ID、query、またはカーソルが不正'),
@@ -72,7 +62,7 @@ const createProjectRoute = createRoute({
   },
   responses: {
     201: {
-      content: { 'application/json': { schema: projectDto } },
+      content: { 'application/json': { schema: itemDto } },
       description: '作成されたプロジェクト',
     },
     400: errorResponse('入力値が不正'),
@@ -96,7 +86,7 @@ const getProjectRoute = createRoute({
   },
   responses: {
     200: {
-      content: { 'application/json': { schema: projectDto } },
+      content: { 'application/json': { schema: itemDto } },
       description: '指定プロジェクト',
     },
     400: errorResponse('パスパラメータが不正'),
@@ -129,7 +119,7 @@ const updateProjectRoute = createRoute({
   },
   responses: {
     200: {
-      content: { 'application/json': { schema: projectDto } },
+      content: { 'application/json': { schema: itemDto } },
       description: '更新後のプロジェクト',
     },
     400: errorResponse('入力値が不正'),
@@ -171,7 +161,7 @@ const removeProjectRoute = createRoute({
  * 書き込み系は、body検証より先にロール確認（403）を確定するため `organizationAdminMiddleware` を適用する。
  * トランザクション内の最新所属・ロールの再判定は、serviceとrepositoryが行う。
  */
-export const organizationsProjectsRoutes = new OpenAPIHono({ defaultHook: openApiDefaultHook })
+export const projectsRoutes = new OpenAPIHono({ defaultHook: openApiDefaultHook })
   .openapi(listProjectsRoute, (c) => projectsController.list(c, c.req.valid('param').id, c.req.valid('query')))
   .openapi(createProjectRoute, (c) => projectsController.create(c, c.req.valid('param').id, c.get('userId'), c.req.valid('json')))
   .openapi(getProjectRoute, (c) => projectsController.getById(c, c.req.valid('param').id, c.req.valid('param').projectId))
