@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, mock, test } from 'bun:test'
 import { sign } from 'hono/jwt'
 
-import type { AuditLog, MemberRoleChangedAuditLog } from '@/features/organizations/entities'
+import type { AuditLog, MemberRoleChangedAuditLog } from '@/features/organizations/entities/auditLogs'
 import type { Invitation } from '@/shared/invitation/entities'
 import type { Membership, Role } from '@/shared/membership/entities'
 import type { Organization } from '@/shared/organization/entities'

@@ -4,8 +4,7 @@ import type { Organization } from '@/shared/organization/entities'
 import { toOrganizationResponse } from '@/shared/organization/mappers'
 
 import type { AuditLogDtoType, AuditLogListDtoType, MemberListDtoType, OrganizationListDtoType } from '../dtos'
-import type { AuditLog, MemberRemovedAuditLog, MemberRoleChangedAuditLog, OwnershipTransferredAuditLog } from '../entities'
-import type { ProjectSnapshot } from '../entities/projects'
+import type { AuditLog, MemberRemovedAuditLog, MemberRoleChangedAuditLog, OwnershipTransferredAuditLog, ProjectSnapshot } from '../entities/auditLogs'
 import {
   AUDIT_LOG_CURSOR_KIND,
   AUDIT_LOG_CURSOR_VERSION,

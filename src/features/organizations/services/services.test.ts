@@ -4,7 +4,7 @@ import type { Membership, Role } from '@/shared/membership/entities'
 import type { Organization } from '@/shared/organization/entities'
 import type { AppError } from '@/utils/errors'
 
-import type { AuditLog } from '../entities'
+import type { AuditLog } from '../entities/auditLogs'
 import { encodeAuditLogCursor, encodeMemberListCursor } from '../mappers'
 
 const createWithOwner = mock()

@@ -4,7 +4,7 @@ import type { Membership } from '@/shared/membership/entities'
 import type { Organization } from '@/shared/organization/entities'
 
 import { auditLogDto, auditLogListDto, memberListDto, organizationListDto } from '../dtos'
-import type { AuditLog } from '../entities'
+import type { AuditLog } from '../entities/auditLogs'
 import {
   decodeAuditLogCursor,
   decodeMemberListCursor,

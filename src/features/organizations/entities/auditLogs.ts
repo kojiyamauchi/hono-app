@@ -1,7 +1,5 @@
 import type { Role } from '@/shared/membership/entities'
 
-import type { ProjectSnapshot } from './projects'
-
 /**
  * メンバー操作の監査ログのイベント種別。
  */
@@ -23,6 +21,16 @@ export const auditActionValues = [...memberAuditActionValues, ...projectAuditAct
  * 監査ログに記録するイベント種別。
  */
 export type AuditAction = (typeof auditActionValues)[number]
+
+/**
+ * 監査ログに記録するProjectのスナップショット。名前と説明の2項目だけを持つ。
+ * 文字数制約やtrimは行わず、DBに保存されている値をそのまま記録する。
+ */
+export type ProjectSnapshot = {
+  name: string
+  /** 説明。未設定はnull。空文字も有効な値として区別する。 */
+  description: string | null
+}
 
 /** すべてのイベントに共通する監査ログの項目。 */
 type AuditLogBase = {

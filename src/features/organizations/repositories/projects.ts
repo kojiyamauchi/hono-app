@@ -2,7 +2,8 @@ import { Prisma } from '@/generated/prisma/client'
 import { prisma } from '@/libs/prisma'
 import type { Role } from '@/shared/membership/entities'
 
-import type { Project, ProjectSnapshot } from '../entities/projects'
+import type { ProjectSnapshot } from '../entities/auditLogs'
+import type { Project } from '../entities/projects'
 
 /** プロジェクト一覧のカーソル式ページ取得の境界値（この行より後ろ、つまりより古い行を取得する）。 */
 export type ProjectPageBoundary = { createdAt: Date; id: number }

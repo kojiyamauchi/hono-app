@@ -2,8 +2,8 @@ import { Prisma } from '@/generated/prisma/client'
 import { prisma } from '@/libs/prisma'
 import { type Membership, type Role, roleValues } from '@/shared/membership/entities'
 
-import type { AuditLog } from '../entities'
-import type { ProjectSnapshot } from '../entities/projects'
+import type { AuditLog } from '../entities/auditLogs'
+import type { ProjectSnapshot } from '../entities/auditLogs'
 
 /** 所有権移譲repositoryの処理結果。 */
 export const ownershipTransferResults = {
