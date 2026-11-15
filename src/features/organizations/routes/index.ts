@@ -12,7 +12,9 @@ import { organizationDto } from '@/shared/organization/dtos'
 import { openApiDefaultHook } from '@/utils/validation'
 
 import { organizationsAuditLogsController, organizationsController, organizationsInvitationsController, organizationsMembersController } from '../controllers'
-import { auditLogListDto, memberListDto, organizationListDto } from '../dtos'
+import { listDto as organizationListDto } from '../dtos'
+import { listDto as auditLogListDto } from '../dtos/auditLogs'
+import { listDto as memberListDto } from '../dtos/members'
 import {
   addMemberBodySchema,
   auditLogsRouteParamSchema,

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { projectDto, projectListDto } from '../dtos/projects'
+import { itemDto as projectDto, listDto as projectListDto } from '../dtos/projects'
 import type { Project } from '../entities/projects'
 import { decodeProjectCursor, encodeProjectCursor, toProjectListResponse, toProjectResponse } from './projects'
 

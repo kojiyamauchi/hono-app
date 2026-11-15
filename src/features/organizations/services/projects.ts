@@ -1,7 +1,7 @@
 import type { Role } from '@/shared/membership/entities'
 import { AppError } from '@/utils/errors'
 
-import type { ProjectDtoType, ProjectListDtoType } from '../dtos/projects'
+import type { ItemDtoType as ProjectDtoType, ListDtoType as ProjectListDtoType } from '../dtos/projects'
 import { decodeProjectCursor, encodeProjectCursor, toProjectListResponse, toProjectResponse } from '../mappers/projects'
 import { type ProjectPageBoundary, projectRepository, projectWriteResults, type ShouldRecordProjectUpdate } from '../repositories/projects'
 

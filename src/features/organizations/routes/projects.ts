@@ -9,7 +9,7 @@ import { SECURITY_SCHEME } from '@/shared/openApi/schemes'
 import { openApiDefaultHook } from '@/utils/validation'
 
 import { organizationsProjectsController } from '../controllers/projects'
-import { projectDto, projectListDto } from '../dtos/projects'
+import { itemDto as projectDto, listDto as projectListDto } from '../dtos/projects'
 import {
   createProjectBodySchema,
   listProjectsQuerySchema,

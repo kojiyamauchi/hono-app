@@ -5,7 +5,9 @@ import type { MemberDtoType } from '@/shared/membership/dtos'
 import type { Role } from '@/shared/membership/entities'
 import type { OrganizationDtoType } from '@/shared/organization/dtos'
 
-import type { AuditLogListDtoType, MemberListDtoType, OrganizationListDtoType } from '../dtos'
+import type { ListDtoType as OrganizationListDtoType } from '../dtos'
+import type { ListDtoType as AuditLogListDtoType } from '../dtos/auditLogs'
+import type { ListDtoType as MemberListDtoType } from '../dtos/members'
 import type {
   AddMemberBodySchemaType,
   CreateInvitationBodySchemaType,

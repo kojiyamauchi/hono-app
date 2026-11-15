@@ -1,6 +1,6 @@
 import type { Context, TypedResponse } from 'hono'
 
-import type { ProjectDtoType, ProjectListDtoType } from '../dtos/projects'
+import type { ItemDtoType as ProjectDtoType, ListDtoType as ProjectListDtoType } from '../dtos/projects'
 import type { CreateProjectBodySchemaType, ListProjectsQuerySchemaType, UpdateProjectBodySchemaType } from '../schemas/projects'
 import { projectsService } from '../services/projects'
 

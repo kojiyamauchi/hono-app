@@ -1,4 +1,4 @@
-import type { ProjectDtoType, ProjectListDtoType } from '../dtos/projects'
+import type { ItemDtoType as ProjectDtoType, ListDtoType as ProjectListDtoType } from '../dtos/projects'
 import type { Project } from '../entities/projects'
 import { PROJECT_CURSOR_KIND, PROJECT_CURSOR_VERSION, projectCursorPayloadSchema } from '../schemas/projects'
 

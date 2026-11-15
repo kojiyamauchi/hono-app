@@ -3,7 +3,9 @@ import { describe, expect, test } from 'bun:test'
 import type { Membership } from '@/shared/membership/entities'
 import type { Organization } from '@/shared/organization/entities'
 
-import { auditLogDto, auditLogListDto, memberListDto, organizationListDto } from '../dtos'
+import { listDto as organizationListDto } from '../dtos'
+import { itemDto as auditLogDto, listDto as auditLogListDto } from '../dtos/auditLogs'
+import { listDto as memberListDto } from '../dtos/members'
 import type { AuditLog } from '../entities/auditLogs'
 import {
   decodeAuditLogCursor,

@@ -3,7 +3,9 @@ import { toMemberResponse } from '@/shared/membership/mappers'
 import type { Organization } from '@/shared/organization/entities'
 import { toOrganizationResponse } from '@/shared/organization/mappers'
 
-import type { AuditLogDtoType, AuditLogListDtoType, MemberListDtoType, OrganizationListDtoType } from '../dtos'
+import type { ListDtoType as OrganizationListDtoType } from '../dtos'
+import type { ItemDtoType as AuditLogDtoType, ListDtoType as AuditLogListDtoType } from '../dtos/auditLogs'
+import type { ListDtoType as MemberListDtoType } from '../dtos/members'
 import type { AuditLog, MemberRemovedAuditLog, MemberRoleChangedAuditLog, OwnershipTransferredAuditLog, ProjectSnapshot } from '../entities/auditLogs'
 import {
   AUDIT_LOG_CURSOR_KIND,

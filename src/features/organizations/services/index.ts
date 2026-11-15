@@ -14,7 +14,9 @@ import { organizationRepository } from '@/shared/organization/repositories'
 import { userRepository } from '@/shared/user/repositories'
 import { AppError } from '@/utils/errors'
 
-import type { AuditLogListDtoType, MemberListDtoType, OrganizationListDtoType } from '../dtos'
+import type { ListDtoType as OrganizationListDtoType } from '../dtos'
+import type { ListDtoType as AuditLogListDtoType } from '../dtos/auditLogs'
+import type { ListDtoType as MemberListDtoType } from '../dtos/members'
 import {
   decodeAuditLogCursor,
   decodeMemberListCursor,
