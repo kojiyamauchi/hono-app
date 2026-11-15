@@ -1,5 +1,5 @@
 import { emailVerificationTokenRepository } from '@/shared/auth/repositories/emailVerification'
-import { hashEmailVerificationToken, sendEmailVerificationBestEffort } from '@/shared/auth/services'
+import { hashEmailVerificationToken, sendEmailVerificationBestEffort } from '@/shared/auth/services/emailVerification'
 import { userRepository } from '@/shared/user/repositories'
 import { AppError } from '@/utils/errors'
 import { createInMemoryRateLimiter } from '@/utils/rateLimit'

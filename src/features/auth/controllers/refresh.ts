@@ -1,7 +1,7 @@
 import type { Context, TypedResponse } from 'hono'
 
 import type { AuthResultDtoType } from '@/shared/auth/dtos'
-import { getRefreshTokenCookie, setRefreshTokenCookie } from '@/shared/auth/services'
+import { getRefreshTokenCookie, setRefreshTokenCookie } from '@/shared/auth/services/cookie'
 import { AppError } from '@/utils/errors'
 
 import { refreshService } from '../services/refresh'

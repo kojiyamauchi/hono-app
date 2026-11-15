@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 
-import { clearRefreshTokenCookie } from '@/shared/auth/services'
+import { clearRefreshTokenCookie } from '@/shared/auth/services/cookie'
 
 import type { BodySchemaType } from '../schemas/changePassword'
 import { changePasswordService } from '../services/changePassword'

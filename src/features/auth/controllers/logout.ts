@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 
-import { clearRefreshTokenCookie, getRefreshTokenCookie } from '@/shared/auth/services'
+import { clearRefreshTokenCookie, getRefreshTokenCookie } from '@/shared/auth/services/cookie'
 
 import { logoutService } from '../services/logout'
 

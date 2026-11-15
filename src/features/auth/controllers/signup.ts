@@ -1,7 +1,7 @@
 import type { Context, TypedResponse } from 'hono'
 
 import type { AuthResultDtoType } from '@/shared/auth/dtos'
-import { setRefreshTokenCookie } from '@/shared/auth/services'
+import { setRefreshTokenCookie } from '@/shared/auth/services/cookie'
 
 import type { BodySchemaType } from '../schemas/signup'
 import { signupService } from '../services/signup'

@@ -1,6 +1,6 @@
 import type { Context, TypedResponse } from 'hono'
 
-import { clearRefreshTokenCookie } from '@/shared/auth/services'
+import { clearRefreshTokenCookie } from '@/shared/auth/services/cookie'
 import type { UserDtoType } from '@/shared/user/dtos'
 
 import type { RemoveBodySchemaType, UpdateBodySchemaType } from '../schemas/me'

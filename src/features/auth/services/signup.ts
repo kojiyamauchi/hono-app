@@ -1,5 +1,5 @@
 import type { IssuedAuthTokens } from '@/shared/auth/dtos'
-import { sendEmailVerificationBestEffort } from '@/shared/auth/services'
+import { sendEmailVerificationBestEffort } from '@/shared/auth/services/emailVerification'
 import { userRepository } from '@/shared/user/repositories'
 import { AppError } from '@/utils/errors'
 import { createInMemoryRateLimiter } from '@/utils/rateLimit'

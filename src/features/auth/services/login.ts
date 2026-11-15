@@ -1,5 +1,5 @@
 import type { IssuedAuthTokens } from '@/shared/auth/dtos'
-import { hashPasswordResetToken } from '@/shared/auth/services'
+import { hashPasswordResetToken } from '@/shared/auth/services/passwordReset'
 import { userRepository } from '@/shared/user/repositories'
 import { AppError } from '@/utils/errors'
 import { createInMemoryRateLimiter } from '@/utils/rateLimit'

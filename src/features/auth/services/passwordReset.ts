@@ -1,5 +1,5 @@
 import { passwordResetTokenRepository } from '@/shared/auth/repositories/passwordReset'
-import { hashPasswordResetToken, issuePasswordResetToken, passwordResetNotifier } from '@/shared/auth/services'
+import { hashPasswordResetToken, issuePasswordResetToken, passwordResetNotifier } from '@/shared/auth/services/passwordReset'
 import { userRepository } from '@/shared/user/repositories'
 import { AppError } from '@/utils/errors'
 import { createInMemoryRateLimiter } from '@/utils/rateLimit'
