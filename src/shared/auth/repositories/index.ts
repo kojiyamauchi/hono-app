@@ -1,6 +1,8 @@
 import type { Prisma } from '@/generated/prisma/client'
 import { prisma } from '@/libs/prisma'
-import type { EmailVerificationToken, PasswordResetToken, RefreshSession, RefreshToken } from '@/shared/auth/entities'
+import type { EmailVerificationToken } from '@/shared/auth/entities/emailVerification'
+import type { PasswordResetToken } from '@/shared/auth/entities/passwordReset'
+import type { RefreshSession, RefreshToken } from '@/shared/auth/entities/refreshToken'
 
 /**
  * リフレッシュトークン作成時の入力値。

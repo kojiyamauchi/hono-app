@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, mock, spyOn, test } from 'bun:test'
 import { sign } from 'hono/jwt'
 
-import type { EmailVerificationToken } from '@/shared/auth/entities'
+import type { EmailVerificationToken } from '@/shared/auth/entities/emailVerification'
 import type { User } from '@/shared/user/entities'
 
 process.env.JWT_SECRET = 'test-secret'

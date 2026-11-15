@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, mock, test } from 'bun:test'
 
-import type { RefreshToken } from '@/shared/auth/entities'
+import type { RefreshToken } from '@/shared/auth/entities/refreshToken'
 import type { User } from '@/shared/user/entities'
 
 process.env.JWT_SECRET = 'test-secret'

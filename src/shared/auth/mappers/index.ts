@@ -1,5 +1,5 @@
 import type { SessionDtoType } from '@/shared/auth/dtos'
-import type { RefreshSession } from '@/shared/auth/entities'
+import type { RefreshSession } from '@/shared/auth/entities/refreshToken'
 
 /**
  * RefreshSessionをAPIレスポンス用のSession DTOへ変換する。

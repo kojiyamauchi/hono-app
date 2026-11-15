@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 
 import { sessionDto } from '@/shared/auth/dtos'
-import type { RefreshSession } from '@/shared/auth/entities'
+import type { RefreshSession } from '@/shared/auth/entities/refreshToken'
 
 import { toSessionResponse } from '.'
 

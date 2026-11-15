@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, mock, test } from 'bun:test'
 
-import type { EmailVerificationToken, PasswordResetToken, RefreshToken } from '@/shared/auth/entities'
+import type { EmailVerificationToken } from '@/shared/auth/entities/emailVerification'
+import type { PasswordResetToken } from '@/shared/auth/entities/passwordReset'
+import type { RefreshToken } from '@/shared/auth/entities/refreshToken'
 
 const create = mock()
 const findUnique = mock()

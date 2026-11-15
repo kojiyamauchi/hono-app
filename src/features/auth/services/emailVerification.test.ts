@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, mock, spyOn, test } from 'bun:test'
 
-import type { EmailVerificationToken } from '@/shared/auth/entities'
+import type { EmailVerificationToken } from '@/shared/auth/entities/emailVerification'
 import type { User } from '@/shared/user/entities'
 
 // JWT発行に必要なシークレットをテスト用に設定

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, mock, spyOn, test } from 'bun:test'
 
-import type { PasswordResetToken } from '@/shared/auth/entities'
+import type { PasswordResetToken } from '@/shared/auth/entities/passwordReset'
 import type { User } from '@/shared/user/entities'
 
 process.env.JWT_SECRET = 'test-secret'
