@@ -262,9 +262,51 @@ services/
   - 例: JWT発行のような認証の共通処理は `src/shared/auth/services/` に置きます。
 - 標準ディレクトリでは表現しづらい責務が出た場合は、実装前に設計方針を確認し、必要に応じてこのドキュメントを更新してから追加します。
 - 現時点で実装がない標準ディレクトリには `.gitkeep` を置き、構成の一貫性を保ちます。
-- OpenAPIドキュメント公開（`/open-api/doc` / `/open-api/scalar`）は、標準構成に対する例外として次を許容します。
+- OpenAPIドキュメント公開（`/open-api/doc` / `/open-api/scalar`）は、登録方式とsecurity schemeの置き場所に限り、標準構成に対する例外を許容します。`features/openApi` 自体も後述のファイル分割・命名ルールの適用対象で、feature全体を例外扱いしません。
   - `src/shared/openApi/schemes/`: OpenAPIのsecurity scheme（認証「方式」の定義）を置く標準外の責務ディレクトリです。入力検証用Zod schema（データ構造）を置く `schemas/` とは責務が異なるため分離します。
-  - `src/features/openApi`: OpenAPI仕様は各featureのroute定義がroot app（`OpenAPIHono`）へ集約されて全体が揃うため、`app.route()` でmountせず、root appを受け取って `/open-api/doc`・`/open-api/scalar` を登録する登録関数 `registerOpenApiRoutes(app)` を提供します。
+  - `src/features/openApi` の登録方式: OpenAPI仕様は各featureのroute定義がroot app（`OpenAPIHono`）へ集約されて全体が揃うため、`app.route()` でmountせず、root appを受け取って登録します。`routes/doc.ts`・`routes/scalar.ts` がそれぞれroot appへ公開URL `/open-api/doc`・`/open-api/scalar` で直接登録し、`routes/index.ts` が集約して登録関数 `registerOpenApiRoutes(app)` を提供します。
+
+### features / shared のファイル分割と命名
+
+`src/features/<feature>/` と `src/shared/<domain>/` の各標準ディレクトリは、リソース・操作の単位でファイル分割します。
+
+#### ファイル配置
+
+- ファイル名はcamelCaseとし、リソース・操作の名前をそのまま使います（例: `members.ts`、`transferOwnership.ts`、`auditLogs.ts`）。
+- `index.ts` にはfeature・ドメイン本体の定義を置きます。routesの `index.ts` だけは、分割したルートの集約も担当します。
+- routes以外では、他ファイルの集約・再export専用の `index.ts` を作りません。本体の定義がなければ `index.ts` を作らず、定義が残らなくなった既存の `index.ts` は参照更新後に削除します。
+- 実装・定義が存在するファイルだけを作り、全レイヤーに同じファイル一覧を機械的に揃えません。
+- 同じ標準ディレクトリ内の複数ファイルが共有する定義は、そのディレクトリの `common.ts` に置き、利用側から直接importします。本体（`index.ts`）の定義でも配下のファイルが使う場合は `common.ts` を優先し、`index.ts` 側も `common.ts` から直接importします。必要な場合にだけ作成し、共通化してもレイヤーの責務を保ちます。
+- 一つのファイル内だけで使う補助定義は、そのファイルに置きます。他レイヤーから参照されるだけの定義を機械的に `common.ts` へ移しません。
+- 個別ファイルと `index.ts` の間で循環importを作りません。
+- テストは対象ファイルに対応させます（例: `members.test.ts`）。`controllers.test.ts` のような旧来のレイヤー単位テストは各テストケースを責務別ファイルのテストへ分配し、`index.ts` 本体のケースが残る場合だけ `index.test.ts` にまとめます。型だけのファイルなどへ機械的にテストを増やさず、[docs/testing.md](docs/testing.md) に従います。
+
+#### routesの分割
+
+- feature本体の直下（本体IDがあればその直下）の先頭の固定セグメントをファイル単位とし、HTTP methodごと・末端の操作ごとには分けません。同じセグメント配下の動的パス・操作・子リソースは同じファイルにまとめ、異なるセグメントは意味が近くても統合しません（例: `logout.ts` と `logoutAll.ts` は分け、`password-reset/request` と `password-reset/confirm` は `passwordReset.ts` にまとめます）。
+- featureのトップレベルのルートと、feature本体を指す動的パスは `routes/index.ts` に定義します。
+- 各ファイルはfeatureのトップレベルURLからの相対パスを定義し、`index.ts` でmountします（openApiのroot appへの直接登録は前述の例外です）。
+- 同じHTTP methodで同じ階層の静的パスと動的パスが衝突しうる場合は、静的パスのルートを先にmountし、その後に動的パスを登録します（例: usersの `GET /me` は `GET /{id}` より先）。ファイル内でも静的パスを先に登録します。
+- routesは各エンドポイントのURL・HTTP method・OpenAPI定義・middlewareと適用順序・入力検証・Controller呼び出しを担当し、業務処理はController以下へ委ねます。
+
+#### 命名
+
+- feature名や、ファイル名から分かるリソース名の重複は省きます。対象はController／Service／Repositoryのオブジェクト名とメソッド名、Zod schemaとその型、DTOとその型、mapper関数です。
+- `<リソース名・操作名>` はファイル名から `.ts` を除いた文字列をそのまま使い、単数・複数を独自に変えません。
+- Controller／Service／Repositoryのexport名は、`index.ts` の本体が `controller`／`service`／`repository`、配下が `<リソース名・操作名>Controller`／`<リソース名・操作名>Service`／`<リソース名・操作名>Repository`（例: `membersController`、`projectsRepository`）です。メソッド名も `membersController.list()` のように重複を省きます。
+- ファイル名が単一の操作名である次のファイルでは、単一操作メソッドを `execute()` とします: `transferOwnership`／`signup`／`login`／`refresh`／`logout`／`logoutAll`／`changePassword`／`accept`／`decline`。複数操作をまとめるリソース（`passwordReset`・`emailVerification`・`sessions` など）は、操作を区別できるメソッド名を使います。
+- `me.ts` は認証中のユーザー自身を表すリソースとし、`execute()` は使わず、GETは `get()`、PATCHは `update()`、DELETEは `remove()` とします。
+- schema: 単一操作ファイルのbodyは `bodySchema`／`BodySchemaType`、queryは `querySchema`／`QuerySchemaType` です。複数操作を持つリソースは `updateBodySchema`／`UpdateBodySchemaType` のように操作を区別します。カーソルのペイロードは `cursorPayloadSchema` です。
+- param schema: 本体の動的IDは `idParamSchema`／`IdParamSchemaType`（配下と共有する場合は `schemas/common.ts`）、単体リソースを指すparamは `itemParamSchema`、本体と検証条件が異なるコレクションparamは `collectionParamSchema` です。APIごとの検証条件とパラメータ名は変えません。
+- DTO: 単体は `itemDto`／`ItemDtoType`、一覧は `listDto`／`ListDtoType` です。同一ファイル内で区別が必要な場合は `memberRoleChangedDto` のように区別できる名前を付けます。OpenAPI component名はTypeScript上のexport名を変えても維持します。
+- mapper: 単体変換は `toResponse`、一覧変換は `toListResponse`、カーソルは `encodeCursor`／`decodeCursor` です。
+- 複数ファイルの同名exportを同時に使う場合は、利用側でimport aliasを付けて区別します。
+- 既存の定数・補助型（結果定数、入力型・結果型・境界型など）とEntityの型名・定数名は省略の対象に含めず、名前と意味を維持します。
+
+#### sharedへの適用
+
+- `src/shared/<domain>/` にも上記の配置ルールを適用します。ただしURLではなくドメイン内の責務でファイルを分割します（例: `shared/invitation/repositories/` の `index.ts`（招待本体）・`emailDelivery.ts`（配信）・`emailResend.ts`（再送））。
+- 複数featureから利用する前提のため、exportにはドメイン名を残します（例: `organizationRepository`、`toOrganizationResponse`、`organizationDto`、`OrganizationDtoType`）。`sharedOrganizationRepository` のような `shared` 接頭辞は付けず、同名衝突がある利用箇所でのみimport aliasを用います。
 
 ### src配下のレイヤー依存ルール
 
@@ -305,11 +347,12 @@ types                          （型宣言のみ・最下層）
 `src/features/**/schemas/` および `src/shared/**/schemas/` 配下では、Zod schemaとそこから推論する型の対応が分かる命名に揃えます。
 
 - Zod schemaは `***Schema` として定義します。
-  - 例: `signupSchema`、`updateMeSchema`、`userIdParamSchema`
+  - 例: `bodySchema`、`updateBodySchema`、`idParamSchema`
 - schemaから `z.infer` でexportする型は、対応するschema名に `Type` を付与した `***SchemaType` とします。
-  - 例: `SignupSchemaType`、`UpdateMeSchemaType`
+  - 例: `BodySchemaType`、`UpdateBodySchemaType`
 - param系schemaの型も同じ規則で `***ParamSchemaType` とします。
-  - 例: `UserIdParamSchemaType`、`OrganizationIdParamSchemaType`
+  - 例: `IdParamSchemaType`、`ItemParamSchemaType`
+- feature名やファイル名から分かるリソース名は名前に含めません。具体的な命名と配置は「features / shared のファイル分割と命名」節に従います。
 - schema由来の型には `***Input` や `***Param` のような別接尾語を使いません。
 - `dtos/` 配下のZod DTO定義とその型はこの規則の対象外とし、後述の `***Dto` / `***DtoType` 命名に従います。
 
@@ -321,7 +364,7 @@ OpenAPIを導入しており、入力検証用schemaとレスポンスDTOの責�
 - `dtos/` はAPIレスポンスDTOに寄せます。
 - レスポンスDTOはZodで定義し、OpenAPI response schemaとDTO型の正本にします。
 - DTO定義名は `***Dto`、そこから `z.infer` でexportする型名は `***DtoType` とします。
-  - 例: `userDto`、`UserDtoType`
+  - 例: `itemDto`、`ItemDtoType`、`listDto`、`ListDtoType`（feature名やファイル名から分かるリソース名は省きます。sharedではドメイン名を残し、`userDto`、`UserDtoType` のように命名します）
 - レスポンスDTOのZodは通常の本番レスポンスで毎回parseせず、mapperテストで `safeParse` して実装との整合を担保します。
 - OpenAPI JSONは `/open-api/doc` で動的生成し、手書きの `openapi.yml` を正本にしません。
 - `/open-api/doc` と `/open-api/scalar` は `ENABLE_API_DOCS=true` のときだけ登録し、staging / prodでは原則非公開にします。
