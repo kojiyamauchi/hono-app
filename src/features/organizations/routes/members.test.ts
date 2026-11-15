@@ -29,13 +29,13 @@ const invitationCancel = mock()
 const requestResend = mock()
 
 const transferOwnership = mock()
-const leaveOrganization = mock()
-const changeRoleWithAuditLog = mock()
+const leaveMember = mock()
+const changeRole = mock()
 const findAuditLogPage = mock()
-const removeWithAuditLog = mock()
+const removeMember = mock()
 
 await mock.module('@/features/organizations/repositories/members', () => ({
-  membersRepository: { remove: removeWithAuditLog, leave: leaveOrganization, changeRole: changeRoleWithAuditLog },
+  membersRepository: { remove: removeMember, leave: leaveMember, changeRole: changeRole },
   memberRemovalResults: {
     removed: 'REMOVED',
     organizationNotFound: 'ORGANIZATION_NOT_FOUND',
@@ -147,8 +147,8 @@ describe('organizations members routes', () => {
     findPageByOrganization.mockReset()
     membershipFindById.mockReset()
     membershipCreate.mockReset()
-    changeRoleWithAuditLog.mockReset()
-    removeWithAuditLog.mockReset()
+    changeRole.mockReset()
+    removeMember.mockReset()
     findAuditLogPage.mockReset()
     membershipDeleteById.mockReset()
     findByEmail.mockReset()
@@ -159,7 +159,7 @@ describe('organizations members routes', () => {
     invitationCancel.mockReset()
     requestResend.mockReset()
     transferOwnership.mockReset()
-    leaveOrganization.mockReset()
+    leaveMember.mockReset()
   })
 
   test('GET /organizations/:id/members は不正なID形式なら（不正queryがあっても）400を返す', async () => {
@@ -187,7 +187,7 @@ describe('organizations members routes', () => {
 
     expect(response.status).toBe(400)
     expect(findByUserAndOrganization).not.toHaveBeenCalled()
-    expect(changeRoleWithAuditLog).not.toHaveBeenCalled()
+    expect(changeRole).not.toHaveBeenCalled()
   })
 
   test('DELETE /organizations/:id/members/:membershipId は不正なmembershipIdなら（非メンバーでも）400を返す', async () => {
@@ -201,7 +201,7 @@ describe('organizations members routes', () => {
 
     expect(response.status).toBe(400)
     expect(findByUserAndOrganization).not.toHaveBeenCalled()
-    expect(removeWithAuditLog).not.toHaveBeenCalled()
+    expect(removeMember).not.toHaveBeenCalled()
   })
 
   test('GET /organizations/:id/members はMEMBERなら200を返す', async () => {
@@ -337,7 +337,7 @@ describe('organizations members routes', () => {
 
   test('PATCH /organizations/:id/members/:membershipId はOWNERならロールを変更できる', async () => {
     findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))
-    changeRoleWithAuditLog.mockResolvedValue({ status: 'CHANGED', membership: targetMembership('ADMIN') })
+    changeRole.mockResolvedValue({ status: 'CHANGED', membership: targetMembership('ADMIN') })
     const token = await createToken(1)
 
     const response = await app.request('/organizations/1/members/10', {
@@ -350,12 +350,12 @@ describe('organizations members routes', () => {
     const body = (await response.json()) as { id?: number; role?: string }
     expect(body).toMatchObject({ id: 10, role: 'ADMIN' })
     // 認証済みユーザーID（トークンのsub）を操作者として渡す
-    expect(changeRoleWithAuditLog).toHaveBeenCalledWith({ organizationId: 1, targetMembershipId: 10, actorUserId: 1, newRole: 'ADMIN' }, expect.any(Function))
+    expect(changeRole).toHaveBeenCalledWith({ organizationId: 1, targetMembershipId: 10, actorUserId: 1, newRole: 'ADMIN' }, expect.any(Function))
   })
 
   test('PATCH /organizations/:id/members/:membershipId は同一ロールの指定でも200を返す', async () => {
     findByUserAndOrganization.mockResolvedValue(membershipWithRole('ADMIN'))
-    changeRoleWithAuditLog.mockResolvedValue({ status: 'UNCHANGED', membership: targetMembership('MEMBER') })
+    changeRole.mockResolvedValue({ status: 'UNCHANGED', membership: targetMembership('MEMBER') })
     const token = await createToken(1)
 
     const response = await app.request('/organizations/1/members/10', {
@@ -370,7 +370,7 @@ describe('organizations members routes', () => {
   test('PATCH /organizations/:id/members/:membershipId は対象がOWNERなら409を返す', async () => {
     findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))
     // repositoryがロック後に読み直したロールで認可コールバックを呼ぶ動きを再現する
-    changeRoleWithAuditLog.mockImplementation(async (_input: unknown, authorize: (state: { operatorRole: Role; targetRole: Role }) => unknown) => ({
+    changeRole.mockImplementation(async (_input: unknown, authorize: (state: { operatorRole: Role; targetRole: Role }) => unknown) => ({
       status: 'REJECTED',
       rejection: authorize({ operatorRole: 'OWNER', targetRole: 'OWNER' }),
     }))
@@ -387,7 +387,7 @@ describe('organizations members routes', () => {
 
   test('PATCH /organizations/:id/members/:membershipId は対象が見つからなければ404を返す', async () => {
     findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))
-    changeRoleWithAuditLog.mockResolvedValue({ status: 'TARGET_NOT_FOUND' })
+    changeRole.mockResolvedValue({ status: 'TARGET_NOT_FOUND' })
     const token = await createToken(1)
 
     const response = await app.request('/organizations/1/members/999', {
@@ -401,7 +401,7 @@ describe('organizations members routes', () => {
 
   test('PATCH /organizations/:id/members/:membershipId は競合なら409を返す', async () => {
     findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))
-    changeRoleWithAuditLog.mockResolvedValue({ status: 'CONFLICT' })
+    changeRole.mockResolvedValue({ status: 'CONFLICT' })
     const token = await createToken(1)
 
     const response = await app.request('/organizations/1/members/10', {
@@ -424,12 +424,12 @@ describe('organizations members routes', () => {
     })
 
     expect(response.status).toBe(403)
-    expect(changeRoleWithAuditLog).not.toHaveBeenCalled()
+    expect(changeRole).not.toHaveBeenCalled()
   })
 
   test('PATCH /organizations/:id/members/:membershipId は監査ログの書き込みに失敗したら500を返す', async () => {
     findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))
-    changeRoleWithAuditLog.mockRejectedValue(new Error('INSERT失敗'))
+    changeRole.mockRejectedValue(new Error('INSERT失敗'))
     const token = await createToken(1)
 
     const response = await app.request('/organizations/1/members/10', {
@@ -452,12 +452,12 @@ describe('organizations members routes', () => {
     })
 
     expect(response.status).toBe(422)
-    expect(changeRoleWithAuditLog).not.toHaveBeenCalled()
+    expect(changeRole).not.toHaveBeenCalled()
   })
 
   /** repositoryがロック後に読み直したロールで認可コールバックを呼ぶ動きを再現する。 */
   const simulateRemovalRepository = (locked: { operatorRole: Role; targetRole: Role | null }): void => {
-    removeWithAuditLog.mockImplementation(async (_input: unknown, authorize: (state: typeof locked) => unknown) => {
+    removeMember.mockImplementation(async (_input: unknown, authorize: (state: typeof locked) => unknown) => {
       const rejection = authorize(locked)
       if (rejection !== null) {
         return { status: 'REJECTED', rejection }
@@ -483,7 +483,7 @@ describe('organizations members routes', () => {
       const response = await deleteMemberRequest(token)
 
       expect(response.status).toBe(204)
-      expect(removeWithAuditLog).toHaveBeenCalledWith({ organizationId: 1, targetMembershipId: 10, actorUserId: 1 }, expect.any(Function))
+      expect(removeMember).toHaveBeenCalledWith({ organizationId: 1, targetMembershipId: 10, actorUserId: 1 }, expect.any(Function))
     },
   )
 
@@ -514,7 +514,7 @@ describe('organizations members routes', () => {
 
   test('DELETE /organizations/:id/members/:membershipId は監査ログの書き込みに失敗したら500を返す', async () => {
     findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))
-    removeWithAuditLog.mockRejectedValue(new Error('INSERT失敗'))
+    removeMember.mockRejectedValue(new Error('INSERT失敗'))
     const token = await createToken(1)
 
     const response = await deleteMemberRequest(token)
@@ -529,12 +529,12 @@ describe('organizations members routes', () => {
     const response = await deleteMemberRequest(token)
 
     expect(response.status).toBe(404)
-    expect(removeWithAuditLog).not.toHaveBeenCalled()
+    expect(removeMember).not.toHaveBeenCalled()
   })
 
   test('DELETE /organizations/:id/members/me はMEMBERなら204を返す', async () => {
     findByUserAndOrganization.mockResolvedValue(membershipWithRole('MEMBER'))
-    leaveOrganization.mockResolvedValue('LEFT')
+    leaveMember.mockResolvedValue('LEFT')
     const token = await createToken(1)
 
     const response = await app.request('/organizations/1/members/me', {
@@ -543,14 +543,14 @@ describe('organizations members routes', () => {
     })
 
     expect(response.status).toBe(204)
-    expect(leaveOrganization).toHaveBeenCalledWith(1, 1)
+    expect(leaveMember).toHaveBeenCalledWith(1, 1)
     expect(membershipFindById).not.toHaveBeenCalled()
   })
 
   // 静的パス `/members/me` が動的パス `/members/{membershipId}` より先に解決され、membershipIdの検証（400）や削除処理へ進まないことを確認する。
   test('DELETE /organizations/:id/members/me は members/:membershipId として検証・削除されず、脱退処理へ到達する', async () => {
     findByUserAndOrganization.mockResolvedValue(membershipWithRole('MEMBER'))
-    leaveOrganization.mockResolvedValue('LEFT')
+    leaveMember.mockResolvedValue('LEFT')
     const token = await createToken(1)
 
     const response = await app.request('/organizations/1/members/me', {
@@ -559,13 +559,13 @@ describe('organizations members routes', () => {
     })
 
     expect(response.status).toBe(204)
-    expect(leaveOrganization).toHaveBeenCalledTimes(1)
-    expect(removeWithAuditLog).not.toHaveBeenCalled()
+    expect(leaveMember).toHaveBeenCalledTimes(1)
+    expect(removeMember).not.toHaveBeenCalled()
   })
 
   test('DELETE /organizations/:id/members/me はADMINなら204を返す', async () => {
     findByUserAndOrganization.mockResolvedValue(membershipWithRole('ADMIN'))
-    leaveOrganization.mockResolvedValue('LEFT')
+    leaveMember.mockResolvedValue('LEFT')
     const token = await createToken(1)
 
     const response = await app.request('/organizations/1/members/me', {
@@ -578,7 +578,7 @@ describe('organizations members routes', () => {
 
   test('DELETE /organizations/:id/members/me はOWNERなら409を返す', async () => {
     findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))
-    leaveOrganization.mockResolvedValue('OWNER')
+    leaveMember.mockResolvedValue('OWNER')
     const token = await createToken(1)
 
     const response = await app.request('/organizations/1/members/me', {
@@ -587,7 +587,7 @@ describe('organizations members routes', () => {
     })
 
     expect(response.status).toBe(409)
-    expect(leaveOrganization).toHaveBeenCalledWith(1, 1)
+    expect(leaveMember).toHaveBeenCalledWith(1, 1)
   })
 
   test('DELETE /organizations/:id/members/me は未所属なら404を返す', async () => {
@@ -600,12 +600,12 @@ describe('organizations members routes', () => {
     })
 
     expect(response.status).toBe(404)
-    expect(leaveOrganization).not.toHaveBeenCalled()
+    expect(leaveMember).not.toHaveBeenCalled()
   })
 
   test('脱退後は同じ組織のメンバー向けAPIへアクセスできない', async () => {
     findByUserAndOrganization.mockResolvedValueOnce(membershipWithRole('MEMBER')).mockResolvedValueOnce(null)
-    leaveOrganization.mockResolvedValue('LEFT')
+    leaveMember.mockResolvedValue('LEFT')
     const token = await createToken(1)
 
     const leaveResponse = await app.request('/organizations/1/members/me', {

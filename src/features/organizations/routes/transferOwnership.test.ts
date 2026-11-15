@@ -28,13 +28,13 @@ const invitationCancel = mock()
 const requestResend = mock()
 
 const transferOwnership = mock()
-const leaveOrganization = mock()
-const changeRoleWithAuditLog = mock()
+const leaveMember = mock()
+const changeRole = mock()
 const findAuditLogPage = mock()
-const removeWithAuditLog = mock()
+const removeMember = mock()
 
 await mock.module('@/features/organizations/repositories/members', () => ({
-  membersRepository: { remove: removeWithAuditLog, leave: leaveOrganization, changeRole: changeRoleWithAuditLog },
+  membersRepository: { remove: removeMember, leave: leaveMember, changeRole: changeRole },
   memberRemovalResults: {
     removed: 'REMOVED',
     organizationNotFound: 'ORGANIZATION_NOT_FOUND',
@@ -128,8 +128,8 @@ describe('organizations transfer-ownership routes', () => {
     findPageByOrganization.mockReset()
     membershipFindById.mockReset()
     membershipCreate.mockReset()
-    changeRoleWithAuditLog.mockReset()
-    removeWithAuditLog.mockReset()
+    changeRole.mockReset()
+    removeMember.mockReset()
     findAuditLogPage.mockReset()
     membershipDeleteById.mockReset()
     findByEmail.mockReset()
@@ -140,7 +140,7 @@ describe('organizations transfer-ownership routes', () => {
     invitationCancel.mockReset()
     requestResend.mockReset()
     transferOwnership.mockReset()
-    leaveOrganization.mockReset()
+    leaveMember.mockReset()
   })
 
   test('POST /organizations/:id/transfer-ownership はOWNERなら204を返す', async () => {

@@ -11,12 +11,12 @@ const membershipCreate = mock()
 const membershipDeleteById = mock()
 const findByUserAndOrganization = mock()
 const findByEmail = mock()
-const leaveOrganization = mock()
-const changeRoleWithAuditLog = mock()
-const removeWithAuditLog = mock()
+const leaveMember = mock()
+const changeRole = mock()
+const removeMember = mock()
 
 await mock.module('@/features/organizations/repositories/members', () => ({
-  membersRepository: { remove: removeWithAuditLog, leave: leaveOrganization, changeRole: changeRoleWithAuditLog },
+  membersRepository: { remove: removeMember, leave: leaveMember, changeRole: changeRole },
   memberRemovalResults: {
     removed: 'REMOVED',
     organizationNotFound: 'ORGANIZATION_NOT_FOUND',
@@ -201,7 +201,7 @@ describe('membersService.updateRole', () => {
   type LockedState = { operatorRole: Role; targetRole: Role }
 
   beforeEach(() => {
-    changeRoleWithAuditLog.mockReset()
+    changeRole.mockReset()
   })
 
   /**
@@ -209,7 +209,7 @@ describe('membersService.updateRole', () => {
    * 拒否ならREJECTED、同一ロールならUNCHANGED、それ以外はCHANGEDを返す。
    */
   const simulateRepository = (locked: LockedState): void => {
-    changeRoleWithAuditLog.mockImplementation(async (input: { newRole: Role }, authorize: (state: LockedState) => AppError | null) => {
+    changeRole.mockImplementation(async (input: { newRole: Role }, authorize: (state: LockedState) => AppError | null) => {
       const rejection = authorize(locked)
       if (rejection !== null) {
         return { status: 'REJECTED', rejection }
@@ -226,12 +226,12 @@ describe('membersService.updateRole', () => {
       statusCode: 422,
       message: 'OWNERへの変更はできません',
     })
-    expect(changeRoleWithAuditLog).not.toHaveBeenCalled()
+    expect(changeRole).not.toHaveBeenCalled()
   })
 
   test('MEMBERは操作できず403エラーを投げる', async () => {
     await expect(membersService.updateRole(1, 10, 1, 'MEMBER', { role: 'MEMBER' })).rejects.toMatchObject({ statusCode: 403 })
-    expect(changeRoleWithAuditLog).not.toHaveBeenCalled()
+    expect(changeRole).not.toHaveBeenCalled()
   })
 
   test('OWNERロール指定のエラー（422）はMEMBERの権限不足（403）より先に返る', async () => {
@@ -243,7 +243,7 @@ describe('membersService.updateRole', () => {
 
     await membersService.updateRole(1, 10, 5, 'OWNER', { role: 'ADMIN' })
 
-    expect(changeRoleWithAuditLog).toHaveBeenCalledWith({ organizationId: 1, targetMembershipId: 10, actorUserId: 5, newRole: 'ADMIN' }, expect.any(Function))
+    expect(changeRole).toHaveBeenCalledWith({ organizationId: 1, targetMembershipId: 10, actorUserId: 5, newRole: 'ADMIN' }, expect.any(Function))
   })
 
   test('OWNERはMEMBERをADMINに昇格できる', async () => {
@@ -313,7 +313,7 @@ describe('membersService.updateRole', () => {
   })
 
   test('操作者の所属または組織が消えていれば404エラー（組織が見つかりません）を投げる', async () => {
-    changeRoleWithAuditLog.mockResolvedValue({ status: 'ORGANIZATION_NOT_FOUND' })
+    changeRole.mockResolvedValue({ status: 'ORGANIZATION_NOT_FOUND' })
 
     await expect(membersService.updateRole(1, 10, 1, 'OWNER', { role: 'MEMBER' })).rejects.toMatchObject({
       statusCode: 404,
@@ -322,7 +322,7 @@ describe('membersService.updateRole', () => {
   })
 
   test('対象が存在しない、または別組織なら404エラー（メンバーが見つかりません）を投げる', async () => {
-    changeRoleWithAuditLog.mockResolvedValue({ status: 'TARGET_NOT_FOUND' })
+    changeRole.mockResolvedValue({ status: 'TARGET_NOT_FOUND' })
 
     await expect(membersService.updateRole(1, 999, 1, 'OWNER', { role: 'MEMBER' })).rejects.toMatchObject({
       statusCode: 404,
@@ -331,7 +331,7 @@ describe('membersService.updateRole', () => {
   })
 
   test('条件付き更新の競合なら409エラーを投げる', async () => {
-    changeRoleWithAuditLog.mockResolvedValue({ status: 'CONFLICT' })
+    changeRole.mockResolvedValue({ status: 'CONFLICT' })
 
     await expect(membersService.updateRole(1, 10, 1, 'OWNER', { role: 'ADMIN' })).rejects.toMatchObject({
       statusCode: 409,
@@ -340,13 +340,13 @@ describe('membersService.updateRole', () => {
   })
 
   test('未知の結果は成功扱いにせずエラーを投げる', async () => {
-    changeRoleWithAuditLog.mockResolvedValue({ status: 'UNKNOWN', membership })
+    changeRole.mockResolvedValue({ status: 'UNKNOWN', membership })
 
     await expect(membersService.updateRole(1, 10, 1, 'OWNER', { role: 'ADMIN' })).rejects.toThrow('結果が不明')
   })
 
   test('repositoryのエラーはそのまま伝播する', async () => {
-    changeRoleWithAuditLog.mockRejectedValue(new Error('INSERT失敗'))
+    changeRole.mockRejectedValue(new Error('INSERT失敗'))
 
     await expect(membersService.updateRole(1, 10, 1, 'OWNER', { role: 'ADMIN' })).rejects.toThrow('INSERT失敗')
   })
@@ -356,7 +356,7 @@ describe('membersService.remove', () => {
   type LockedState = { operatorRole: Role; targetRole: Role | null }
 
   beforeEach(() => {
-    removeWithAuditLog.mockReset()
+    removeMember.mockReset()
   })
 
   /**
@@ -364,7 +364,7 @@ describe('membersService.remove', () => {
    * 対象なしならTARGET_NOT_FOUND、拒否ならREJECTED、それ以外はREMOVEDを返す。
    */
   const simulateRepository = (locked: LockedState): void => {
-    removeWithAuditLog.mockImplementation(async (_input: unknown, authorize: (state: LockedState) => AppError | null) => {
+    removeMember.mockImplementation(async (_input: unknown, authorize: (state: LockedState) => AppError | null) => {
       const rejection = authorize(locked)
       if (rejection !== null) {
         return { status: 'REJECTED', rejection }
@@ -381,7 +381,7 @@ describe('membersService.remove', () => {
 
     await membersService.remove(1, 10, 5)
 
-    expect(removeWithAuditLog).toHaveBeenCalledWith({ organizationId: 1, targetMembershipId: 10, actorUserId: 5 }, expect.any(Function))
+    expect(removeMember).toHaveBeenCalledWith({ organizationId: 1, targetMembershipId: 10, actorUserId: 5 }, expect.any(Function))
   })
 
   test.each([
@@ -412,19 +412,19 @@ describe('membersService.remove', () => {
   })
 
   test('操作者の所属が確認できなければ404エラーを投げる', async () => {
-    removeWithAuditLog.mockResolvedValue({ status: 'ORGANIZATION_NOT_FOUND' })
+    removeMember.mockResolvedValue({ status: 'ORGANIZATION_NOT_FOUND' })
 
     await expect(membersService.remove(1, 10, 5)).rejects.toMatchObject({ statusCode: 404, message: '組織が見つかりません' })
   })
 
   test('未知の結果は成功扱いせずエラーを投げる', async () => {
-    removeWithAuditLog.mockResolvedValue({ status: 'UNKNOWN' })
+    removeMember.mockResolvedValue({ status: 'UNKNOWN' })
 
     await expect(membersService.remove(1, 10, 5)).rejects.toThrow('メンバー削除の結果が不明です')
   })
 
   test('監査ログの記録失敗はそのまま伝播する', async () => {
-    removeWithAuditLog.mockRejectedValue(new Error('INSERT失敗'))
+    removeMember.mockRejectedValue(new Error('INSERT失敗'))
 
     await expect(membersService.remove(1, 10, 5)).rejects.toThrow('INSERT失敗')
   })
@@ -432,19 +432,19 @@ describe('membersService.remove', () => {
 
 describe('membersService.leave', () => {
   beforeEach(() => {
-    leaveOrganization.mockReset()
+    leaveMember.mockReset()
   })
 
   test('repositoryがLEFTを返した場合は脱退を完了する', async () => {
-    leaveOrganization.mockResolvedValue('LEFT')
+    leaveMember.mockResolvedValue('LEFT')
 
     await membersService.leave(1, 2)
 
-    expect(leaveOrganization).toHaveBeenCalledWith(1, 2)
+    expect(leaveMember).toHaveBeenCalledWith(1, 2)
   })
 
   test('最新状態がOWNERなら所有権移譲を求める409エラーになる', async () => {
-    leaveOrganization.mockResolvedValue('OWNER')
+    leaveMember.mockResolvedValue('OWNER')
 
     await expect(membersService.leave(1, 2)).rejects.toMatchObject({
       statusCode: 409,
@@ -453,13 +453,13 @@ describe('membersService.leave', () => {
   })
 
   test('最新状態で未所属なら404エラーになる', async () => {
-    leaveOrganization.mockResolvedValue('NOT_MEMBER')
+    leaveMember.mockResolvedValue('NOT_MEMBER')
 
     await expect(membersService.leave(1, 2)).rejects.toMatchObject({ statusCode: 404 })
   })
 
   test('再試行後も競合した場合は409エラーになる', async () => {
-    leaveOrganization.mockResolvedValue('CONFLICT')
+    leaveMember.mockResolvedValue('CONFLICT')
 
     await expect(membersService.leave(1, 2)).rejects.toMatchObject({ statusCode: 409 })
   })
