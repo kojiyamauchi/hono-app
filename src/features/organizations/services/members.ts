@@ -6,7 +6,7 @@ import { userRepository } from '@/shared/user/repositories'
 import { AppError } from '@/utils/errors'
 
 import type { ListDtoType } from '../dtos/members'
-import { decodeCursor, encodeCursor, toListResponse } from '../mappers/members'
+import { decodeMemberListCursor, encodeMemberListCursor, toMemberListResponse } from '../mappers/members'
 import { leaveOrganizationResults, memberRemovalResults, memberRoleChangeResults, membersRepository } from '../repositories/members'
 import type { AddBodySchemaType, UpdateRoleBodySchemaType } from '../schemas/members'
 
@@ -66,7 +66,7 @@ export const membersService = {
   list: async (organizationId: number, limit: number, cursor?: string): Promise<ListDtoType> => {
     let boundary: MembershipPageBoundary | null = null
     if (cursor !== undefined) {
-      const decoded = decodeCursor(cursor)
+      const decoded = decodeMemberListCursor(cursor)
       if (decoded === null || decoded.organizationId !== organizationId) {
         throw new AppError(400, 'カーソルが不正です')
       }
@@ -77,9 +77,10 @@ export const membersService = {
     const memberships = await membershipRepository.findPageByOrganization(organizationId, limit + 1, boundary)
     const items = memberships.slice(0, limit)
     const last = items.at(-1)
-    const nextCursor = memberships.length > limit && last !== undefined ? encodeCursor({ organizationId, createdAt: last.createdAt, id: last.id }) : null
+    const nextCursor =
+      memberships.length > limit && last !== undefined ? encodeMemberListCursor({ organizationId, createdAt: last.createdAt, id: last.id }) : null
 
-    return toListResponse(items, nextCursor)
+    return toMemberListResponse(items, nextCursor)
   },
 
   /**

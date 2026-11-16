@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 
 import { itemDto as projectDto, listDto as projectListDto } from '../dtos/projects'
 import type { Project } from '../entities/projects'
-import { decodeCursor, encodeCursor, toListResponse, toResponse } from './projects'
+import { decodeProjectCursor, encodeProjectCursor, toProjectListResponse, toProjectResponse } from './projects'
 
 const toBase64Url = (value: string): string => Buffer.from(value, 'utf8').toString('base64url')
 
@@ -17,24 +17,24 @@ const project: Project = {
   updatedAt: new Date('2026-01-02T03:04:05.678Z'),
 }
 
-describe('encodeCursor / decodeCursor', () => {
+describe('encodeProjectCursor / decodeProjectCursor', () => {
   test('encodeした境界値をdecodeで元の値へ戻せる', () => {
     const boundary = { organizationId: 7, createdAt: new Date('2026-03-04T05:06:07.890Z'), id: 42 }
 
-    const decoded = decodeCursor(encodeCursor(boundary))
+    const decoded = decodeProjectCursor(encodeProjectCursor(boundary))
 
     expect(decoded).toEqual(boundary)
     expect(decoded?.createdAt).toBeInstanceOf(Date)
   })
 
   test('kindとversionを含むbase64urlを発行する', () => {
-    const cursor = encodeCursor({ organizationId: 1, createdAt: new Date('2026-01-01T00:00:00.000Z'), id: 3 })
+    const cursor = encodeProjectCursor({ organizationId: 1, createdAt: new Date('2026-01-01T00:00:00.000Z'), id: 3 })
 
     expect(JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8'))).toEqual(validPayload)
   })
 
   test('正規のペイロードをdecodeできる', () => {
-    expect(decodeCursor(toBase64Url(JSON.stringify(validPayload)))).toEqual({
+    expect(decodeProjectCursor(toBase64Url(JSON.stringify(validPayload)))).toEqual({
       organizationId: 1,
       createdAt: new Date('2026-01-01T00:00:00.000Z'),
       id: 3,
@@ -54,13 +54,13 @@ describe('encodeCursor / decodeCursor', () => {
     ['末尾に不正な文字を付加', `${toBase64Url(JSON.stringify(validPayload))}!`],
     ['パディング付き', `${toBase64Url(JSON.stringify(validPayload))}=`],
   ])('不正なカーソルはnullを返す: %s', (_name, raw) => {
-    expect(decodeCursor(raw)).toBeNull()
+    expect(decodeProjectCursor(raw)).toBeNull()
   })
 })
 
-describe('toResponse', () => {
+describe('toProjectResponse', () => {
   test('6項目のDTOへ変換し、日時をISO 8601文字列にする', () => {
-    const dto = toResponse(project)
+    const dto = toProjectResponse(project)
 
     expect(dto).toEqual({
       id: 5,
@@ -74,17 +74,17 @@ describe('toResponse', () => {
   })
 
   test('descriptionがnullでもキーを返し、空文字はそのまま返す', () => {
-    const nullDto = toResponse({ ...project, description: null })
+    const nullDto = toProjectResponse({ ...project, description: null })
     expect(nullDto).toHaveProperty('description', null)
     expect(projectDto.safeParse(nullDto).success).toBe(true)
 
-    expect(toResponse({ ...project, description: '' }).description).toBe('')
+    expect(toProjectResponse({ ...project, description: '' }).description).toBe('')
   })
 })
 
-describe('toListResponse', () => {
+describe('toProjectListResponse', () => {
   test('itemsとnextCursorを返し、DTOの定義と整合する', () => {
-    const response = toListResponse([project], 'next')
+    const response = toProjectListResponse([project], 'next')
 
     expect(response.items).toHaveLength(1)
     expect(response.nextCursor).toBe('next')
@@ -92,7 +92,7 @@ describe('toListResponse', () => {
   })
 
   test('0件・最終ページではnextCursorをnullで返す', () => {
-    const response = toListResponse([], null)
+    const response = toProjectListResponse([], null)
 
     expect(response).toEqual({ items: [], nextCursor: null })
     expect(projectListDto.safeParse(response).success).toBe(true)

@@ -1,7 +1,7 @@
 import { AppError } from '@/utils/errors'
 
 import type { ListDtoType } from '../dtos/auditLogs'
-import { decodeCursor, encodeCursor, toListResponse } from '../mappers/auditLogs'
+import { decodeAuditLogCursor, encodeAuditLogCursor, toAuditLogListResponse } from '../mappers/auditLogs'
 import { type AuditLogPageBoundary, auditLogsRepository } from '../repositories/auditLogs'
 
 /**
@@ -17,7 +17,7 @@ export const auditLogsService = {
   list: async (organizationId: number, limit: number, cursor?: string): Promise<ListDtoType> => {
     let boundary: AuditLogPageBoundary | null = null
     if (cursor !== undefined) {
-      const decoded = decodeCursor(cursor)
+      const decoded = decodeAuditLogCursor(cursor)
       if (decoded === null || decoded.organizationId !== organizationId) {
         throw new AppError(400, 'カーソルが不正です')
       }
@@ -28,8 +28,8 @@ export const auditLogsService = {
     const auditLogs = await auditLogsRepository.findPage(organizationId, limit + 1, boundary)
     const items = auditLogs.slice(0, limit)
     const last = items.at(-1)
-    const nextCursor = auditLogs.length > limit && last !== undefined ? encodeCursor({ organizationId, createdAt: last.createdAt, id: last.id }) : null
+    const nextCursor = auditLogs.length > limit && last !== undefined ? encodeAuditLogCursor({ organizationId, createdAt: last.createdAt, id: last.id }) : null
 
-    return toListResponse(items, nextCursor)
+    return toAuditLogListResponse(items, nextCursor)
   },
 }

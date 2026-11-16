@@ -15,7 +15,7 @@ export type AuditLogCursorBoundary = { organizationId: number; createdAt: Date; 
  * メンバー一覧のカーソルと区別するため `kind` を含める。
  * 署名・暗号化は行わない。デコードすれば内容を読めて改変もできる前提のため、機密情報を含めないこと。
  */
-export const encodeCursor = (boundary: AuditLogCursorBoundary): string => {
+export const encodeAuditLogCursor = (boundary: AuditLogCursorBoundary): string => {
   const json = JSON.stringify({
     kind: AUDIT_LOG_CURSOR_KIND,
     version: AUDIT_LOG_CURSOR_VERSION,
@@ -32,7 +32,7 @@ export const encodeCursor = (boundary: AuditLogCursorBoundary): string => {
  * 発行時と同じ正規のbase64url文字列だけを受け付ける（不正な文字の付加や `=` パディングは不正として扱う）。
  * 対象組織の一致はservice層が認可済みのorganizationIdと突き合わせて確認する。
  */
-export const decodeCursor = (raw: string): AuditLogCursorBoundary | null => {
+export const decodeAuditLogCursor = (raw: string): AuditLogCursorBoundary | null => {
   let parsed: unknown
   try {
     const decoded = Buffer.from(raw, 'base64url')
@@ -81,7 +81,7 @@ const toProjectSnapshotResponse = (snapshot: ProjectSnapshot): { name: string; d
 /**
  * 監査ログをレスポンス用DTOへ変換する。`createdAt` はISO 8601の日時文字列にする。
  */
-export const toResponse = (auditLog: AuditLog): ItemDtoType => {
+export const toAuditLogResponse = (auditLog: AuditLog): ItemDtoType => {
   const common = {
     id: auditLog.id,
     organizationId: auditLog.organizationId,
@@ -131,9 +131,9 @@ export const toResponse = (auditLog: AuditLog): ItemDtoType => {
  * 監査ログのページをカーソル式ページネーションの応答DTOへ変換する。
  * `nextCursor` が `null` なら後続のページは存在しない。
  */
-export const toListResponse = (auditLogs: AuditLog[], nextCursor: string | null): ListDtoType => {
+export const toAuditLogListResponse = (auditLogs: AuditLog[], nextCursor: string | null): ListDtoType => {
   return {
-    items: auditLogs.map(toResponse),
+    items: auditLogs.map(toAuditLogResponse),
     nextCursor,
   }
 }

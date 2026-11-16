@@ -4,7 +4,7 @@ import { sign } from 'hono/jwt'
 import type { Membership, Role } from '@/shared/membership/entities'
 
 import type { Project } from '../entities/projects'
-import { encodeCursor as encodeProjectCursor } from '../mappers/projects'
+import { encodeProjectCursor } from '../mappers/projects'
 
 process.env.JWT_SECRET = 'test-secret'
 

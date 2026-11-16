@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, mock, test } from 'bun:test'
 
 import type { AuditLog } from '../entities/auditLogs'
-import { encodeCursor as encodeAuditLogCursor } from '../mappers/auditLogs'
-import { encodeCursor as encodeMemberListCursor } from '../mappers/members'
+import { encodeAuditLogCursor } from '../mappers/auditLogs'
+import { encodeMemberListCursor } from '../mappers/members'
 
 const findAuditLogPage = mock()
 

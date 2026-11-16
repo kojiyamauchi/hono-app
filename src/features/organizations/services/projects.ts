@@ -2,7 +2,7 @@ import type { Role } from '@/shared/membership/entities'
 import { AppError } from '@/utils/errors'
 
 import type { ItemDtoType as ProjectDtoType, ListDtoType as ProjectListDtoType } from '../dtos/projects'
-import { decodeCursor, encodeCursor, toListResponse, toResponse } from '../mappers/projects'
+import { decodeProjectCursor, encodeProjectCursor, toProjectListResponse, toProjectResponse } from '../mappers/projects'
 import { type ProjectPageBoundary, projectsRepository, projectWriteResults, type ShouldRecordProjectUpdate } from '../repositories/projects'
 
 /** プロジェクト作成の入力。`description` を省略した場合はnullとして保存する。 */
@@ -68,7 +68,7 @@ export const projectsService = {
   list: async (organizationId: number, limit: number, cursor?: string): Promise<ProjectListDtoType> => {
     let boundary: ProjectPageBoundary | null = null
     if (cursor !== undefined) {
-      const decoded = decodeCursor(cursor)
+      const decoded = decodeProjectCursor(cursor)
       if (decoded === null || decoded.organizationId !== organizationId) {
         throw new AppError(400, 'カーソルが不正です')
       }
@@ -79,9 +79,9 @@ export const projectsService = {
     const projects = await projectsRepository.findPage(organizationId, limit + 1, boundary)
     const items = projects.slice(0, limit)
     const last = items.at(-1)
-    const nextCursor = projects.length > limit && last !== undefined ? encodeCursor({ organizationId, createdAt: last.createdAt, id: last.id }) : null
+    const nextCursor = projects.length > limit && last !== undefined ? encodeProjectCursor({ organizationId, createdAt: last.createdAt, id: last.id }) : null
 
-    return toListResponse(items, nextCursor)
+    return toProjectListResponse(items, nextCursor)
   },
 
   /**
@@ -92,7 +92,7 @@ export const projectsService = {
     if (!project) {
       throw new AppError(404, 'プロジェクトが見つかりません')
     }
-    return toResponse(project)
+    return toProjectResponse(project)
   },
 
   /**
@@ -105,7 +105,7 @@ export const projectsService = {
     )
 
     if (result.status === projectWriteResults.succeeded) {
-      return toResponse(result.value)
+      return toProjectResponse(result.value)
     }
     return failWriteResult(result, { notFound: 'プロジェクトが見つかりません' })
   },
@@ -130,7 +130,7 @@ export const projectsService = {
     )
 
     if (result.status === projectWriteResults.succeeded) {
-      return toResponse(result.value)
+      return toProjectResponse(result.value)
     }
     return failWriteResult(result, { notFound: 'プロジェクトが見つかりません' })
   },
