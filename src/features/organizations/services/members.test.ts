@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, mock, test } from 'bun:test'
 import type { Membership, Role } from '@/shared/membership/entities'
 import type { AppError } from '@/utils/errors'
 
-import { encodeCursor as encodeMemberListCursor } from '../mappers/members'
+import { encodeMemberListCursor } from '../mappers/members'
 
 const findPageByOrganization = mock()
 const membershipFindById = mock()
