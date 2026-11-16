@@ -48,6 +48,7 @@ description: Use when reviewing a GitHub Pull Request for this repository, espec
 - features間の相互import、レイヤー依存方向違反、標準ディレクトリ外の責務ディレクトリ追加
 - `***Schema` / `***SchemaType`、`***Dto` / `***DtoType` の命名・配置違反
 - リソース・操作単位のファイル分割、集約専用`index.ts`（routes以外）・循環import、`common.ts` への共通定義配置の違反（AGENTS.md「features / shared のファイル分割と命名」）
+- 単独export関数が対象リソースと操作を定義名に含め、オブジェクトメソッドは短い名前を維持しているか。対象・用途が明確な関数や汎用関数を機械的に改名していないか
 - APIの追加・変更・削除がある場合の `docs/endpoints.md` 更新漏れ
 - 入力検証、エラーハンドリング、HTTP statusの不備
 - テスト不足、CIで検出できないリスク

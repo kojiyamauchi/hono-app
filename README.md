@@ -291,22 +291,23 @@ services/
 
 #### 命名
 
-- feature名や、ファイル名から分かるリソース名の重複は省きます。対象はController／Service／Repositoryのオブジェクト名とメソッド名、Zod schemaとその型、DTOとその型、mapper関数です。
-- `<リソース名・操作名>` はファイル名から `.ts` を除いた文字列をそのまま使い、単数・複数を独自に変えません。
+- feature名や、ファイル名から分かるリソース名の重複は省きます。対象はController／Service／Repositoryのオブジェクト名とメソッド名、Zod schemaとその型、DTOとその型です。
+- Controller／Service／Repositoryのオブジェクト名に使う `<リソース名・操作名>` はファイル名から `.ts` を除いた文字列をそのまま使い、単数・複数を独自に変えません。
 - Controller／Service／Repositoryのexport名は、`index.ts` の本体が `controller`／`service`／`repository`、配下が `<リソース名・操作名>Controller`／`<リソース名・操作名>Service`／`<リソース名・操作名>Repository`（例: `membersController`、`projectsRepository`）です。メソッド名も `membersController.list()` のように重複を省きます。
 - ファイル名が単一の操作名である次のファイルでは、単一操作メソッドを `execute()` とします: `transferOwnership`／`signup`／`login`／`refresh`／`logout`／`logoutAll`／`changePassword`／`accept`／`decline`。複数操作をまとめるリソース（`passwordReset`・`emailVerification`・`sessions` など）は、操作を区別できるメソッド名を使います。
 - `me.ts` は認証中のユーザー自身を表すリソースとし、`execute()` は使わず、GETは `get()`、PATCHは `update()`、DELETEは `remove()` とします。
 - schema: 単一操作ファイルのbodyは `bodySchema`／`BodySchemaType`、queryは `querySchema`／`QuerySchemaType` です。複数操作を持つリソースは `updateBodySchema`／`UpdateBodySchemaType` のように操作を区別します。カーソルのペイロードは `cursorPayloadSchema` です。
 - param schema: 本体の動的IDは `idParamSchema`／`IdParamSchemaType`（配下と共有する場合は `schemas/common.ts`）、単体リソースを指すparamは `itemParamSchema`、本体と検証条件が異なるコレクションparamは `collectionParamSchema` です。APIごとの検証条件とパラメータ名は変えません。
 - DTO: 単体は `itemDto`／`ItemDtoType`、一覧は `listDto`／`ListDtoType` です。同一ファイル内で区別が必要な場合は `memberRoleChangedDto` のように区別できる名前を付けます。OpenAPI component名はTypeScript上のexport名を変えても維持します。
-- mapper: 単体変換は `toResponse`、一覧変換は `toListResponse`、カーソルは `encodeCursor`／`decodeCursor` です。
-- 複数ファイルの同名exportを同時に使う場合は、利用側でimport aliasを付けて区別します。
+- 単独export関数は、対象リソースと操作が定義名だけで分かる名前にします。アロー関数・関数式・function宣言で基準を変えず、mapper以外にも適用します。すでに対象・用途が明確な関数、特定リソースを持たない汎用関数、privateな補助関数は一律に変更しません。
+- mapper: 単体変換は `toProjectResponse`／`toAuditLogResponse`、一覧変換は `toProjectListResponse`／`toMemberListResponse`／`toOrganizationListResponse`、カーソルは `encodeProjectCursor`／`decodeProjectCursor`／`encodeMemberListCursor`／`decodeMemberListCursor` のように対象を明示します。単数・複数は意味で決め、ファイル名の複数形を機械的に転写しません。オブジェクトメソッドは `projectsService.list()` のような短い名前を維持します。
+- importは定義名を基本とします。同名衝突や外部ライブラリとの区別など必要なimport aliasは許容し、schema／DTO／オブジェクト等の同名exportも利用側で区別できます。
 - 既存の定数・補助型（結果定数、入力型・結果型・境界型など）とEntityの型名・定数名は省略の対象に含めず、名前と意味を維持します。
 
 #### sharedへの適用
 
 - `src/shared/<domain>/` にも上記の配置ルールを適用します。ただしURLではなくドメイン内の責務でファイルを分割します（例: `shared/invitation/repositories/` の `index.ts`（招待本体）・`emailDelivery.ts`（配信）・`emailResend.ts`（再送））。
-- 複数featureから利用する前提のため、exportにはドメイン名を残します（例: `organizationRepository`、`toOrganizationResponse`、`organizationDto`、`OrganizationDtoType`）。`sharedOrganizationRepository` のような `shared` 接頭辞は付けず、同名衝突がある利用箇所でのみimport aliasを用います。
+- 複数featureから利用する前提のため、exportにはドメイン名を残します（例: `organizationRepository`、`toOrganizationResponse`、`organizationDto`、`OrganizationDtoType`）。`sharedOrganizationRepository` のような `shared` 接頭辞は付けず、同名衝突がある利用箇所でのみimport aliasを用います。単独export関数も、上記の対象・操作が分かる命名方針に従います。
 
 ### src配下のレイヤー依存ルール
 
