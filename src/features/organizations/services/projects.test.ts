@@ -4,7 +4,7 @@ import type { Role } from '@/shared/membership/entities'
 import type { AppError } from '@/utils/errors'
 
 import type { Project } from '../entities/projects'
-import { encodeProjectCursor } from '../mappers/projects'
+import { encodeCursor as encodeProjectCursor } from '../mappers/projects'
 
 const findPageByOrganization = mock()
 const findByOrganizationAndId = mock()
@@ -13,7 +13,7 @@ const updateWithAuthorization = mock()
 const removeWithAuthorization = mock()
 
 await mock.module('@/features/organizations/repositories/projects', () => ({
-  projectRepository: { findPageByOrganization, findByOrganizationAndId, createWithAuthorization, updateWithAuthorization, removeWithAuthorization },
+  projectsRepository: { findPage: findPageByOrganization, findByOrganizationAndId, createWithAuthorization, updateWithAuthorization, removeWithAuthorization },
   projectWriteResults: {
     succeeded: 'SUCCEEDED',
     organizationNotFound: 'ORGANIZATION_NOT_FOUND',

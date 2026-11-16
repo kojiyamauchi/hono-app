@@ -1,0 +1,61 @@
+import { beforeEach, describe, expect, mock, test } from 'bun:test'
+import { Hono } from 'hono'
+import type { ContentfulStatusCode } from 'hono/utils/http-status'
+
+import { AppError } from '@/utils/errors'
+
+process.env.JWT_SECRET = 'test-secret'
+process.env.REFRESH_TOKEN_SECRET = 'test-refresh-secret'
+
+const refresh = mock()
+
+await mock.module('../services/refresh', () => ({ refreshService: { execute: refresh } }))
+
+const { refreshController } = await import('./refresh')
+
+/**
+ * テスト用アプリ。AppErrorをstatusCodeへ変換するonErrorを追加する。
+ */
+const app = new Hono()
+  .post('/refresh', (c) => refreshController.execute(c))
+  .onError((err, c) => {
+    if (err instanceof AppError) {
+      return c.json({ error: { message: err.message } }, err.statusCode as ContentfulStatusCode)
+    }
+    return c.json({ error: { message: 'サーバーエラー' } }, 500)
+  })
+
+beforeEach(() => {
+  refresh.mockReset()
+})
+
+describe('refreshController', () => {
+  test('refreshはCookieからトークンを取得し、serviceの認証結果のうちアクセストークンとユーザーを200で返す', async () => {
+    const result = {
+      token: 'access-token',
+      refreshToken: 'next-refresh-token',
+      user: { id: 1, name: 'Taro', email: 'taro@example.com' },
+    }
+    refresh.mockResolvedValue(result)
+
+    const response = await app.request('/refresh', {
+      method: 'POST',
+      headers: { Cookie: 'refreshToken=cookie-refresh-token' },
+    })
+
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as { token?: string; refreshToken?: string; user?: { id?: number } }
+    expect(body.token).toBe('access-token')
+    // bodyにrefreshTokenが含まれないことを確認する
+    expect(body.refreshToken).toBeUndefined()
+    expect(body.user?.id).toBe(1)
+    expect(refresh).toHaveBeenCalledWith('cookie-refresh-token')
+  })
+
+  test('refreshはCookieがない場合に401を返す', async () => {
+    const response = await app.request('/refresh', { method: 'POST' })
+
+    expect(response.status).toBe(401)
+    expect(refresh).not.toHaveBeenCalled()
+  })
+})

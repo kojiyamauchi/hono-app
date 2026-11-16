@@ -42,7 +42,7 @@ permissionMode: acceptEdits
 - **features独立（外せない）**: `src/features/*` 同士の相互importは禁止。feature間で共有する処理・型・ドメインは `src/shared/*` に置き、依存方向は `features -> shared` の一方向に保つ。
 - **標準ディレクトリを増やさない（外せない）**: `src/features/<feature>/` と `src/shared/<domain>/` は標準ディレクトリ（`controllers`/`dtos`/`entities`/`mappers`/`repositories`/`routes`/`schemas`/`services`）に揃える。`tokens/`・`handlers/`・`clients/` のような新しい責務名のディレクトリを勝手に増やさない。置き場所に迷う責務が出たら実装前に設計方針を確認すること。
 - **レイヤード**: controller → service → repository。リクエスト/レスポンスはHonoの `c`、バリデーションはzod + `@hono/zod-validator`、エラーは `AppError` + `app.onError`。DBアクセスはrepository層に閉じる（`@/libs/prisma`）。
-- **命名・ドキュメント**: コメント・JSDocは日本語、変数名・関数名は英語のcamelCase/PascalCase。Zod schemaは `***Schema`、`z.infer` 由来の型は `***SchemaType`（param系は `***ParamSchemaType`）。命名規則とfeatures設計（公開URLは `src/routes/`、feature内部は `src/features/<feature>/routes/` など）の詳細は CLAUDE.md「Zod schema と型定義の命名」「features設計」を参照。
+- **命名・ドキュメント**: コメント・JSDocは日本語、変数名・関数名は英語のcamelCase/PascalCase。Zod schemaは `***Schema`、`z.infer` 由来の型は `***SchemaType`（param系は `***ParamSchemaType`）。各レイヤーはリソース・操作単位のcamelCaseファイルへ分割し（本体はindex、共有定義はcommon、集約専用indexは作らない）、feature名・ファイル名から分かるリソース名は命名から省く（例: `membersController`、`bodySchema`、`idParamSchema`）。ファイル分割・命名規則とfeatures設計（公開URLは `src/routes/`、feature内部は `src/features/<feature>/routes/` など）の詳細は CLAUDE.md「features設計」「features / shared のファイル分割と命名」「Zod schema と型定義の命名」を参照。
 - **公開APIの正本**: APIを追加・変更・削除した場合は、同じPRで `docs/endpoints.md` も更新すること。
 - **migration検証**: migrationを伴う実装はローカル実DBで一次検証する（`prisma migrate dev` で適用、非自明なデータ層は実DB smokeで挙動を確認して結果を報告、使い捨てスクリプトはコミットせず検証データは削除）。詳細は CLAUDE.md「migrationを含む変更の実DB検証」を参照。
 

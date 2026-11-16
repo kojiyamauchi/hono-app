@@ -74,6 +74,7 @@ gh pr diff <PR番号>
   - `src/features/*` 間の相互importがないか
   - `src/shared/` から `src/features/` / `src/middlewares/` への逆方向importがないか（依存方向はCLAUDE.md「src配下のレイヤー依存ルール」の下方向のみ）
   - 標準ディレクトリ（`controllers` / `dtos` / `entities` / `mappers` / `repositories` / `routes` / `schemas` / `services`）以外の新しい責務ディレクトリを増やしていないか
+  - 各レイヤーがリソース・操作単位のファイルに分割され、集約・再export専用の `index.ts`（routes以外）や循環importがなく、複数ファイル共有の定義が `common.ts` にあるか（CLAUDE.md「features / shared のファイル分割と命名」）
 
 - **Schema / DTOの命名・配置**
   - 入力検証用Zod schemaが `schemas/` にあり、`***Schema` / `***SchemaType`（param系は `***ParamSchemaType`）の命名に従っているか

@@ -5,7 +5,7 @@ import { z } from '@hono/zod-openapi'
  * `description` は未設定でもキーを返して `null` とする。日時はISO 8601文字列として扱う。
  * OpenAPI response schemaとして参照するため、`.openapi()` でcomponent名を付与する。
  */
-export const projectDto = z
+export const itemDto = z
   .object({
     id: z.number().int(),
     organizationId: z.number().int(),
@@ -28,9 +28,9 @@ export const projectDto = z
  * 次ページの有無は `nextCursor !== null` で表す。
  * OpenAPI response schemaとして参照するため、`.openapi()` でcomponent名を付与する。
  */
-export const projectListDto = z
+export const listDto = z
   .object({
-    items: z.array(projectDto),
+    items: z.array(itemDto),
     nextCursor: z
       .string()
       .nullable()
@@ -41,5 +41,5 @@ export const projectListDto = z
   })
   .openapi('ProjectList')
 
-export type ProjectDtoType = z.infer<typeof projectDto>
-export type ProjectListDtoType = z.infer<typeof projectListDto>
+export type ItemDtoType = z.infer<typeof itemDto>
+export type ListDtoType = z.infer<typeof listDto>
