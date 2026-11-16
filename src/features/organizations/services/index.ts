@@ -5,7 +5,7 @@ import { organizationRepository } from '@/shared/organization/repositories'
 import { AppError } from '@/utils/errors'
 
 import type { ListDtoType } from '../dtos'
-import { toListResponse } from '../mappers'
+import { toOrganizationListResponse } from '../mappers'
 import type { CreateSchemaType, UpdateSchemaType } from '../schemas'
 
 /**
@@ -28,7 +28,7 @@ export const service = {
   listMine: async (userId: number, limit: number, offset: number): Promise<ListDtoType> => {
     const organizations = await organizationRepository.findPageByUserId(userId, limit + 1, offset)
     const hasNext = organizations.length > limit
-    return toListResponse(organizations.slice(0, limit), limit, offset, hasNext)
+    return toOrganizationListResponse(organizations.slice(0, limit), limit, offset, hasNext)
   },
 
   /**
