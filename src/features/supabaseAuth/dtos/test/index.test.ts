@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { authResultDto, supabaseUserDto } from '.'
+import { authResultDto, supabaseUserDto } from '..'
 
 /** 現実的なSupabase User fixture。 */
 const supabaseUserFixture = {
