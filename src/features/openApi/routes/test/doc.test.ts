@@ -1,7 +1,7 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
 import { describe, expect, test } from 'bun:test'
 
-import { registerDocRoute } from './doc'
+import { registerDocRoute } from '../doc'
 
 describe('registerDocRoute', () => {
   test('/open-api/doc が仕様バージョンとinfoを含むOpenAPI JSONを返す', async () => {

@@ -1,7 +1,7 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
 import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
 
-import { registerOpenApiRoutes } from '.'
+import { registerOpenApiRoutes } from '..'
 
 /**
  * root appの読み込みに必要な起動準備（利用先がこのテストだけのため、helperを作らずここに置く）。

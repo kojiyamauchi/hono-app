@@ -1,7 +1,7 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
 import { describe, expect, test } from 'bun:test'
 
-import { registerScalarRoute } from './scalar'
+import { registerScalarRoute } from '../scalar'
 
 describe('registerScalarRoute', () => {
   test('/open-api/scalar がScalar UIを返す', async () => {
