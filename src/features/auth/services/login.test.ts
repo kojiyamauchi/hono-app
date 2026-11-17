@@ -1,94 +1,32 @@
-import { beforeEach, describe, expect, mock, spyOn, test } from 'bun:test'
+import { afterAll, beforeEach, describe, expect, spyOn, test } from 'bun:test'
 
 import type { User } from '@/shared/user/entities'
 
-// JWT発行に必要なシークレットをテスト用に設定
-process.env.JWT_SECRET = 'test-secret'
-process.env.REFRESH_TOKEN_SECRET = 'test-refresh-secret'
-process.env.PASSWORD_RESET_TOKEN_SECRET = 'test-password-reset-secret'
-process.env.EMAIL_VERIFICATION_TOKEN_SECRET = 'test-email-verification-secret'
+import {
+  createEmailVerificationTokenRepositoryMock,
+  createRefreshTokenRepositoryMock,
+  createUserRepositoryMock,
+  installEmailVerificationTokenRepositoryMock,
+  installRefreshTokenRepositoryMock,
+  installUserRepositoryMock,
+  setTestEnv,
+} from './testSupport'
 
-const createRefreshToken = mock()
-const findByTokenHash = mock()
-const revokeById = mock()
-const revokeFamily = mock()
-const rotate = mock()
-const revokeAllByUserId = mock()
-const revokeByUserIdAndFamilyId = mock()
-const changePassword = mock()
-const findActiveSessionsByUserId = mock()
+// JWT・リフレッシュトークンの発行と、レート制限キーのHMAC化に必要なシークレットだけをテスト用に設定する
+const env = setTestEnv({
+  JWT_SECRET: 'test-secret',
+  REFRESH_TOKEN_SECRET: 'test-refresh-secret',
+  PASSWORD_RESET_TOKEN_SECRET: 'test-password-reset-secret',
+})
 
-const prtCreate = mock()
-const prtFindByTokenHash = mock()
-const prtDeleteByIdAndTokenHash = mock()
-const prtConfirm = mock()
-const evtFindByTokenHash = mock()
-const evtConfirm = mock()
-
-await mock.module('@/shared/auth/repositories/credential', () => ({
-  authCredentialRepository: {
-    changePassword,
-  },
-}))
-
-await mock.module('@/shared/auth/repositories/refreshToken', () => ({
-  refreshTokenRepository: {
-    create: createRefreshToken,
-    findByTokenHash,
-    revokeById,
-    revokeFamily,
-    rotate,
-    revokeAllByUserId,
-    revokeByUserIdAndFamilyId,
-    findActiveSessionsByUserId,
-  },
-}))
-
-await mock.module('@/shared/auth/repositories/passwordReset', () => ({
-  passwordResetTokenRepository: {
-    create: prtCreate,
-    findByTokenHash: prtFindByTokenHash,
-    deleteByIdAndTokenHash: prtDeleteByIdAndTokenHash,
-    confirm: prtConfirm,
-  },
-}))
-
-await mock.module('@/shared/auth/repositories/emailVerification', () => ({
-  emailVerificationTokenRepository: {
-    findByTokenHash: evtFindByTokenHash,
-    confirm: evtConfirm,
-  },
-}))
-
-// notifierをモックしてno-op実装を差し替える
-const notifierSend = mock()
-const sendEmailVerificationBestEffort = mock()
-
-// shared/auth/servicesの実装関数はそのまま使い、passwordResetNotifierとsendEmailVerificationBestEffortのみ差し替える
-const emailVerificationModule = await import('@/shared/auth/services/emailVerification')
-await mock.module('@/shared/auth/services/emailVerification', () => ({
-  ...emailVerificationModule,
-  sendEmailVerificationBestEffort,
-}))
-const passwordResetModule = await import('@/shared/auth/services/passwordReset')
-await mock.module('@/shared/auth/services/passwordReset', () => ({
-  ...passwordResetModule,
-  passwordResetNotifier: { send: notifierSend },
-}))
-
-const passwordResetRequestDelayMs = mock(() => 0)
-await mock.module('@/utils/timing', () => ({
-  passwordResetRequestDelayMs,
-}))
-
-// userRepositoryをモックし、DBに依存せずserviceのロジックを検証する
-const findByEmail = mock()
-const create = mock()
-const findById = mock()
-
-await mock.module('@/shared/user/repositories', () => ({
-  userRepository: { findByEmail, create, findById },
-}))
+const refreshTokens = createRefreshTokenRepositoryMock()
+const users = createUserRepositoryMock()
+await installRefreshTokenRepositoryMock(refreshTokens.mocks)
+await installUserRepositoryMock(users.mocks)
+// ./signup（レート制限の定数確認）が読み込むshared層がメール検証トークンRepositoryに依存するため差し替える（呼び出さない）
+await installEmailVerificationTokenRepositoryMock(createEmailVerificationTokenRepositoryMock().mocks)
+const { create: createRefreshToken } = refreshTokens.mocks
+const { findByEmail } = users.mocks
 
 const { loginService, loginRateLimiter, LOGIN_IP_RATE_LIMIT, LOGIN_IP_RATE_LIMIT_WINDOW_MS, LOGIN_EMAIL_RATE_LIMIT, LOGIN_EMAIL_RATE_LIMIT_WINDOW_MS } =
   await import('./login')
@@ -105,27 +43,14 @@ const user: User = {
 }
 
 beforeEach(() => {
-  createRefreshToken.mockReset()
-  findByTokenHash.mockReset()
-  revokeById.mockReset()
-  revokeFamily.mockReset()
-  rotate.mockReset()
-  revokeAllByUserId.mockReset()
-  revokeByUserIdAndFamilyId.mockReset()
-  changePassword.mockReset()
-  findActiveSessionsByUserId.mockReset()
-  findById.mockReset()
-  prtCreate.mockReset()
-  prtFindByTokenHash.mockReset()
-  prtDeleteByIdAndTokenHash.mockReset()
-  prtConfirm.mockReset()
-  evtFindByTokenHash.mockReset()
-  evtConfirm.mockReset()
-  notifierSend.mockReset()
-  sendEmailVerificationBestEffort.mockReset()
-  passwordResetRequestDelayMs.mockReset()
-  passwordResetRequestDelayMs.mockImplementation(() => 0)
+  refreshTokens.reset()
+  users.reset()
+  // rate limiterは対象を読み込んだ後に同じインスタンスをresetする
   loginRateLimiter.reset()
+})
+
+afterAll(() => {
+  env.restore()
 })
 
 describe('loginService.execute', () => {
