@@ -5,7 +5,7 @@ import type { Invitation, InvitationWithEmailDeliveryStatus } from '@/shared/inv
 import { invitationEmailDeliveryStatusValues } from '@/shared/invitation/entities/emailDelivery'
 import type { Organization } from '@/shared/organization/entities'
 
-import { toInvitationDetailResponse, toInvitationListItemResponse, toInvitationResponse } from '.'
+import { toInvitationDetailResponse, toInvitationListItemResponse, toInvitationResponse } from '..'
 
 const invitation: Invitation = {
   id: 1,
