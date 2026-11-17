@@ -7,7 +7,7 @@ await mock.module('@/libs/supabase', () => ({
   supabase: { auth: { signInWithPassword } },
 }))
 
-const { loginService } = await import('./login')
+const { loginService } = await import('../login')
 
 describe('loginService.execute', () => {
   beforeEach(() => {
