@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { confirmBodySchema, requestBodySchema } from './passwordReset'
+import { confirmBodySchema, requestBodySchema } from '../passwordReset'
 
 describe('requestBodySchema', () => {
   test('正しいメールアドレスを受け付ける', () => {

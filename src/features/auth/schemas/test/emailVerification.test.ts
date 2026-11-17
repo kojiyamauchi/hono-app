@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { confirmBodySchema } from './emailVerification'
+import { confirmBodySchema } from '../emailVerification'
 
 describe('confirmBodySchema', () => {
   test('正しいtokenを受け付ける', () => {

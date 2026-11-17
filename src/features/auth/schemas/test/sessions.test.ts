@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { itemParamSchema } from './sessions'
+import { itemParamSchema } from '../sessions'
 
 describe('itemParamSchema', () => {
   test('UUID形式のidを受け付ける', () => {

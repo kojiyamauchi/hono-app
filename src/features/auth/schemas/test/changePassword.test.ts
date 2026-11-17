@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { bodySchema } from './changePassword'
+import { bodySchema } from '../changePassword'
 
 describe('bodySchema', () => {
   test('正しいcurrentPassword・newPasswordを受け付ける', () => {
