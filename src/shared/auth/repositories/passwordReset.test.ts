@@ -3,25 +3,16 @@ import { beforeEach, describe, expect, mock, test } from 'bun:test'
 import type { PasswordResetToken } from '@/shared/auth/entities/passwordReset'
 
 const transactionUpdateMany = mock()
-const prtTransactionCreate = mock()
-const prtTransactionFindUnique = mock()
 const prtTransactionUpdateMany = mock()
-const prtTransactionDeleteMany = mock()
 const userTransactionUpdate = mock()
-const prtCreate = mock()
 const prtFindUnique = mock()
-const prtUpdateMany = mock()
-const prtDelete = mock()
 const prtDeleteMany = mock()
 const prtUpsert = mock()
 const transaction = mock(async (callback: (tx: unknown) => Promise<unknown>) =>
   callback({
     refreshToken: { updateMany: transactionUpdateMany },
     passwordResetToken: {
-      create: prtTransactionCreate,
-      findUnique: prtTransactionFindUnique,
       updateMany: prtTransactionUpdateMany,
-      deleteMany: prtTransactionDeleteMany,
     },
     user: { update: userTransactionUpdate },
   }),
@@ -30,10 +21,7 @@ const transaction = mock(async (callback: (tx: unknown) => Promise<unknown>) =>
 await mock.module('@/libs/prisma', () => ({
   prisma: {
     passwordResetToken: {
-      create: prtCreate,
       findUnique: prtFindUnique,
-      updateMany: prtUpdateMany,
-      delete: prtDelete,
       deleteMany: prtDeleteMany,
       upsert: prtUpsert,
     },
@@ -57,15 +45,9 @@ const passwordResetToken: PasswordResetToken = {
 beforeEach(() => {
   transaction.mockClear()
   transactionUpdateMany.mockReset()
-  prtTransactionCreate.mockReset()
-  prtTransactionFindUnique.mockReset()
   prtTransactionUpdateMany.mockReset()
-  prtTransactionDeleteMany.mockReset()
   userTransactionUpdate.mockReset()
-  prtCreate.mockReset()
   prtFindUnique.mockReset()
-  prtUpdateMany.mockReset()
-  prtDelete.mockReset()
   prtDeleteMany.mockReset()
   prtUpsert.mockReset()
 })
