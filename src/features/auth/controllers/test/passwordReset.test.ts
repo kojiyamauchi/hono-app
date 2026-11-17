@@ -6,9 +6,9 @@ import { AppError } from '@/utils/errors'
 
 const requestPasswordReset = mock()
 
-await mock.module('../services/passwordReset', () => ({ passwordResetService: { request: requestPasswordReset } }))
+await mock.module('../../services/passwordReset', () => ({ passwordResetService: { request: requestPasswordReset } }))
 
-const { passwordResetController } = await import('./passwordReset')
+const { passwordResetController } = await import('../passwordReset')
 
 /**
  * テスト用アプリ。AppErrorをstatusCodeへ変換するonErrorを追加する。

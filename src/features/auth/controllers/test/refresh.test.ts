@@ -9,9 +9,9 @@ process.env.REFRESH_TOKEN_SECRET = 'test-refresh-secret'
 
 const refresh = mock()
 
-await mock.module('../services/refresh', () => ({ refreshService: { execute: refresh } }))
+await mock.module('../../services/refresh', () => ({ refreshService: { execute: refresh } }))
 
-const { refreshController } = await import('./refresh')
+const { refreshController } = await import('../refresh')
 
 /**
  * テスト用アプリ。AppErrorをstatusCodeへ変換するonErrorを追加する。

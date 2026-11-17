@@ -10,9 +10,9 @@ process.env.REFRESH_TOKEN_SECRET = 'test-refresh-secret'
 const listSessions = mock()
 const logoutSession = mock()
 
-await mock.module('../services/sessions', () => ({ sessionsService: { list: listSessions, revoke: logoutSession } }))
+await mock.module('../../services/sessions', () => ({ sessionsService: { list: listSessions, revoke: logoutSession } }))
 
-const { sessionsController } = await import('./sessions')
+const { sessionsController } = await import('../sessions')
 
 /**
  * テスト用アプリ。AppErrorをstatusCodeへ変換するonErrorを追加する。

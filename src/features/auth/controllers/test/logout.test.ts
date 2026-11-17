@@ -9,9 +9,9 @@ process.env.REFRESH_TOKEN_SECRET = 'test-refresh-secret'
 
 const logout = mock()
 
-await mock.module('../services/logout', () => ({ logoutService: { execute: logout } }))
+await mock.module('../../services/logout', () => ({ logoutService: { execute: logout } }))
 
-const { logoutController } = await import('./logout')
+const { logoutController } = await import('../logout')
 
 /**
  * テスト用アプリ。AppErrorをstatusCodeへ変換するonErrorを追加する。

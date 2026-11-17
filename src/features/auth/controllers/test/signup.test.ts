@@ -9,9 +9,9 @@ process.env.REFRESH_TOKEN_SECRET = 'test-refresh-secret'
 
 const signup = mock()
 
-await mock.module('../services/signup', () => ({ signupService: { execute: signup } }))
+await mock.module('../../services/signup', () => ({ signupService: { execute: signup } }))
 
-const { signupController } = await import('./signup')
+const { signupController } = await import('../signup')
 
 /**
  * テスト用アプリ。AppErrorをstatusCodeへ変換するonErrorを追加する。

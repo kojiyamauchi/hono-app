@@ -7,17 +7,22 @@ import { AppError } from '@/utils/errors'
 process.env.JWT_SECRET = 'test-secret'
 process.env.REFRESH_TOKEN_SECRET = 'test-refresh-secret'
 
-const logoutAll = mock()
+const changePassword = mock()
 
-await mock.module('../services/logoutAll', () => ({ logoutAllService: { execute: logoutAll } }))
+await mock.module('../../services/changePassword', () => ({ changePasswordService: { execute: changePassword } }))
 
-const { logoutAllController } = await import('./logoutAll')
+const { changePasswordController } = await import('../changePassword')
 
 /**
  * テスト用アプリ。AppErrorをstatusCodeへ変換するonErrorを追加する。
  */
 const app = new Hono()
-  .post('/logout-all', (c) => logoutAllController.execute(c, 1))
+  .post('/change-password', (c) =>
+    changePasswordController.execute(c, 1, {
+      currentPassword: 'current-password-123',
+      newPassword: 'new-password-123',
+    }),
+  )
   .onError((err, c) => {
     if (err instanceof AppError) {
       return c.json({ error: { message: err.message } }, err.statusCode as ContentfulStatusCode)
@@ -26,18 +31,18 @@ const app = new Hono()
   })
 
 beforeEach(() => {
-  logoutAll.mockReset()
+  changePassword.mockReset()
 })
 
-describe('logoutAllController', () => {
-  test('logoutAllはserviceを呼び出し、Cookieをクリアして204を返す', async () => {
-    logoutAll.mockResolvedValue(undefined)
+describe('changePasswordController', () => {
+  test('change-passwordはserviceを呼び出し、Cookieをクリアして204を返す', async () => {
+    changePassword.mockResolvedValue(undefined)
 
-    const response = await app.request('/logout-all', { method: 'POST' })
+    const response = await app.request('/change-password', { method: 'POST' })
 
     expect(response.status).toBe(204)
     expect(await response.text()).toBe('')
-    expect(logoutAll).toHaveBeenCalledWith(1)
+    expect(changePassword).toHaveBeenCalledWith(1, 'current-password-123', 'new-password-123')
     expect(response.headers.get('set-cookie')).toContain('refreshToken=')
   })
 })

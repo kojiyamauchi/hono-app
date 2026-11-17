@@ -10,11 +10,11 @@ process.env.REFRESH_TOKEN_SECRET = 'test-refresh-secret'
 const requestEmailVerification = mock()
 const confirmEmailVerification = mock()
 
-await mock.module('../services/emailVerification', () => ({
+await mock.module('../../services/emailVerification', () => ({
   emailVerificationService: { request: requestEmailVerification, confirm: confirmEmailVerification },
 }))
 
-const { emailVerificationController } = await import('./emailVerification')
+const { emailVerificationController } = await import('../emailVerification')
 
 /**
  * テスト用アプリ。AppErrorをstatusCodeへ変換するonErrorを追加する。
