@@ -193,19 +193,19 @@ export const prepareRouteTestEnvironment = async (
 // ---------------------------------------------------------------------------
 
 /**
- * Supabase Auth SDKのmock。メソッド名と引数は実クライアントの型に対応させる。
- * SDKの応答型は大きく、各ケースは必要な項目だけの応答を返すため、戻り値のresolve型だけを緩める。
+ * Supabase Auth SDKのmock。メソッド名・引数・戻り値を実クライアントの関数型に対応させる。
+ * 既存ケースが返す不完全／異常な応答は、型が合わない場合にそのケースの中だけで型を迂回する。
  */
 export type SupabaseAuthMocks = {
-  [K in SupabaseAuthMethodName]: Mock<(...args: Parameters<SupabaseAuthClient[K]>) => Promise<unknown>>
+  [K in SupabaseAuthMethodName]: Mock<SupabaseAuthClient[K]>
 }
 
 /** Supabase Auth SDKのmockを生成する。boundaryOverrides.supabaseへ渡し、呼び出し元がresetと呼び出しのassertを行う。 */
 export const createSupabaseAuthMock = (): MockSet<SupabaseAuthMocks> => {
   const mocks: SupabaseAuthMocks = {
-    signUp: mock<(...args: Parameters<SupabaseAuthClient['signUp']>) => Promise<unknown>>(),
-    signInWithPassword: mock<(...args: Parameters<SupabaseAuthClient['signInWithPassword']>) => Promise<unknown>>(),
-    getUser: mock<(...args: Parameters<SupabaseAuthClient['getUser']>) => Promise<unknown>>(),
+    signUp: mock<SupabaseAuthClient['signUp']>(),
+    signInWithPassword: mock<SupabaseAuthClient['signInWithPassword']>(),
+    getUser: mock<SupabaseAuthClient['getUser']>(),
   }
   return { mocks, reset: () => resetAll(mocks) }
 }

@@ -53,8 +53,9 @@ describe('testSupport（supabaseAuth Route用helper）', () => {
 
   test('SDK mockのresetは値・once・呼び出し履歴を初期化する', async () => {
     const { signUp, getUser } = supabaseAuth.mocks
-    signUp.mockResolvedValue({ data: {}, error: null })
-    getUser.mockResolvedValueOnce({ data: {}, error: null })
+    signUp.mockResolvedValue({ data: { user: null, session: null }, error: null })
+    // once設定の初期化確認が目的で、SDK応答の中身は問わないため、この箇所に限って型を迂回する
+    getUser.mockResolvedValueOnce({ data: { user: null }, error: null } as never)
     await signUp({ email: 'a@example.com', password: 'password123' })
 
     supabaseAuth.reset()

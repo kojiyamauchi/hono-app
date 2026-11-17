@@ -32,10 +32,11 @@ describe('supabaseAuth login routes', () => {
   })
 
   test('POST /supabase-auth/login は成功時にトークンとユーザーを返す', async () => {
+    // SDKの完全な応答ではなく、ケースに必要な項目だけの応答を返すため、このケースに限って型を迂回する
     signInWithPassword.mockResolvedValue({
       data: { session: { access_token: 'token-xyz' }, user: supabaseUser },
       error: null,
-    })
+    } as never)
 
     const response = await app.request('/supabase-auth/login', {
       method: 'POST',
@@ -50,10 +51,11 @@ describe('supabaseAuth login routes', () => {
   })
 
   test('POST /supabase-auth/login は認証失敗時に401と統一エラー形式を返す', async () => {
+    // SDKの完全な応答ではなく、ケースに必要な項目だけの応答を返すため、このケースに限って型を迂回する
     signInWithPassword.mockResolvedValue({
       data: { session: null, user: null },
       error: { message: 'Invalid login credentials' },
-    })
+    } as never)
 
     const response = await app.request('/supabase-auth/login', {
       method: 'POST',

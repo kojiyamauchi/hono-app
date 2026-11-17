@@ -32,10 +32,11 @@ describe('supabaseAuth signup routes', () => {
   })
 
   test('POST /supabase-auth/signup は成功時にトークンとユーザーを返す', async () => {
+    // SDKの完全な応答ではなく、ケースに必要な項目だけの応答を返すため、このケースに限って型を迂回する
     signUp.mockResolvedValue({
       data: { session: { access_token: 'token-abc' }, user: supabaseUser },
       error: null,
-    })
+    } as never)
 
     const response = await app.request('/supabase-auth/signup', {
       method: 'POST',
