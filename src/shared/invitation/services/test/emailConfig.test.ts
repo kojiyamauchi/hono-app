@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { getInvitationEmailConfig } from './emailConfig'
+import { getInvitationEmailConfig } from '../emailConfig'
 
 const env = {
   ENABLE_INVITATION_EMAIL: 'true',

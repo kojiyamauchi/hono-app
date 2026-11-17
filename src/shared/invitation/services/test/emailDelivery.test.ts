@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test'
 
-import type { ClaimedInvitationEmail, InvitationEmailClaim } from '../repositories/emailDelivery'
+import type { ClaimedInvitationEmail, InvitationEmailClaim } from '../../repositories/emailDelivery'
 
 const claim = mock<() => Promise<InvitationEmailClaim | undefined>>()
 const readClaim = mock<() => Promise<ClaimedInvitationEmail | null>>()
 const finish = mock()
-await mock.module('../repositories/emailDelivery', () => ({
+await mock.module('../../repositories/emailDelivery', () => ({
   invitationEmailDeliveryRepository: { claim, readClaim, finish },
 }))
-const { deliverInvitationEmails } = await import('./emailDelivery')
+const { deliverInvitationEmails } = await import('../emailDelivery')
 const fetchSpy = spyOn(globalThis, 'fetch')
 
 let currentClaim: InvitationEmailClaim
