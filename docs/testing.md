@@ -13,6 +13,28 @@
 - DB固有の挙動はmockテストだけで完了としない
 - Repositoryの未知の結果値は暗黙の成功にせず、エラーへ倒す
 
+## テストファイルの配置
+
+Bunテストは、対象実装があるディレクトリの直下の `test/` に置きます。ファイル名と対象実装の対応を保ちます（`login.ts` → `test/login.test.ts`、`index.ts` → `test/index.test.ts`）。
+
+```text
+src/features/auth/services/
+├── login.ts
+├── logout.ts
+└── test/
+    ├── login.test.ts
+    ├── logout.test.ts
+    ├── testSupport.ts
+    └── testSupport.test.ts
+```
+
+- features／sharedでは各レイヤー直下（`services/test/`、`routes/test/` など）に置き、feature／domain直下やリポジトリ直下へ集約しません
+- features／shared以外も同じ配置原則です。`src/app.ts` のテストは `src/test/app.test.ts`、scripts・certificatesのBunテストも各ディレクトリ直下の `test/` に置きます
+- テストがある場合だけ `test/` を作り、空のディレクトリや `test/test/` は作りません。Terraformのモックテストや生成物は対象外です
+- テスト専用helper・fixtureも同じ `test/` に置き、共有範囲は同じfeature／domain・同じレイヤーに限定します。製品コードから `test/` へのimportは禁止です
+- 移動時は相対import、dynamic import、`mock.module`、`import.meta.url` を基準にしたfixture参照を更新し、参照先・mock登録順・既存ケースとassertを維持します
+- `.dockerignore` の `**/test` でディレクトリ全体をビルドコンテキストから除外し、実行イメージへhelper・fixtureを含めません
+
 ## 変更内容とテストの対応
 
 | 変更内容                       | 主に追加・更新するテスト |
@@ -214,12 +236,12 @@ Resend、Supabase Auth、OpenTelemetry exporterなどの外部サービスは、
 
 ## テスト準備の共有（testSupport.ts）
 
-複数テストで複製される環境設定・mock・fixtureは、同じfeature／domainの同じ標準ディレクトリ直下の `testSupport.ts` に切り出せます。切り出しは重複の実益がある場合に限り、シナリオ固有の条件と期待値は各テストに残します。
+複数テストで複製される環境設定・mock・fixtureは、同じfeature／domainの同じ標準ディレクトリ直下の `test/testSupport.ts` に切り出せます。切り出しは重複の実益がある場合に限り、シナリオ固有の条件と期待値は各テストに残します。
 
 ### 配置と依存
 
-- 同じ層（例: `features/auth/routes/`）の複数テストだけが直接importします。featureを跨ぐimport、`index.ts` からの再export、製品コードからのimportは禁止です（`rg -n 'testSupport' src --glob '*.ts' --glob '!**/*.test.ts' --glob '!**/testSupport.ts'` が0件であること）
-- `.dockerignore` の `**/testSupport.ts` により実行イメージへ含めません
+- 同じ層の `test/`（例: `features/auth/routes/test/`）の複数テストだけが直接importします。featureを跨ぐimport、`index.ts` からの再export、製品コードからのimportは禁止です（`rg -n 'testSupport' src --glob '*.ts' --glob '!**/test/**'` が0件であること）
+- `.dockerignore` の `**/test` によりhelper・fixtureを含むディレクトリ全体を実行イメージへ含めません
 - 全体preloadや巨大な共通基盤は作りません。利用先が1つしかないfeature（openApiなど）はテスト内に小さな準備を置きます
 
 ### 生成・登録・reset・復元
@@ -277,7 +299,7 @@ bun run build
 
 通常のCIテストはDB非依存とし、Repositoryと外部サービスをmockします。
 
-PRでは検査専用の `ci.yml` を実行し、ChecksにCDジョブを含めません。mainへのpushでは `cd-gcp.yml` から同じ `ci.yml` を呼び出します。GCP devの配備は全CI成功後、明示的に有効化された場合だけ動きます。配備前のコンテナ検証は通常のUnit Testとは分離し、使い捨てDBで行います。CDのplan許可範囲・migration失敗時の停止・IAP検証・イメージ保持は `scripts/gcp-cd*.test.js` とGCPのTerraformモックテストで確認します。[GCP devの自動配備](deployment-gcp-cd.md)
+PRでは検査専用の `ci.yml` を実行し、ChecksにCDジョブを含めません。mainへのpushでは `cd-gcp.yml` から同じ `ci.yml` を呼び出します。GCP devの配備は全CI成功後、明示的に有効化された場合だけ動きます。配備前のコンテナ検証は通常のUnit Testとは分離し、使い捨てDBで行います。CDのplan許可範囲・migration失敗時の停止・IAP検証・イメージ保持は `scripts/test/gcp-cd*.test.js` とGCPのTerraformモックテストで確認します。[GCP devの自動配備](deployment-gcp-cd.md)
 
 GCPのCIは `init -backend=false -lockfile=readonly` の後にvalidate・モックテストを実行します。初期化時にlockfileへハッシュを自動追加して成功扱いにせず、Mac/ARM64とLinux/AMD64の両方が記録されていることを前提にします。platformやproviderを更新する手順は[lockfile管理](deployment-gcp-cd.md#providerのlockfile管理)を参照してください。
 

@@ -85,8 +85,9 @@ Bun上で動作するHono.js APIアプリケーションです。TypeScriptを�
 - 同じ標準ディレクトリ内の複数ファイルが共有する定義は、そのディレクトリの `common.ts` に置き、利用側から直接importする。本体（`index.ts`）の定義でも配下のファイルが使う場合は `common.ts` を優先し、`index.ts` 側も `common.ts` から直接importする。必要な場合にだけ作成し、共通化してもレイヤーの責務を保つ
 - 一つのファイル内だけで使う補助定義は、そのファイルに置く。他レイヤーから参照されるだけの定義を機械的に `common.ts` へ移さない
 - 個別ファイルと `index.ts` の間で循環importを作らないこと
-- テストは対象ファイルに対応させる（例: `members.test.ts`）。`controllers.test.ts` のような旧来のレイヤー単位テストは各テストケースを責務別ファイルのテストへ分配し、`index.ts` 本体のケースが残る場合だけ `index.test.ts` にまとめる。型だけのファイルなどへ機械的にテストを増やさず、[docs/testing.md](docs/testing.md) に従う
-- テスト専用の共有準備（mock factory・Route用の起動準備など）は、同じfeature／domainの同じ標準ディレクトリ直下の `testSupport.ts` に置く（例: `features/auth/routes/testSupport.ts`）。同じ層の複数テストだけが直接importし、featureを跨いだimport、`index.ts` からの再export、製品コードからのimportは禁止する。`common.ts` は製品の共有定義用でありBun依存のhelperを置かない。helperはトップレベルで環境変更・`mock.module`・hook登録・app importを行わず、呼び出しで状態を生成・登録・復元する。`.dockerignore` で実行イメージから除外する。詳細は [docs/testing.md](docs/testing.md) に従う
+- テストは対象実装のディレクトリ直下の `test/` に置き、対象ファイルに対応させる（例: `members.ts` に対する `test/members.test.ts`）。`controllers.test.ts` のような旧来のレイヤー単位テストは各テストケースを責務別ファイルのテストへ分配し、`index.ts` 本体のケースが残る場合だけ `index.test.ts` にまとめる。型だけのファイルなどへ機械的にテストを増やさず、[docs/testing.md](docs/testing.md) に従う
+- テスト専用の `test/` は各標準ディレクトリの直下にのみ置く。feature／domain直下やリポジトリ直下へ集約せず、空の `test/` や `test/test/` は作らない。features／shared以外も同じ配置原則とし、`src/app.test.ts` は `src/test/app.test.ts`、scripts・certificatesのBunテストも各ディレクトリ直下の `test/` に置く。Terraformのモックテストは対象外とする。
+- テスト専用の共有準備（mock factory・Route用の起動準備など）は、同じfeature／domainの同じ標準ディレクトリ直下の `test/testSupport.ts` に置く（例: `features/auth/routes/test/testSupport.ts`）。同じ層の複数テストだけが直接importし、featureを跨いだimport、`index.ts` からの再export、製品コードからのimportは禁止する。`common.ts` は製品の共有定義用でありBun依存のhelperを置かない。helperはトップレベルで環境変更・`mock.module`・hook登録・app importを行わず、呼び出しで状態を生成・登録・復元する。`.dockerignore` で実行イメージから除外する。詳細は [docs/testing.md](docs/testing.md) に従う
 
 ##### routesの分割
 

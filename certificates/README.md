@@ -14,7 +14,7 @@ Dockerfileはruntimeとmigrationへこのファイルを同梱し、`NODE_EXTRA_
 
 ```bash
 openssl x509 -in certificates/supabase-root-2021.crt -noout -subject -issuer -dates -fingerprint -sha256
-bun test certificates/supabase-ca.test.js
+bun test certificates/test/supabase-ca.test.js
 bun run test:container
 ```
 
