@@ -18,7 +18,7 @@ await mock.module('resend', () => ({
   },
 }))
 
-const { sendResendEmail } = await import('.')
+const { sendResendEmail } = await import('..')
 
 describe('sendResendEmail', () => {
   beforeEach(() => {
