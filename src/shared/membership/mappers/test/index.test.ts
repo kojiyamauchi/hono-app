@@ -3,7 +3,7 @@ import { describe, expect, test } from 'bun:test'
 import { memberDto } from '@/shared/membership/dtos'
 import type { Membership } from '@/shared/membership/entities'
 
-import { toMemberResponse } from '.'
+import { toMemberResponse } from '..'
 
 const membership: Membership = {
   id: 1,
