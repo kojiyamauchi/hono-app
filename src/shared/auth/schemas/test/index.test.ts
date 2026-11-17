@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { authSubjectSchema } from '.'
+import { authSubjectSchema } from '..'
 
 describe('authSubjectSchema', () => {
   test('正の整数（number）は通し、数値として取り出せる', () => {
