@@ -8,7 +8,7 @@ await mock.module('@/libs/prisma', () => ({
   prisma: { $queryRaw: queryRaw },
 }))
 
-const { membershipRepository } = await import('.')
+const { membershipRepository } = await import('..')
 
 /** $queryRaw に渡された Prisma.Sql を取り出す。 */
 const getIssuedSql = (): Prisma.Sql => queryRaw.mock.calls[0]?.[0] as Prisma.Sql
