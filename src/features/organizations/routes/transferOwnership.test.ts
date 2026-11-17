@@ -1,107 +1,14 @@
-import { beforeEach, describe, expect, mock, test } from 'bun:test'
+import { afterAll, afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { sign } from 'hono/jwt'
 
 import type { Membership, Role } from '@/shared/membership/entities'
 
-process.env.JWT_SECRET = 'test-secret'
+import { createRouteTestContext } from './testSupport'
 
-const createWithOwner = mock()
-const findPageByUserId = mock()
-const findById = mock()
-const update = mock()
-const deleteById = mock()
-
-const findByUserAndOrganization = mock()
-const findPageByOrganization = mock()
-const membershipFindById = mock()
-const membershipCreate = mock()
-const membershipDeleteById = mock()
-
-const findByEmail = mock()
-const existsById = mock()
-
-const invitationFindPendingByOrgAndEmail = mock()
-const invitationCreate = mock()
-const invitationFindAllByOrganization = mock()
-const invitationFindById = mock()
-const invitationCancel = mock()
-const requestResend = mock()
-
-const transferOwnership = mock()
-const leaveMember = mock()
-const changeRole = mock()
-const findAuditLogPage = mock()
-const removeMember = mock()
-
-await mock.module('@/features/organizations/repositories/members', () => ({
-  membersRepository: { remove: removeMember, leave: leaveMember, changeRole: changeRole },
-  memberRemovalResults: {
-    removed: 'REMOVED',
-    organizationNotFound: 'ORGANIZATION_NOT_FOUND',
-    targetNotFound: 'TARGET_NOT_FOUND',
-    rejected: 'REJECTED',
-  },
-  memberRoleChangeResults: {
-    changed: 'CHANGED',
-    unchanged: 'UNCHANGED',
-    organizationNotFound: 'ORGANIZATION_NOT_FOUND',
-    targetNotFound: 'TARGET_NOT_FOUND',
-    rejected: 'REJECTED',
-    conflict: 'CONFLICT',
-  },
-  leaveOrganizationResults: {
-    left: 'LEFT',
-    owner: 'OWNER',
-    notMember: 'NOT_MEMBER',
-    conflict: 'CONFLICT',
-  },
-}))
-
-await mock.module('@/features/organizations/repositories/transferOwnership', () => ({
-  transferOwnershipRepository: { execute: transferOwnership },
-  ownershipTransferResults: {
-    transferred: 'TRANSFERRED',
-    targetNotFound: 'TARGET_NOT_FOUND',
-    selfTransfer: 'SELF_TRANSFER',
-    conflict: 'CONFLICT',
-  },
-}))
-
-await mock.module('@/features/organizations/repositories/auditLogs', () => ({
-  auditLogsRepository: { findPage: findAuditLogPage },
-}))
-
-await mock.module('@/shared/organization/repositories', () => ({
-  organizationRepository: { createWithOwner, findPageByUserId, findById, update, deleteById },
-}))
-await mock.module('@/shared/membership/repositories', () => ({
-  membershipRepository: {
-    findByUserAndOrganization,
-    findPageByOrganization,
-    findById: membershipFindById,
-    create: membershipCreate,
-    deleteById: membershipDeleteById,
-  },
-}))
-await mock.module('@/shared/user/repositories', () => ({
-  userRepository: { findByEmail, existsById },
-}))
-await mock.module('@/shared/invitation/repositories', () => ({
-  invitationRepository: {
-    findPendingByOrgAndEmail: invitationFindPendingByOrgAndEmail,
-    create: invitationCreate,
-    findAllByOrganization: invitationFindAllByOrganization,
-    findById: invitationFindById,
-    cancel: invitationCancel,
-  },
-}))
-
-await mock.module('@/shared/invitation/repositories/emailResend', () => ({
-  invitationEmailResendRepository: { requestResend },
-  invitationEmailResendResults: { requested: 'REQUESTED', organizationNotFound: 'ORGANIZATION_NOT_FOUND', rejected: 'REJECTED' },
-}))
-
-const { app } = await import('@/app')
+const context = await createRouteTestContext()
+const { app } = context
+const { findByUserAndOrganization } = context.mocks.memberships
+const { execute: transferOwnership } = context.mocks.transferOwnership
 
 const membershipWithRole = (role: Role): Membership => ({
   id: 1,
@@ -115,32 +22,17 @@ const createToken = async (userId: number): Promise<string> => {
   return sign({ sub: userId, exp: Math.floor(Date.now() / 1000) + 60 }, 'test-secret')
 }
 
+afterEach(() => {
+  context.assertNoUnexpectedCalls()
+})
+
+afterAll(() => {
+  context.cleanup()
+})
+
 describe('organizations transfer-ownership routes', () => {
   beforeEach(() => {
-    existsById.mockReset()
-    existsById.mockResolvedValue(true)
-    createWithOwner.mockReset()
-    findPageByUserId.mockReset()
-    findById.mockReset()
-    update.mockReset()
-    deleteById.mockReset()
-    findByUserAndOrganization.mockReset()
-    findPageByOrganization.mockReset()
-    membershipFindById.mockReset()
-    membershipCreate.mockReset()
-    changeRole.mockReset()
-    removeMember.mockReset()
-    findAuditLogPage.mockReset()
-    membershipDeleteById.mockReset()
-    findByEmail.mockReset()
-    invitationFindPendingByOrgAndEmail.mockReset()
-    invitationCreate.mockReset()
-    invitationFindAllByOrganization.mockReset()
-    invitationFindById.mockReset()
-    invitationCancel.mockReset()
-    requestResend.mockReset()
-    transferOwnership.mockReset()
-    leaveMember.mockReset()
+    context.reset()
   })
 
   test('POST /organizations/:id/transfer-ownership はOWNERなら204を返す', async () => {

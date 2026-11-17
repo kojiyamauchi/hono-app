@@ -1,38 +1,22 @@
-import { beforeEach, describe, expect, mock, test } from 'bun:test'
+import { afterAll, afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { sign } from 'hono/jwt'
 
 import type { Membership, Role } from '@/shared/membership/entities'
 
 import type { Project } from '../entities/projects'
 import { encodeProjectCursor } from '../mappers/projects'
+import { createRouteTestContext } from './testSupport'
 
-process.env.JWT_SECRET = 'test-secret'
-
-const findPageByOrganization = mock()
-const findByOrganizationAndId = mock()
-const createWithAuthorization = mock()
-const updateWithAuthorization = mock()
-const removeWithAuthorization = mock()
-const findByUserAndOrganization = mock()
-const existsById = mock()
-
-await mock.module('@/features/organizations/repositories/projects', () => ({
-  projectsRepository: { findPage: findPageByOrganization, findByOrganizationAndId, createWithAuthorization, updateWithAuthorization, removeWithAuthorization },
-  projectWriteResults: {
-    succeeded: 'SUCCEEDED',
-    organizationNotFound: 'ORGANIZATION_NOT_FOUND',
-    projectNotFound: 'PROJECT_NOT_FOUND',
-    rejected: 'REJECTED',
-  },
-}))
-await mock.module('@/shared/membership/repositories', () => ({
-  membershipRepository: { findByUserAndOrganization },
-}))
-await mock.module('@/shared/user/repositories', () => ({
-  userRepository: { existsById },
-}))
-
-const { app } = await import('@/app')
+const context = await createRouteTestContext()
+const { app } = context
+const {
+  findPage: findPageByOrganization,
+  findByOrganizationAndId,
+  createWithAuthorization,
+  updateWithAuthorization,
+  removeWithAuthorization,
+} = context.mocks.projects
+const { findByUserAndOrganization } = context.mocks.memberships
 
 const membershipWithRole = (role: Role): Membership => ({
   id: 1,
@@ -66,23 +50,30 @@ const request = async (method: string, path: string, options: { token?: string; 
 }
 
 /** repositoryの書き込みモックを、指定ロールの認可コールバックを実行したうえで結果を返す実装にする。 */
-const mockWrite = (repositoryMock: ReturnType<typeof mock>, role: Role, onAllowed: () => unknown): void => {
-  repositoryMock.mockImplementation(async (_input: unknown, authorize: (state: { operatorRole: Role }) => unknown) => {
+const mockWrite = (
+  repositoryMock: typeof createWithAuthorization | typeof updateWithAuthorization | typeof removeWithAuthorization,
+  role: Role,
+  onAllowed: () => unknown,
+): void => {
+  // 3つの書き込みRepositoryで入力型が異なるため、認可コールバックを実行する共通実装として型を迂回する
+  const setImplementation = repositoryMock.mockImplementation as (implementation: unknown) => unknown
+  setImplementation.call(repositoryMock, async (_input: unknown, authorize: (state: { operatorRole: Role }) => unknown) => {
     const rejection = authorize({ operatorRole: role })
     return rejection !== null ? { status: 'REJECTED', rejection } : onAllowed()
   })
 }
 
+afterEach(() => {
+  context.assertNoUnexpectedCalls()
+})
+
+afterAll(() => {
+  context.cleanup()
+})
+
 describe('organizations projects routes', () => {
   beforeEach(() => {
-    findPageByOrganization.mockReset()
-    findByOrganizationAndId.mockReset()
-    createWithAuthorization.mockReset()
-    updateWithAuthorization.mockReset()
-    removeWithAuthorization.mockReset()
-    findByUserAndOrganization.mockReset()
-    existsById.mockReset()
-    existsById.mockResolvedValue(true)
+    context.reset()
   })
 
   describe('認証・パス・所属', () => {
@@ -264,7 +255,7 @@ describe('organizations projects routes', () => {
 
     test('未知のrepository結果は500', async () => {
       findByUserAndOrganization.mockResolvedValue(membershipWithRole('OWNER'))
-      createWithAuthorization.mockResolvedValue({ status: 'UNKNOWN' })
+      createWithAuthorization.mockResolvedValue({ status: 'UNKNOWN' } as never)
       const token = await createToken(1)
 
       expect((await request('POST', '/organizations/1/projects', { token, body: { name: 'a' } })).status).toBe(500)
@@ -370,7 +361,7 @@ describe('organizations projects routes', () => {
       updateWithAuthorization.mockResolvedValue({ status: 'PROJECT_NOT_FOUND' })
       expect((await request('PATCH', '/organizations/1/projects/999', { token, body: { name: 'a' } })).status).toBe(404)
 
-      updateWithAuthorization.mockResolvedValue({ status: 'UNKNOWN' })
+      updateWithAuthorization.mockResolvedValue({ status: 'UNKNOWN' } as never)
       expect((await request('PATCH', '/organizations/1/projects/2', { token, body: { name: 'a' } })).status).toBe(500)
     })
   })
