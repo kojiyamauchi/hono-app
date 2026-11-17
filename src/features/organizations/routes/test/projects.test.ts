@@ -3,8 +3,8 @@ import { sign } from 'hono/jwt'
 
 import type { Membership, Role } from '@/shared/membership/entities'
 
-import type { Project } from '../entities/projects'
-import { encodeProjectCursor } from '../mappers/projects'
+import type { Project } from '../../entities/projects'
+import { encodeProjectCursor } from '../../mappers/projects'
 import { createRouteTestContext } from './testSupport'
 
 const context = await createRouteTestContext()
