@@ -5,7 +5,7 @@ import { createRouteTestContext, createUserFixture } from './testSupport'
 const context = await createRouteTestContext()
 const { app } = context
 const { findByEmail } = context.mocks.users
-const { loginRateLimiter } = await import('../services/login')
+const { loginRateLimiter } = await import('../../services/login')
 
 const user = createUserFixture()
 

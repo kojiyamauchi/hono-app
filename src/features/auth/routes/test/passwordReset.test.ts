@@ -9,7 +9,7 @@ const { app } = context
 const { create: prtCreate, findByTokenHash: prtFindByTokenHash, confirm: prtConfirm } = context.mocks.passwordResetTokens
 const { findByEmail } = context.mocks.users
 const { send: notifierSend } = context.mocks.passwordResetNotifier
-const { passwordResetRequestRateLimiter } = await import('../services/passwordReset')
+const { passwordResetRequestRateLimiter } = await import('../../services/passwordReset')
 
 const user = createUserFixture()
 

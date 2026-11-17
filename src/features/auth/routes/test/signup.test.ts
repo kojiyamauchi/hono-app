@@ -5,7 +5,7 @@ import { createRouteTestContext } from './testSupport'
 const context = await createRouteTestContext()
 const { app } = context
 const { findByEmail, create: createUser } = context.mocks.users
-const { signupRateLimiter } = await import('../services/signup')
+const { signupRateLimiter } = await import('../../services/signup')
 
 beforeEach(() => {
   context.reset()

@@ -10,7 +10,7 @@ const { app } = context
 const { findByTokenHash: evtFindByTokenHash, confirm: evtConfirm } = context.mocks.emailVerificationTokens
 const { findById } = context.mocks.users
 const { sendEmailVerificationBestEffort } = context.mocks.emailVerification
-const { emailVerificationRequestRateLimiter } = await import('../services/emailVerification')
+const { emailVerificationRequestRateLimiter } = await import('../../services/emailVerification')
 
 const user = createUserFixture()
 
