@@ -3,7 +3,7 @@ import { describe, expect, test } from 'bun:test'
 import { sessionDto } from '@/shared/auth/dtos'
 import type { RefreshSession } from '@/shared/auth/entities/refreshToken'
 
-import { toSessionResponse } from '.'
+import { toSessionResponse } from '..'
 
 const createdAt = new Date('2026-06-01T00:00:00.000Z')
 const expiresAt = new Date('2026-07-01T00:00:00.000Z')
