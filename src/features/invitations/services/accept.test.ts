@@ -1,51 +1,27 @@
-import { beforeEach, describe, expect, mock, test } from 'bun:test'
+import { beforeEach, describe, expect, test } from 'bun:test'
 
 import type { Invitation } from '@/shared/invitation/entities'
 import type { Membership } from '@/shared/membership/entities'
 import type { User } from '@/shared/user/entities'
 
-process.env.JWT_SECRET = 'test-secret'
-process.env.REFRESH_TOKEN_SECRET = 'test-refresh-secret'
+import {
+  createInvitationRepositoryMock,
+  createMembershipRepositoryMock,
+  createUserRepositoryMock,
+  installInvitationRepositoryMock,
+  installMembershipRepositoryMock,
+  installUserRepositoryMock,
+} from './testSupport'
 
-const createRefreshToken = mock()
-
-await mock.module('@/shared/auth/repositories/emailVerification', () => ({
-  emailVerificationTokenRepository: { create: mock(), deleteByIdAndTokenHash: mock() },
-}))
-
-await mock.module('@/shared/auth/repositories/refreshToken', () => ({
-  refreshTokenRepository: { create: createRefreshToken },
-}))
-
-const sendEmailVerificationBestEffort = mock()
-const emailVerificationModule = await import('@/shared/auth/services/emailVerification')
-await mock.module('@/shared/auth/services/emailVerification', () => ({
-  ...emailVerificationModule,
-  sendEmailVerificationBestEffort,
-}))
-
-// repositoryをモックしDB非依存でservice層のロジックを検証する
-const findByToken = mock()
-const findByTokenWithOrganization = mock()
-const markExpired = mock()
-const accept = mock()
-const decline = mock()
-const signup = mock()
-
-const findByUserAndOrganization = mock()
-
-const findById = mock()
-const findByEmail = mock()
-
-await mock.module('@/shared/invitation/repositories', () => ({
-  invitationRepository: { findByToken, findByTokenWithOrganization, markExpired, accept, decline, signup },
-}))
-await mock.module('@/shared/membership/repositories', () => ({
-  membershipRepository: { findByUserAndOrganization },
-}))
-await mock.module('@/shared/user/repositories', () => ({
-  userRepository: { findById, findByEmail },
-}))
+const invitations = createInvitationRepositoryMock()
+const memberships = createMembershipRepositoryMock()
+const users = createUserRepositoryMock()
+await installInvitationRepositoryMock(invitations.mocks)
+await installMembershipRepositoryMock(memberships.mocks)
+await installUserRepositoryMock(users.mocks)
+const { findByToken, markExpired, accept } = invitations.mocks
+const { findByUserAndOrganization } = memberships.mocks
+const { findById } = users.mocks
 
 const { acceptService } = await import('./accept')
 
@@ -91,23 +67,12 @@ const createdMembership: Membership = {
 }
 
 beforeEach(() => {
-  createRefreshToken.mockReset()
-  sendEmailVerificationBestEffort.mockReset()
+  invitations.reset()
+  memberships.reset()
+  users.reset()
 })
 
 describe('acceptService.execute', () => {
-  beforeEach(() => {
-    findByToken.mockReset()
-    findByTokenWithOrganization.mockReset()
-    markExpired.mockReset()
-    accept.mockReset()
-    decline.mockReset()
-    signup.mockReset()
-    findByUserAndOrganization.mockReset()
-    findById.mockReset()
-    findByEmail.mockReset()
-  })
-
   test('有効な招待を受諾してMemberDtoTypeを返す', async () => {
     findByToken.mockResolvedValue(pendingInvitation)
     findById.mockResolvedValue(inviteeUser)
@@ -167,7 +132,8 @@ describe('acceptService.execute', () => {
   })
 
   test('未知の結果値はエラー側へ倒れる（fail-closed）', async () => {
-    findByToken.mockResolvedValue({ ...pendingInvitation, status: 'UNKNOWN' })
+    // 未知のstatusを作るため、このケースに限って型を迂回する
+    findByToken.mockResolvedValue({ ...pendingInvitation, status: 'UNKNOWN' } as never)
 
     await expect(acceptService.execute(5, TOKEN)).rejects.toThrow('この招待は利用できません')
     expect(findById).not.toHaveBeenCalled()

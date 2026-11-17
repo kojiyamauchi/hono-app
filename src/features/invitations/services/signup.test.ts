@@ -1,50 +1,40 @@
-import { beforeEach, describe, expect, mock, test } from 'bun:test'
+import { afterAll, beforeEach, describe, expect, test } from 'bun:test'
 
 import type { Invitation } from '@/shared/invitation/entities'
 import type { User } from '@/shared/user/entities'
 
-process.env.JWT_SECRET = 'test-secret'
-process.env.REFRESH_TOKEN_SECRET = 'test-refresh-secret'
+import {
+  createEmailVerificationServiceMock,
+  createEmailVerificationTokenRepositoryMock,
+  createInvitationRepositoryMock,
+  createRefreshTokenRepositoryMock,
+  createUserRepositoryMock,
+  installEmailVerificationServiceMock,
+  installEmailVerificationTokenRepositoryMock,
+  installInvitationRepositoryMock,
+  installRefreshTokenRepositoryMock,
+  installUserRepositoryMock,
+  setTestEnv,
+} from './testSupport'
 
-const createRefreshToken = mock()
+// JWT・リフレッシュトークンの発行に必要なシークレットだけをテスト用に設定する。
+// EMAIL_VERIFICATION_TOKEN_SECRETは、sendEmailVerificationBestEffort自体を部分mockしており到達しないため設定しない。
+const env = setTestEnv({ JWT_SECRET: 'test-secret', REFRESH_TOKEN_SECRET: 'test-refresh-secret' })
 
-await mock.module('@/shared/auth/repositories/emailVerification', () => ({
-  emailVerificationTokenRepository: { create: mock(), deleteByIdAndTokenHash: mock() },
-}))
-
-await mock.module('@/shared/auth/repositories/refreshToken', () => ({
-  refreshTokenRepository: { create: createRefreshToken },
-}))
-
-const sendEmailVerificationBestEffort = mock()
-const emailVerificationModule = await import('@/shared/auth/services/emailVerification')
-await mock.module('@/shared/auth/services/emailVerification', () => ({
-  ...emailVerificationModule,
-  sendEmailVerificationBestEffort,
-}))
-
-// repositoryをモックしDB非依存でservice層のロジックを検証する
-const findByToken = mock()
-const findByTokenWithOrganization = mock()
-const markExpired = mock()
-const accept = mock()
-const decline = mock()
-const signup = mock()
-
-const findByUserAndOrganization = mock()
-
-const findById = mock()
-const findByEmail = mock()
-
-await mock.module('@/shared/invitation/repositories', () => ({
-  invitationRepository: { findByToken, findByTokenWithOrganization, markExpired, accept, decline, signup },
-}))
-await mock.module('@/shared/membership/repositories', () => ({
-  membershipRepository: { findByUserAndOrganization },
-}))
-await mock.module('@/shared/user/repositories', () => ({
-  userRepository: { findById, findByEmail },
-}))
+const invitations = createInvitationRepositoryMock()
+const users = createUserRepositoryMock()
+const refreshTokens = createRefreshTokenRepositoryMock()
+const emailVerificationService = createEmailVerificationServiceMock()
+await installInvitationRepositoryMock(invitations.mocks)
+await installUserRepositoryMock(users.mocks)
+await installRefreshTokenRepositoryMock(refreshTokens.mocks)
+// 実モジュールを読み込む部分mockの前提として、メール検証トークンRepositoryを差し替える（本テストでは呼び出さない）
+await installEmailVerificationTokenRepositoryMock(createEmailVerificationTokenRepositoryMock().mocks)
+await installEmailVerificationServiceMock(emailVerificationService.mocks)
+const { findByToken, markExpired, signup } = invitations.mocks
+const { findByEmail } = users.mocks
+const { create: createRefreshToken } = refreshTokens.mocks
+const { sendEmailVerificationBestEffort } = emailVerificationService.mocks
 
 const { signupService } = await import('./signup')
 
@@ -81,23 +71,17 @@ const inviteeUser: User = {
 }
 
 beforeEach(() => {
-  createRefreshToken.mockReset()
-  sendEmailVerificationBestEffort.mockReset()
+  invitations.reset()
+  users.reset()
+  refreshTokens.reset()
+  emailVerificationService.reset()
+})
+
+afterAll(() => {
+  env.restore()
 })
 
 describe('signupService.execute', () => {
-  beforeEach(() => {
-    findByToken.mockReset()
-    findByTokenWithOrganization.mockReset()
-    markExpired.mockReset()
-    accept.mockReset()
-    decline.mockReset()
-    signup.mockReset()
-    findByUserAndOrganization.mockReset()
-    findById.mockReset()
-    findByEmail.mockReset()
-  })
-
   test('有効なPENDING招待なら招待メールでユーザー作成しトークンとUserDtoTypeを返す', async () => {
     findByToken.mockResolvedValue(pendingInvitation)
     findByEmail.mockResolvedValue(null)
@@ -184,7 +168,8 @@ describe('signupService.execute', () => {
   })
 
   test('未知の結果値はエラー側へ倒れる（fail-closed）', async () => {
-    findByToken.mockResolvedValue({ ...pendingInvitation, status: 'UNKNOWN' })
+    // 未知のstatusを作るため、このケースに限って型を迂回する
+    findByToken.mockResolvedValue({ ...pendingInvitation, status: 'UNKNOWN' } as never)
 
     await expect(signupService.execute(TOKEN, 'New Invitee', 'password123')).rejects.toThrow('この招待は利用できません')
     expect(findByEmail).not.toHaveBeenCalled()
