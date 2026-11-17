@@ -280,6 +280,7 @@ services/
 - 一つのファイル内だけで使う補助定義は、そのファイルに置きます。他レイヤーから参照されるだけの定義を機械的に `common.ts` へ移しません。
 - 個別ファイルと `index.ts` の間で循環importを作りません。
 - テストは対象ファイルに対応させます（例: `members.test.ts`）。`controllers.test.ts` のような旧来のレイヤー単位テストは各テストケースを責務別ファイルのテストへ分配し、`index.ts` 本体のケースが残る場合だけ `index.test.ts` にまとめます。型だけのファイルなどへ機械的にテストを増やさず、[docs/testing.md](docs/testing.md) に従います。
+- テスト専用の共有準備（mock factory・Route用の起動準備など）は、同じfeature／domainの同じ標準ディレクトリ直下の `testSupport.ts` に置きます（例: `features/auth/routes/testSupport.ts`）。同じ層の複数テストだけが直接importし、featureを跨いだimport、`index.ts` からの再export、製品コードからのimportは禁止します。`common.ts` は製品の共有定義用でありBun依存のhelperを置きません。helperはトップレベルで環境変更・`mock.module`・hook登録・app importを行わず、呼び出しで状態を生成・登録・復元します。`.dockerignore` で実行イメージから除外します。詳細は [docs/testing.md](docs/testing.md) に従います。
 
 #### routesの分割
 

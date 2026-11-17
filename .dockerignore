@@ -2,9 +2,10 @@
 node_modules
 src/generated
 
-# テストファイル（実行イメージへ含めない）
+# テストファイルとテスト専用helper（実行イメージへ含めない）
 **/*.test.ts
 **/*.test.js
+**/testSupport.ts
 
 # 環境変数・シークレット
 .env

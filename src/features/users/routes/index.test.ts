@@ -1,21 +1,13 @@
-import { beforeEach, describe, expect, mock, test } from 'bun:test'
+import { afterAll, afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { sign } from 'hono/jwt'
 
 import type { User } from '@/shared/user/entities'
 
-process.env.JWT_SECRET = 'test-secret'
+import { createRouteTestContext } from './testSupport'
 
-const findById = mock()
-const updateById = mock()
-const findByEmail = mock()
-const create = mock()
-const existsById = mock()
-
-await mock.module('@/shared/user/repositories', () => ({
-  userRepository: { findById, updateById, findByEmail, create, existsById },
-}))
-
-const { app } = await import('@/app')
+const context = await createRouteTestContext()
+const { app } = context
+const { findById } = context.mocks.users
 
 const user: User = {
   id: 1,
@@ -37,14 +29,17 @@ const createToken = async (userId: number): Promise<string> => {
   )
 }
 
+afterEach(() => {
+  context.assertNoUnexpectedCalls()
+})
+
+afterAll(() => {
+  context.cleanup()
+})
+
 describe('users routes', () => {
   beforeEach(() => {
-    findById.mockReset()
-    updateById.mockReset()
-    findByEmail.mockReset()
-    create.mockReset()
-    existsById.mockReset()
-    existsById.mockResolvedValue(true)
+    context.reset()
   })
 
   test('GET /users/:id は指定ユーザーの公開情報だけを返す', async () => {

@@ -5,11 +5,10 @@ import type { User } from '@/shared/user/entities'
 
 const create = mock()
 const findUnique = mock()
-const update = mock()
 
 await mock.module('@/libs/prisma', () => ({
   prisma: {
-    user: { create, findUnique, update },
+    user: { create, findUnique },
   },
 }))
 

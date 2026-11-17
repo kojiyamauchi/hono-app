@@ -24,6 +24,7 @@ description: Use before planning commits, immediately before each commit, and wh
 
 ## 作業開始時チェック
 
+- ブランチ／作業ツリーを作成する前に、`AGENTS.md` / `CLAUDE.md`「ブランチ命名」に従い、作業全体の主目的に合う名前を決めたか。
 - 今回の作業は、PR本文の作業項目に対応する単位へ分解できているか
 - APIやユースケース追加では、DTO / mapper / repository / service / schema / controller / routes / top-level route登録を混ぜず、レイヤー単位に分けているか
 - 実装コミットと対応テストコミットを隣接させる計画になっているか

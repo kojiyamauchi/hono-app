@@ -1,95 +1,44 @@
-import { beforeEach, describe, expect, mock, spyOn, test } from 'bun:test'
+import { afterAll, beforeEach, describe, expect, spyOn, test } from 'bun:test'
 
 import type { PasswordResetToken } from '@/shared/auth/entities/passwordReset'
 import type { User } from '@/shared/user/entities'
 
-// JWT発行に必要なシークレットをテスト用に設定
-process.env.JWT_SECRET = 'test-secret'
-process.env.REFRESH_TOKEN_SECRET = 'test-refresh-secret'
-process.env.PASSWORD_RESET_TOKEN_SECRET = 'test-password-reset-secret'
-process.env.EMAIL_VERIFICATION_TOKEN_SECRET = 'test-email-verification-secret'
+import {
+  createPasswordResetDelayMock,
+  createPasswordResetNotifierMock,
+  createPasswordResetTokenRepositoryMock,
+  createRefreshTokenRepositoryMock,
+  createUserRepositoryMock,
+  installPasswordResetDelayMock,
+  installPasswordResetNotifierMock,
+  installPasswordResetTokenRepositoryMock,
+  installRefreshTokenRepositoryMock,
+  installUserRepositoryMock,
+  setTestEnv,
+} from './testSupport'
 
-const createRefreshToken = mock()
-const findByTokenHash = mock()
-const revokeById = mock()
-const revokeFamily = mock()
-const rotate = mock()
-const revokeAllByUserId = mock()
-const revokeByUserIdAndFamilyId = mock()
-const changePassword = mock()
-const findActiveSessionsByUserId = mock()
+// パスワードリセットトークンとレート制限キーのHMAC化に必要なシークレットだけをテスト用に設定する
+const env = setTestEnv({ PASSWORD_RESET_TOKEN_SECRET: 'test-password-reset-secret' })
 
-const prtCreate = mock()
-const prtFindByTokenHash = mock()
-const prtDeleteByIdAndTokenHash = mock()
-const prtConfirm = mock()
-const evtFindByTokenHash = mock()
-const evtConfirm = mock()
-
-await mock.module('@/shared/auth/repositories/credential', () => ({
-  authCredentialRepository: {
-    changePassword,
-  },
-}))
-
-await mock.module('@/shared/auth/repositories/refreshToken', () => ({
-  refreshTokenRepository: {
-    create: createRefreshToken,
-    findByTokenHash,
-    revokeById,
-    revokeFamily,
-    rotate,
-    revokeAllByUserId,
-    revokeByUserIdAndFamilyId,
-    findActiveSessionsByUserId,
-  },
-}))
-
-await mock.module('@/shared/auth/repositories/passwordReset', () => ({
-  passwordResetTokenRepository: {
-    create: prtCreate,
-    findByTokenHash: prtFindByTokenHash,
-    deleteByIdAndTokenHash: prtDeleteByIdAndTokenHash,
-    confirm: prtConfirm,
-  },
-}))
-
-await mock.module('@/shared/auth/repositories/emailVerification', () => ({
-  emailVerificationTokenRepository: {
-    findByTokenHash: evtFindByTokenHash,
-    confirm: evtConfirm,
-  },
-}))
-
-// notifierをモックしてno-op実装を差し替える
-const notifierSend = mock()
-const sendEmailVerificationBestEffort = mock()
-
-// shared/auth/servicesの実装関数はそのまま使い、passwordResetNotifierとsendEmailVerificationBestEffortのみ差し替える
-const emailVerificationModule = await import('@/shared/auth/services/emailVerification')
-await mock.module('@/shared/auth/services/emailVerification', () => ({
-  ...emailVerificationModule,
-  sendEmailVerificationBestEffort,
-}))
-const passwordResetModule = await import('@/shared/auth/services/passwordReset')
-await mock.module('@/shared/auth/services/passwordReset', () => ({
-  ...passwordResetModule,
-  passwordResetNotifier: { send: notifierSend },
-}))
-
-const passwordResetRequestDelayMs = mock(() => 0)
-await mock.module('@/utils/timing', () => ({
-  passwordResetRequestDelayMs,
-}))
-
-// userRepositoryをモックし、DBに依存せずserviceのロジックを検証する
-const findByEmail = mock()
-const create = mock()
-const findById = mock()
-
-await mock.module('@/shared/user/repositories', () => ({
-  userRepository: { findByEmail, create, findById },
-}))
+const passwordResetTokens = createPasswordResetTokenRepositoryMock()
+const users = createUserRepositoryMock()
+const notifier = createPasswordResetNotifierMock()
+const delay = createPasswordResetDelayMock()
+await installPasswordResetTokenRepositoryMock(passwordResetTokens.mocks)
+await installUserRepositoryMock(users.mocks)
+// ./commonがリフレッシュトークンRepositoryを読み込むため差し替える（本テストでは呼び出さない）
+await installRefreshTokenRepositoryMock(createRefreshTokenRepositoryMock().mocks)
+await installPasswordResetNotifierMock(notifier.mocks)
+await installPasswordResetDelayMock(delay.mocks)
+const {
+  create: prtCreate,
+  findByTokenHash: prtFindByTokenHash,
+  deleteByIdAndTokenHash: prtDeleteByIdAndTokenHash,
+  confirm: prtConfirm,
+} = passwordResetTokens.mocks
+const { findByEmail } = users.mocks
+const { send: notifierSend } = notifier.mocks
+const { passwordResetRequestDelayMs } = delay.mocks
 
 const { passwordResetService, passwordResetRequestRateLimiter } = await import('./passwordReset')
 
@@ -113,27 +62,17 @@ const savedPasswordResetToken: PasswordResetToken = {
 }
 
 beforeEach(() => {
-  createRefreshToken.mockReset()
-  findByTokenHash.mockReset()
-  revokeById.mockReset()
-  revokeFamily.mockReset()
-  rotate.mockReset()
-  revokeAllByUserId.mockReset()
-  revokeByUserIdAndFamilyId.mockReset()
-  changePassword.mockReset()
-  findActiveSessionsByUserId.mockReset()
-  findById.mockReset()
-  prtCreate.mockReset()
-  prtFindByTokenHash.mockReset()
-  prtDeleteByIdAndTokenHash.mockReset()
-  prtConfirm.mockReset()
-  evtFindByTokenHash.mockReset()
-  evtConfirm.mockReset()
-  notifierSend.mockReset()
-  sendEmailVerificationBestEffort.mockReset()
-  passwordResetRequestDelayMs.mockReset()
-  passwordResetRequestDelayMs.mockImplementation(() => 0)
+  passwordResetTokens.reset()
+  users.reset()
+  notifier.reset()
+  // 待機時間は既定値（0ms）へ戻る
+  delay.reset()
+  // rate limiterは対象を読み込んだ後に同じインスタンスをresetする
   passwordResetRequestRateLimiter.reset()
+})
+
+afterAll(() => {
+  env.restore()
 })
 
 describe('passwordResetService.request', () => {

@@ -1,13 +1,12 @@
-import { beforeEach, describe, expect, mock, test } from 'bun:test'
+import { afterAll, afterEach, beforeEach, describe, expect, test } from 'bun:test'
 
-// Supabaseクライアントをモックし、DBに依存せずroutesの挙動を検証する
-const getUser = mock()
+import { createRouteTestContext, createSupabaseAuthMock } from './testSupport'
 
-await mock.module('@/libs/supabase', () => ({
-  supabase: { auth: { getUser } },
-}))
-
-const { app } = await import('@/app')
+// Supabaseクライアントはケース用mockで差し替え、DBに依存せずroutesの挙動を検証する
+const supabaseAuth = createSupabaseAuthMock()
+const context = await createRouteTestContext({ boundaryOverrides: { supabase: { supabase: { auth: supabaseAuth.mocks } } } })
+const { app } = context
+const { getUser } = supabaseAuth.mocks
 
 const supabaseUser = {
   id: '11111111-1111-4111-8111-111111111111',
@@ -18,9 +17,18 @@ const supabaseUser = {
   created_at: '2026-01-01T00:00:00.000Z',
 }
 
+afterEach(() => {
+  context.assertNoUnexpectedCalls()
+})
+
+afterAll(() => {
+  context.cleanup()
+})
+
 describe('supabaseAuth me routes', () => {
   beforeEach(() => {
-    getUser.mockReset()
+    supabaseAuth.reset()
+    context.reset()
   })
 
   test('GET /supabase-auth/me はトークンがなければ401を返す', async () => {

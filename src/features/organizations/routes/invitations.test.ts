@@ -1,108 +1,23 @@
-import { beforeEach, describe, expect, mock, test } from 'bun:test'
+import { afterAll, afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { sign } from 'hono/jwt'
 
 import type { Invitation } from '@/shared/invitation/entities'
 import type { Membership, Role } from '@/shared/membership/entities'
 
-process.env.JWT_SECRET = 'test-secret'
+import { createRouteTestContext } from './testSupport'
 
-const createWithOwner = mock()
-const findPageByUserId = mock()
-const findById = mock()
-const update = mock()
-const deleteById = mock()
-
-const findByUserAndOrganization = mock()
-const findPageByOrganization = mock()
-const membershipFindById = mock()
-const membershipCreate = mock()
-const membershipDeleteById = mock()
-
-const findByEmail = mock()
-const existsById = mock()
-
-const invitationFindPendingByOrgAndEmail = mock()
-const invitationCreate = mock()
-const invitationFindAllByOrganization = mock()
-const invitationFindById = mock()
-const invitationCancel = mock()
-const requestResend = mock()
-
-const transferOwnership = mock()
-const leaveMember = mock()
-const changeRole = mock()
-const findAuditLogPage = mock()
-const removeMember = mock()
-
-await mock.module('@/features/organizations/repositories/members', () => ({
-  membersRepository: { remove: removeMember, leave: leaveMember, changeRole: changeRole },
-  memberRemovalResults: {
-    removed: 'REMOVED',
-    organizationNotFound: 'ORGANIZATION_NOT_FOUND',
-    targetNotFound: 'TARGET_NOT_FOUND',
-    rejected: 'REJECTED',
-  },
-  memberRoleChangeResults: {
-    changed: 'CHANGED',
-    unchanged: 'UNCHANGED',
-    organizationNotFound: 'ORGANIZATION_NOT_FOUND',
-    targetNotFound: 'TARGET_NOT_FOUND',
-    rejected: 'REJECTED',
-    conflict: 'CONFLICT',
-  },
-  leaveOrganizationResults: {
-    left: 'LEFT',
-    owner: 'OWNER',
-    notMember: 'NOT_MEMBER',
-    conflict: 'CONFLICT',
-  },
-}))
-
-await mock.module('@/features/organizations/repositories/transferOwnership', () => ({
-  transferOwnershipRepository: { execute: transferOwnership },
-  ownershipTransferResults: {
-    transferred: 'TRANSFERRED',
-    targetNotFound: 'TARGET_NOT_FOUND',
-    selfTransfer: 'SELF_TRANSFER',
-    conflict: 'CONFLICT',
-  },
-}))
-
-await mock.module('@/features/organizations/repositories/auditLogs', () => ({
-  auditLogsRepository: { findPage: findAuditLogPage },
-}))
-
-await mock.module('@/shared/organization/repositories', () => ({
-  organizationRepository: { createWithOwner, findPageByUserId, findById, update, deleteById },
-}))
-await mock.module('@/shared/membership/repositories', () => ({
-  membershipRepository: {
-    findByUserAndOrganization,
-    findPageByOrganization,
-    findById: membershipFindById,
-    create: membershipCreate,
-    deleteById: membershipDeleteById,
-  },
-}))
-await mock.module('@/shared/user/repositories', () => ({
-  userRepository: { findByEmail, existsById },
-}))
-await mock.module('@/shared/invitation/repositories', () => ({
-  invitationRepository: {
-    findPendingByOrgAndEmail: invitationFindPendingByOrgAndEmail,
-    create: invitationCreate,
-    findAllByOrganization: invitationFindAllByOrganization,
-    findById: invitationFindById,
-    cancel: invitationCancel,
-  },
-}))
-
-await mock.module('@/shared/invitation/repositories/emailResend', () => ({
-  invitationEmailResendRepository: { requestResend },
-  invitationEmailResendResults: { requested: 'REQUESTED', organizationNotFound: 'ORGANIZATION_NOT_FOUND', rejected: 'REJECTED' },
-}))
-
-const { app } = await import('@/app')
+const context = await createRouteTestContext()
+const { app } = context
+const { findByUserAndOrganization } = context.mocks.memberships
+const { findByEmail } = context.mocks.users
+const {
+  findPendingByOrgAndEmail: invitationFindPendingByOrgAndEmail,
+  create: invitationCreate,
+  findAllByOrganization: invitationFindAllByOrganization,
+  findById: invitationFindById,
+  cancel: invitationCancel,
+} = context.mocks.invitations
+const { requestResend } = context.mocks.invitationEmailResend
 
 const membershipWithRole = (role: Role): Membership => ({
   id: 1,
@@ -116,32 +31,17 @@ const createToken = async (userId: number): Promise<string> => {
   return sign({ sub: userId, exp: Math.floor(Date.now() / 1000) + 60 }, 'test-secret')
 }
 
+afterEach(() => {
+  context.assertNoUnexpectedCalls()
+})
+
+afterAll(() => {
+  context.cleanup()
+})
+
 describe('organizations invitations routes', () => {
   beforeEach(() => {
-    existsById.mockReset()
-    existsById.mockResolvedValue(true)
-    createWithOwner.mockReset()
-    findPageByUserId.mockReset()
-    findById.mockReset()
-    update.mockReset()
-    deleteById.mockReset()
-    findByUserAndOrganization.mockReset()
-    findPageByOrganization.mockReset()
-    membershipFindById.mockReset()
-    membershipCreate.mockReset()
-    changeRole.mockReset()
-    removeMember.mockReset()
-    findAuditLogPage.mockReset()
-    membershipDeleteById.mockReset()
-    findByEmail.mockReset()
-    invitationFindPendingByOrgAndEmail.mockReset()
-    invitationCreate.mockReset()
-    invitationFindAllByOrganization.mockReset()
-    invitationFindById.mockReset()
-    invitationCancel.mockReset()
-    requestResend.mockReset()
-    transferOwnership.mockReset()
-    leaveMember.mockReset()
+    context.reset()
   })
 
   test('GET /organizations/:id/invitations は不正なID形式なら400を返す', async () => {
@@ -198,8 +98,10 @@ describe('organizations invitations routes', () => {
 
   test('GET /organizations/:id/invitations は既存項目を維持しemailDeliveryStatus(保存値/null)のみを追加して返す', async () => {
     findByUserAndOrganization.mockResolvedValue(membershipWithRole('ADMIN'))
+    // 保存値に含まれる内部ID(resendEmailId)がレスポンスへ漏れないことを確認するため、型にないプロパティを持たせる
+    const deliveryWithInternalId = { status: 'ACCEPTED' as const, resendEmailId: 'resend-secret' }
     invitationFindAllByOrganization.mockResolvedValue([
-      { ...invitation, id: 21, emailDelivery: { status: 'ACCEPTED', resendEmailId: 'resend-secret' } },
+      { ...invitation, id: 21, emailDelivery: deliveryWithInternalId },
       { ...invitation, id: 20, emailDelivery: null },
     ])
     const token = await createToken(1)
@@ -439,7 +341,8 @@ describe('organizations invitations routes', () => {
 
   /** repositoryがロック後の状態で段階ごとのコールバックを呼び、拒否で止まる動きを再現する。 */
   const mockLockedState = (state: Record<string, unknown> = {}): void => {
-    requestResend.mockImplementation(async (_input: unknown, callbacks: ResendCallbacks) => {
+    // 実Repositoryの厳密な状態型ではなく、判定コールバックの呼び出し順を再現する簡易実装のため、型を迂回する
+    requestResend.mockImplementation((async (_input: unknown, callbacks: ResendCallbacks) => {
       const locked = {
         operatorRole: 'OWNER',
         invitation: { role: 'MEMBER', status: 'PENDING', expiresAt: new Date(Date.now() + 60_000) } as unknown,
@@ -454,7 +357,7 @@ describe('organizations invitations routes', () => {
       if (target !== null) return rejected(target)
       const evaluation = callbacks.evaluate({ invitation: locked.invitation, delivery: locked.delivery, now: locked.now })
       return evaluation === null ? { status: 'REQUESTED' } : rejected(evaluation)
-    })
+    }) as never)
   }
 
   const postResend = async (path = '/organizations/1/invitations/20/resend-email', userId = 1): Promise<Response> => {

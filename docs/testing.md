@@ -212,6 +212,36 @@ Resend、Supabase Auth、OpenTelemetry exporterなどの外部サービスは、
 
 実配達や外部サービスの管理画面への反映は、必要に応じて手動のsmoke testで確認します。
 
+## テスト準備の共有（testSupport.ts）
+
+複数テストで複製される環境設定・mock・fixtureは、同じfeature／domainの同じ標準ディレクトリ直下の `testSupport.ts` に切り出せます。切り出しは重複の実益がある場合に限り、シナリオ固有の条件と期待値は各テストに残します。
+
+### 配置と依存
+
+- 同じ層（例: `features/auth/routes/`）の複数テストだけが直接importします。featureを跨ぐimport、`index.ts` からの再export、製品コードからのimportは禁止です（`rg -n 'testSupport' src --glob '*.ts' --glob '!**/*.test.ts' --glob '!**/testSupport.ts'` が0件であること）
+- `.dockerignore` の `**/testSupport.ts` により実行イメージへ含めません
+- 全体preloadや巨大な共通基盤は作りません。利用先が1つしかないfeature（openApiなど）はテスト内に小さな準備を置きます
+
+### 生成・登録・reset・復元
+
+- helperはトップレベルで環境変更・`mock.module`・hook登録・app importをしません。呼び出しで状態を生成します。固定データもfactory（`createXxxFixture(overrides)`）にし、可変singletonにしません
+- Service／Repository用は `createXxxRepositoryMock()` が `{ mocks, reset }` を返し、必要なら `installXxxRepositoryMock(mocks)` で登録します。mockの型は実装の型（`import type` / `typeof import(...)`）を参照し、`mock<実装の関数型>()` と、実装オブジェクトの各メソッドに同じ関数型のmockを対応させる型（`FunctionMocks<T>`）、必要に応じて `satisfies` / `Pick` で照合し、`any`やmock全体の型assertionは使いません
+- Route用は `createRouteTestContext()` をファイルのトップレベルで1回awaitし、`{ app, mocks, reset, assertNoUnexpectedCalls, cleanup }` を使います。各ファイルで `beforeEach(reset)`、`afterEach(assertNoUnexpectedCalls)`、`afterAll(cleanup)` を明記します
+- 起動準備だけが必要なテスト（OpenAPIなど）は `prepareRouteTestEnvironment({ envOverrides, boundaryOverrides })` を使い、準備後にappをdynamic importします
+- 順序は「環境値の保存とテスト値設定 → `@/libs/prisma`・`@/libs/supabase`・`@/libs/resend` の遮断とrepository mock登録 → 部分mock → appのdynamic import」です。同じspecifierを1ファイルで二度登録せず、SDKをケースで差し替える場合は `boundaryOverrides` を使います
+- 遮断stubは呼び出しを境界名・操作名だけ記録して例外を投げます。best-effortが例外を握りつぶしても `assertNoUnexpectedCalls()` が失敗させます
+- resetは所有するmockの履歴・実装を初期化し、必要な既定値を明示的に戻します。cleanupは変更した環境値だけを元に戻します
+
+### 個別実行と接続用env非依存の確認
+
+各ファイルを新しいプロセスで `bun test --isolate <file>` 実行します。Route統合テスト（`@/app` を読むテスト）は、接続用envなしでも成功する必要があります。
+
+```bash
+env -u DATABASE_URL -u DIRECT_URL -u SUPABASE_URL -u SUPABASE_PUBLISHABLE_KEY -u SUPABASE_ANON_KEY -u SUPABASE_SERVICE_ROLE_KEY -u RESEND_API_KEY -u OTEL_EXPORTER_OTLP_ENDPOINT -u OTEL_EXPORTER_OTLP_TRACES_ENDPOINT bun --no-env-file test --isolate <file>
+```
+
+複数ファイルの実行、逆順、`--randomize --seed=<n>` でも状態漏れがないことを確認します。
+
 ## 重複テストを避ける
 
 同じ条件を全レイヤーで繰り返し検証しません。

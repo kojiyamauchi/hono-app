@@ -1,49 +1,12 @@
-import { beforeEach, describe, expect, mock, test } from 'bun:test'
+import { beforeEach, describe, expect, test } from 'bun:test'
 
 import type { Invitation, InvitationWithOrganization } from '@/shared/invitation/entities'
 
-process.env.JWT_SECRET = 'test-secret'
-process.env.REFRESH_TOKEN_SECRET = 'test-refresh-secret'
+import { createInvitationRepositoryMock, installInvitationRepositoryMock } from './testSupport'
 
-const createRefreshToken = mock()
-
-await mock.module('@/shared/auth/repositories/emailVerification', () => ({
-  emailVerificationTokenRepository: { create: mock(), deleteByIdAndTokenHash: mock() },
-}))
-
-await mock.module('@/shared/auth/repositories/refreshToken', () => ({
-  refreshTokenRepository: { create: createRefreshToken },
-}))
-
-const sendEmailVerificationBestEffort = mock()
-const emailVerificationModule = await import('@/shared/auth/services/emailVerification')
-await mock.module('@/shared/auth/services/emailVerification', () => ({
-  ...emailVerificationModule,
-  sendEmailVerificationBestEffort,
-}))
-
-// repositoryをモックしDB非依存でservice層のロジックを検証する
-const findByToken = mock()
-const findByTokenWithOrganization = mock()
-const markExpired = mock()
-const accept = mock()
-const decline = mock()
-const signup = mock()
-
-const findByUserAndOrganization = mock()
-
-const findById = mock()
-const findByEmail = mock()
-
-await mock.module('@/shared/invitation/repositories', () => ({
-  invitationRepository: { findByToken, findByTokenWithOrganization, markExpired, accept, decline, signup },
-}))
-await mock.module('@/shared/membership/repositories', () => ({
-  membershipRepository: { findByUserAndOrganization },
-}))
-await mock.module('@/shared/user/repositories', () => ({
-  userRepository: { findById, findByEmail },
-}))
+const invitations = createInvitationRepositoryMock()
+await installInvitationRepositoryMock(invitations.mocks)
+const { findByTokenWithOrganization, markExpired } = invitations.mocks
 
 const { service } = await import('.')
 
@@ -75,23 +38,10 @@ const pendingInvitationWithOrg: InvitationWithOrganization = {
 }
 
 beforeEach(() => {
-  createRefreshToken.mockReset()
-  sendEmailVerificationBestEffort.mockReset()
+  invitations.reset()
 })
 
 describe('service.getDetailByToken', () => {
-  beforeEach(() => {
-    findByToken.mockReset()
-    findByTokenWithOrganization.mockReset()
-    markExpired.mockReset()
-    accept.mockReset()
-    decline.mockReset()
-    signup.mockReset()
-    findByUserAndOrganization.mockReset()
-    findById.mockReset()
-    findByEmail.mockReset()
-  })
-
   test('PENDING有効な招待をInvitationDetailDtoTypeで返す', async () => {
     findByTokenWithOrganization.mockResolvedValue(pendingInvitationWithOrg)
 

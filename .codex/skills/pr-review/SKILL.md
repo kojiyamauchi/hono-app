@@ -23,7 +23,7 @@ description: Use when reviewing a GitHub Pull Request for this repository, espec
 
 ## Workflow
 
-1. PRの対象リポジトリ、PR番号、base/head branchを確認する。
+1. PRの対象リポジトリ、PR番号、base/head branchを確認する。head branchの名前が、`AGENTS.md` / `CLAUDE.md`「ブランチ命名」とPR全体の主目的に合っているか確認する。
 2. GitHub connectorが使える場合は、PR本文、差分、コメント、レビュー状態をconnectorで取得する。
 3. PR本文の `関連Issue`、または `Closes #...` / `Fixes #...` / `Resolves #...` を確認する。
 4. 対象Issueがある場合は、レビュー前にIssue本文・コメント・受け入れ条件・完了条件・未完了TODOを取得して、PR差分が意図を満たしているか確認する。対象IssueがあるのにPR本文から参照されていない場合は指摘する。

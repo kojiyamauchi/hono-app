@@ -1,117 +1,23 @@
-import { beforeEach, describe, expect, mock, spyOn, test } from 'bun:test'
+import { afterAll, afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test'
 
-process.env.JWT_SECRET = 'test-secret'
-process.env.REFRESH_TOKEN_SECRET = 'test-refresh-secret'
-process.env.PASSWORD_RESET_TOKEN_SECRET = 'test-password-reset-secret'
-process.env.EMAIL_VERIFICATION_TOKEN_SECRET = 'test-email-verification-secret'
-process.env.ALLOWED_ORIGINS = 'http://localhost:3000'
+import { createRouteTestContext } from './testSupport'
 
-const create = mock()
-const findByTokenHash = mock()
-const revokeById = mock()
-const revokeFamily = mock()
-const rotate = mock()
-const revokeAllByUserId = mock()
-const revokeByUserIdAndFamilyId = mock()
-const changePassword = mock()
-const findActiveSessionsByUserId = mock()
-
-const prtCreate = mock()
-const prtFindByTokenHash = mock()
-const prtDeleteById = mock()
-const prtConfirm = mock()
-const evtFindByTokenHash = mock()
-const evtConfirm = mock()
-
-const findByEmail = mock()
-const findById = mock()
-const existsById = mock()
-const createUser = mock()
-
-await mock.module('@/shared/auth/repositories/credential', () => ({
-  authCredentialRepository: { changePassword },
-}))
-
-await mock.module('@/shared/auth/repositories/refreshToken', () => ({
-  refreshTokenRepository: {
-    create,
-    findByTokenHash,
-    revokeById,
-    revokeFamily,
-    rotate,
-    revokeAllByUserId,
-    revokeByUserIdAndFamilyId,
-    findActiveSessionsByUserId,
-  },
-}))
-
-await mock.module('@/shared/auth/repositories/passwordReset', () => ({
-  passwordResetTokenRepository: {
-    create: prtCreate,
-    findByTokenHash: prtFindByTokenHash,
-    deleteById: prtDeleteById,
-    confirm: prtConfirm,
-  },
-}))
-
-await mock.module('@/shared/auth/repositories/emailVerification', () => ({
-  emailVerificationTokenRepository: {
-    findByTokenHash: evtFindByTokenHash,
-    confirm: evtConfirm,
-  },
-}))
-await mock.module('@/shared/user/repositories', () => ({
-  userRepository: { findByEmail, findById, existsById, create: createUser },
-}))
-
-// notifierをモックしてno-op実装を差し替える
-const notifierSend = mock()
-const sendEmailVerificationBestEffort = mock()
-const emailVerificationModule = await import('@/shared/auth/services/emailVerification')
-await mock.module('@/shared/auth/services/emailVerification', () => ({
-  ...emailVerificationModule,
-  sendEmailVerificationBestEffort,
-}))
-const passwordResetModule = await import('@/shared/auth/services/passwordReset')
-await mock.module('@/shared/auth/services/passwordReset', () => ({
-  ...passwordResetModule,
-  passwordResetNotifier: { send: notifierSend },
-}))
-
-const passwordResetRequestDelayMs = mock(() => 0)
-await mock.module('@/utils/timing', () => ({
-  passwordResetRequestDelayMs,
-}))
-
-const { app } = await import('@/app')
+const context = await createRouteTestContext()
+const { app } = context
+const { findByEmail, create: createUser } = context.mocks.users
 const { signupRateLimiter } = await import('../services/signup')
 
 beforeEach(() => {
-  existsById.mockReset()
-  existsById.mockResolvedValue(true)
-  create.mockReset()
-  findByTokenHash.mockReset()
-  revokeById.mockReset()
-  revokeFamily.mockReset()
-  rotate.mockReset()
-  revokeAllByUserId.mockReset()
-  revokeByUserIdAndFamilyId.mockReset()
-  changePassword.mockReset()
-  findActiveSessionsByUserId.mockReset()
-  prtCreate.mockReset()
-  prtFindByTokenHash.mockReset()
-  prtDeleteById.mockReset()
-  prtConfirm.mockReset()
-  evtFindByTokenHash.mockReset()
-  evtConfirm.mockReset()
-  findByEmail.mockReset()
-  findById.mockReset()
-  createUser.mockReset()
-  notifierSend.mockReset()
-  sendEmailVerificationBestEffort.mockReset()
-  passwordResetRequestDelayMs.mockReset()
-  passwordResetRequestDelayMs.mockImplementation(() => 0)
+  context.reset()
   signupRateLimiter.reset()
+})
+
+afterEach(() => {
+  context.assertNoUnexpectedCalls()
+})
+
+afterAll(() => {
+  context.cleanup()
 })
 
 describe('POST /auth/signup（Cookie設定・レート制限）', () => {
@@ -149,14 +55,18 @@ describe('POST /auth/signup（Cookie設定・レート制限）', () => {
 
   test('POST /auth/signupは偽装した先頭IPを変えても信頼するエッジが追記した同一IPの制限を回避できない', async () => {
     findByEmail.mockResolvedValue(null)
-    createUser.mockImplementation(async (input: { name: string; email: string; password: string }) => ({
-      id: 1,
-      name: input.name,
-      email: input.email,
-      password: input.password,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    }))
+    // emailVerifiedAtを含まない既存の入力を保つため、このケースに限って型を迂回する
+    createUser.mockImplementation(
+      async (input: { name: string; email: string; password: string }) =>
+        ({
+          id: 1,
+          name: input.name,
+          email: input.email,
+          password: input.password,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }) as never,
+    )
     const infoSpy = spyOn(console, 'info').mockImplementation(() => {})
 
     try {

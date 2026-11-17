@@ -1,32 +1,14 @@
-import { beforeEach, describe, expect, mock, test } from 'bun:test'
+import { afterAll, afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { sign } from 'hono/jwt'
 
 import type { User } from '@/shared/user/entities'
 
-process.env.JWT_SECRET = 'test-secret'
+import { createRouteTestContext } from './testSupport'
 
-const findById = mock()
-const updateById = mock()
-const findByEmail = mock()
-const create = mock()
-const remove = mock()
-const existsById = mock()
-
-await mock.module('@/shared/user/repositories', () => ({
-  userRepository: { findById, updateById, findByEmail, create, existsById },
-}))
-
-await mock.module('@/features/users/repositories/me', () => ({
-  meRepository: { remove },
-  accountDeletionResults: {
-    deleted: 'DELETED',
-    notFound: 'NOT_FOUND',
-    invalidPassword: 'INVALID_PASSWORD',
-    soleOwner: 'SOLE_OWNER',
-  },
-}))
-
-const { app } = await import('@/app')
+const context = await createRouteTestContext()
+const { app } = context
+const { findById, updateById } = context.mocks.users
+const { remove } = context.mocks.me
 
 const user: User = {
   id: 1,
@@ -48,15 +30,17 @@ const createToken = async (userId: number): Promise<string> => {
   )
 }
 
+afterEach(() => {
+  context.assertNoUnexpectedCalls()
+})
+
+afterAll(() => {
+  context.cleanup()
+})
+
 describe('users me routes', () => {
   beforeEach(() => {
-    findById.mockReset()
-    updateById.mockReset()
-    findByEmail.mockReset()
-    create.mockReset()
-    remove.mockReset()
-    existsById.mockReset()
-    existsById.mockResolvedValue(true)
+    context.reset()
   })
 
   test('GET /users/me は認証済みユーザー自身の詳細情報を返す', async () => {

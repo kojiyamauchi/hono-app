@@ -6,9 +6,7 @@ import type { AppError } from '@/utils/errors'
 import { encodeMemberListCursor } from '../mappers/members'
 
 const findPageByOrganization = mock()
-const membershipFindById = mock()
 const membershipCreate = mock()
-const membershipDeleteById = mock()
 const findByUserAndOrganization = mock()
 const findByEmail = mock()
 const leaveMember = mock()
@@ -43,9 +41,7 @@ await mock.module('@/shared/membership/repositories', () => ({
   membershipRepository: {
     findByUserAndOrganization,
     findPageByOrganization,
-    findById: membershipFindById,
     create: membershipCreate,
-    deleteById: membershipDeleteById,
   },
 }))
 await mock.module('@/shared/user/repositories', () => ({
