@@ -1,12 +1,24 @@
-import { describe, expect, test } from 'bun:test'
+import { afterAll, afterEach, beforeEach, describe, expect, test } from 'bun:test'
+
+import { prepareRouteTestEnvironment } from './testSupport'
 
 // registerOpenApiRoutes は登録時に ENABLE_API_DOCS を評価するため、app import より前に有効化する。
-process.env.ENABLE_API_DOCS = 'true'
-process.env.JWT_SECRET = 'test-secret'
-process.env.REFRESH_TOKEN_SECRET = 'test-refresh-secret'
-process.env.PASSWORD_RESET_TOKEN_SECRET = 'test-password-reset-secret'
-
+const environment = await prepareRouteTestEnvironment({ envOverrides: { ENABLE_API_DOCS: 'true' } })
 const { app } = await import('@/app')
+// 起動時の呼び出し記録をケース前のresetで消さないよう、import直後に検査する
+environment.assertNoUnexpectedCalls()
+
+beforeEach(() => {
+  environment.resetUnexpectedCalls()
+})
+
+afterEach(() => {
+  environment.assertNoUnexpectedCalls()
+})
+
+afterAll(() => {
+  environment.cleanup()
+})
 
 /** OpenAPI JSON（/open-api/doc）を取得してパースする。 */
 const fetchOpenApiDoc = async (): Promise<{
