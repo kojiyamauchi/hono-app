@@ -10,7 +10,7 @@ await mock.module('@/shared/user/repositories', () => ({
   userRepository: { findById, updateById },
 }))
 
-await mock.module('../repositories/me', () => ({
+await mock.module('../../repositories/me', () => ({
   meRepository: { remove },
   accountDeletionResults: {
     deleted: 'DELETED',
@@ -20,7 +20,7 @@ await mock.module('../repositories/me', () => ({
   },
 }))
 
-const { meService } = await import('./me')
+const { meService } = await import('../me')
 
 const user: User = {
   id: 1,

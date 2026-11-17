@@ -8,7 +8,7 @@ await mock.module('@/shared/user/repositories', () => ({
   userRepository: { findById },
 }))
 
-const { service } = await import('.')
+const { service } = await import('..')
 
 const user: User = {
   id: 1,
