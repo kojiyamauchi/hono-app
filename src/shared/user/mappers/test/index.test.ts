@@ -3,7 +3,7 @@ import { describe, expect, test } from 'bun:test'
 import { publicUserDto, userDto } from '@/shared/user/dtos'
 import type { User } from '@/shared/user/entities'
 
-import { toPublicUserResponse, toUserResponse } from '.'
+import { toPublicUserResponse, toUserResponse } from '..'
 
 const user: User = {
   id: 1,
