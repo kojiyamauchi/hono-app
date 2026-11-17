@@ -31,6 +31,10 @@ beforeEach(() => {
 afterAll(() => {
   // 未検査の記録がなければ検査に成功し、環境値を復元する
   context.cleanup()
+  // cleanupは環境値を元の存在・値へ戻す（テスト順に依存しないようafterAllで検証する）
+  expect(process.env[sentinelKey]).toBe('sentinel-before-context')
+  expect(process.env.JWT_SECRET).toBe(jwtSecretBefore)
+  expect(process.env.EMAIL_VERIFICATION_TOKEN_SECRET).toBe('sentinel-email-verification')
   delete process.env[sentinelKey]
   if (emailVerificationSecretBefore === undefined) delete process.env.EMAIL_VERIFICATION_TOKEN_SECRET
   else process.env.EMAIL_VERIFICATION_TOKEN_SECRET = emailVerificationSecretBefore
@@ -115,13 +119,5 @@ describe('testSupport（invitations Route用helper）', () => {
     expect(() => context.assertNoUnexpectedCalls()).toThrow('resend.deliverResendEmail')
 
     context.reset()
-  })
-
-  test('cleanupは環境値を元の存在・値へ戻す（最後に実行する）', () => {
-    context.cleanup()
-
-    expect(process.env[sentinelKey]).toBe('sentinel-before-context')
-    expect(process.env.JWT_SECRET).toBe(jwtSecretBefore)
-    expect(process.env.EMAIL_VERIFICATION_TOKEN_SECRET).toBe('sentinel-email-verification')
   })
 })
