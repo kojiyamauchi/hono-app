@@ -2,7 +2,8 @@
 node_modules
 src/generated
 
-# テストファイルとテスト専用helper（実行イメージへ含めない）
+# テスト専用ディレクトリ・ファイル・helper・fixture（実行イメージへ含めない）
+**/test
 **/*.test.ts
 **/*.test.js
 **/testSupport.ts
