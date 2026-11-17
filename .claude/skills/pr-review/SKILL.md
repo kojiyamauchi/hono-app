@@ -30,6 +30,7 @@ gh pr view <PR番号またはURL>
 ```
 
 - PRのタイトル、説明、作成者、変更ファイル数などを確認
+- PR番号、base/head branch、HEAD SHAを確認し、head branchの名前が `AGENTS.md` / `CLAUDE.md`「ブランチ命名」とPR全体の主目的に合っているか確認する。
 
 ### 2. CI状態の確認
 
