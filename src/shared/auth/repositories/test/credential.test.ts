@@ -15,7 +15,7 @@ await mock.module('@/libs/prisma', () => ({
   },
 }))
 
-const { authCredentialRepository } = await import('./credential')
+const { authCredentialRepository } = await import('../credential')
 
 beforeEach(() => {
   transaction.mockClear()

@@ -29,7 +29,7 @@ await mock.module('@/libs/prisma', () => ({
   },
 }))
 
-const { passwordResetTokenRepository } = await import('./passwordReset')
+const { passwordResetTokenRepository } = await import('../passwordReset')
 
 const expiresAt = new Date('2026-07-01T00:00:00.000Z')
 const createdAt = new Date('2026-06-18T00:00:00.000Z')

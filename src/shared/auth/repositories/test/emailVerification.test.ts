@@ -25,7 +25,7 @@ await mock.module('@/libs/prisma', () => ({
   },
 }))
 
-const { emailVerificationTokenRepository } = await import('./emailVerification')
+const { emailVerificationTokenRepository } = await import('../emailVerification')
 
 const expiresAt = new Date('2026-07-01T00:00:00.000Z')
 const createdAt = new Date('2026-06-18T00:00:00.000Z')
