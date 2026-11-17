@@ -4,7 +4,7 @@ import type { ContentfulStatusCode } from 'hono/utils/http-status'
 
 import { AppError } from '@/utils/errors'
 
-const { originMiddleware } = await import('.')
+const { originMiddleware } = await import('..')
 
 /**
  * テスト用アプリ: originMiddlewareを経由してHello worldを返す。
