@@ -225,7 +225,7 @@ Resend、Supabase Auth、OpenTelemetry exporterなどの外部サービスは、
 ### 生成・登録・reset・復元
 
 - helperはトップレベルで環境変更・`mock.module`・hook登録・app importをしません。呼び出しで状態を生成します。固定データもfactory（`createXxxFixture(overrides)`）にし、可変singletonにしません
-- Service／Repository用は `createXxxRepositoryMock()` が `{ mocks, reset }` を返し、必要なら `installXxxRepositoryMock(mocks)` で登録します。mockの型は実装の型（`import type` / `typeof import(...)`）と `satisfies` で照合し、`any`やmock全体の型assertionは使いません
+- Service／Repository用は `createXxxRepositoryMock()` が `{ mocks, reset }` を返し、必要なら `installXxxRepositoryMock(mocks)` で登録します。mockの型は実装の型（`import type` / `typeof import(...)`）を参照し、`mock<実装の関数型>()` と、実装オブジェクトの各メソッドに同じ関数型のmockを対応させる型（`FunctionMocks<T>`）、必要に応じて `satisfies` / `Pick` で照合し、`any`やmock全体の型assertionは使いません
 - Route用は `createRouteTestContext()` をファイルのトップレベルで1回awaitし、`{ app, mocks, reset, assertNoUnexpectedCalls, cleanup }` を使います。各ファイルで `beforeEach(reset)`、`afterEach(assertNoUnexpectedCalls)`、`afterAll(cleanup)` を明記します
 - 起動準備だけが必要なテスト（OpenAPIなど）は `prepareRouteTestEnvironment({ envOverrides, boundaryOverrides })` を使い、準備後にappをdynamic importします
 - 順序は「環境値の保存とテスト値設定 → `@/libs/prisma`・`@/libs/supabase`・`@/libs/resend` の遮断とrepository mock登録 → 部分mock → appのdynamic import」です。同じspecifierを1ファイルで二度登録せず、SDKをケースで差し替える場合は `boundaryOverrides` を使います
