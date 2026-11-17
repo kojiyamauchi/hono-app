@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { imagePath, imagePlan, newDigest, oldDigest } from './gcp-cd-fixtures.js'
-import { createDeployment, execute } from './gcp-cd.mjs'
+import { createDeployment, execute } from '../gcp-cd.mjs'
 
 const sha = 'd'.repeat(40)
 let directory

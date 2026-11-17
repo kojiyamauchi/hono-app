@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { assertDeploymentPlan } from './gcp-cd-policy.mjs'
+import { assertDeploymentPlan } from '../gcp-cd-policy.mjs'
 import { imagePath, imagePlan, newDigest } from './gcp-cd-fixtures.js'
 
 /** 実測と同じ、対象Registryの更新日時だけが変わるdriftを作る。 */

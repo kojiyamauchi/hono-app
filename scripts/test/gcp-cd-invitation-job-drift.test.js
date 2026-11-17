@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { assertDeploymentPlan } from './gcp-cd-policy.mjs'
+import { assertDeploymentPlan } from '../gcp-cd-policy.mjs'
 
 import { imagePath, imagePlan, newDigest } from './gcp-cd-fixtures.js'
 

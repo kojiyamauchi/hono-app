@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { assertDatabaseUrl, assertDeploymentPlan, obsoleteReleaseTags, pendingMigrations } from './gcp-cd-policy.mjs'
+import { assertDatabaseUrl, assertDeploymentPlan, obsoleteReleaseTags, pendingMigrations } from '../gcp-cd-policy.mjs'
 
 import { imagePath, imagePlan, newDigest, oldDigest } from './gcp-cd-fixtures.js'
 
