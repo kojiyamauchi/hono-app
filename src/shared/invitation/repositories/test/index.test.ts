@@ -15,7 +15,7 @@ await mock.module('@/libs/prisma', () => ({
   prisma: { $transaction: transaction, invitation: { findMany: invitationFindMany } },
 }))
 
-const { invitationRepository } = await import('.')
+const { invitationRepository } = await import('..')
 
 const membership: Membership = { id: 5, userId: 2, organizationId: 1, role: 'MEMBER', createdAt: new Date('2026-01-01T00:00:00.000Z') }
 const user: User = {

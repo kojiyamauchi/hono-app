@@ -9,7 +9,7 @@ const transaction = mock()
 
 await mock.module('@/libs/prisma', () => ({ prisma: { $transaction: transaction } }))
 
-const { invitationEmailResendRepository, invitationEmailResendResults } = await import('./emailResend')
+const { invitationEmailResendRepository, invitationEmailResendResults } = await import('../emailResend')
 
 const snapshot = { fromEmail: 'noreply@example.com', scalarUrl: 'https://example.com/open-api/scalar', templateVersion: 1 }
 const input = { organizationId: 1, invitationId: 7, actorUserId: 3, snapshot }
