@@ -22,8 +22,8 @@ await mock.module('@/libs/resend', () => ({
 }))
 
 const { EMAIL_VERIFICATION_TOKEN_TTL_MS, emailVerificationNotifier, hashEmailVerificationToken, issueEmailVerificationToken, sendEmailVerificationBestEffort } =
-  await import('./emailVerification')
-const { hashPasswordResetToken } = await import('./passwordReset')
+  await import('../emailVerification')
+const { hashPasswordResetToken } = await import('../passwordReset')
 
 describe('メールアドレス検証トークン', () => {
   test('専用鍵を使って同じtokenから同じHMACを生成する', () => {

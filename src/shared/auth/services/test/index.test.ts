@@ -1,12 +1,12 @@
 import { describe, expect, test } from 'bun:test'
 import { decode } from 'hono/jwt'
 
-import { REFRESH_TOKEN_TTL_MS } from './common'
+import { REFRESH_TOKEN_TTL_MS } from '../common'
 
 process.env.JWT_SECRET = 'test-jwt-secret'
 process.env.REFRESH_TOKEN_SECRET = 'test-refresh-secret'
 
-const { ACCESS_TOKEN_TTL_SECONDS, hashRefreshToken, issueAuthToken, issueRefreshToken } = await import('.')
+const { ACCESS_TOKEN_TTL_SECONDS, hashRefreshToken, issueAuthToken, issueRefreshToken } = await import('..')
 
 describe('issueAuthToken', () => {
   test('15分後に期限切れになるアクセストークンを発行する', async () => {

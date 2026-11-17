@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from 'bun:test'
 
-import { createScalarAuthEmail } from './scalarEmail'
+import { createScalarAuthEmail } from '../scalarEmail'
 
 const originalMode = process.env.AUTH_EMAIL_MODE
 const params = { url: 'https://example.run.app/open-api/scalar', token: 'verification-token', endpoint: '/auth/email-verification/confirm', ttlHours: 24 }

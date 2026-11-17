@@ -13,8 +13,8 @@ await mock.module('@/libs/resend', () => ({
   sendResendEmail,
 }))
 
-const { hashRefreshToken } = await import('.')
-const { hashPasswordResetToken, issuePasswordResetToken, PASSWORD_RESET_TOKEN_TTL_MS, passwordResetNotifier } = await import('./passwordReset')
+const { hashRefreshToken } = await import('..')
+const { hashPasswordResetToken, issuePasswordResetToken, PASSWORD_RESET_TOKEN_TTL_MS, passwordResetNotifier } = await import('../passwordReset')
 
 describe('hashPasswordResetToken', () => {
   test('同じtoken/secretで同じHMAC、異なるtokenで異なるHMACを生成する', () => {
