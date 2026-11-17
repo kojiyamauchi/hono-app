@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { PASSWORD_RESET_JITTER_MAX_MS, PASSWORD_RESET_MIN_DELAY_MS, passwordResetRequestDelayMs } from '.'
+import { PASSWORD_RESET_JITTER_MAX_MS, PASSWORD_RESET_MIN_DELAY_MS, passwordResetRequestDelayMs } from '..'
 
 describe('passwordResetRequestDelayMs', () => {
   test('経過時間が最低応答時間未満のとき、残り時間＋ジッターを返す', () => {
