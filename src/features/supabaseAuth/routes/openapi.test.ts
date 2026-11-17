@@ -4,9 +4,20 @@ import { prepareRouteTestEnvironment } from './testSupport'
 
 // registerOpenApiRoutes は登録時に ENABLE_API_DOCS を評価するため、app import より前に有効化する。
 const environment = await prepareRouteTestEnvironment({ envOverrides: { ENABLE_API_DOCS: 'true' } })
-const { app } = await import('@/app')
-// 起動時の呼び出し記録をケース前のresetで消さないよう、import直後に検査する
-environment.assertNoUnexpectedCalls()
+let app: Awaited<typeof import('@/app')>['app']
+try {
+  ;({ app } = await import('@/app'))
+  // 起動時の呼び出し記録をケース前のresetで消さないよう、import直後に検査する
+  environment.assertNoUnexpectedCalls()
+} catch (error) {
+  // afterAllを登録する前に失敗しても環境値を必ず復元し、元の例外を保持して投げ直す
+  try {
+    environment.cleanup()
+  } catch {
+    // cleanup側の検査例外で元の例外を上書きしない
+  }
+  throw error
+}
 
 beforeEach(() => {
   environment.resetUnexpectedCalls()
