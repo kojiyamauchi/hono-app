@@ -43,9 +43,9 @@ const resetAll = (mocks: Record<string, { mockReset: () => unknown }>): void => 
  */
 const routeTestEnvDefaults: Record<string, string | undefined> = {
   JWT_SECRET: 'test-secret',
-  REFRESH_TOKEN_SECRET: 'test-refresh-secret',
-  PASSWORD_RESET_TOKEN_SECRET: 'test-password-reset-secret',
-  EMAIL_VERIFICATION_TOKEN_SECRET: 'test-email-verification-secret',
+  REFRESH_TOKEN_SECRET: undefined,
+  PASSWORD_RESET_TOKEN_SECRET: undefined,
+  EMAIL_VERIFICATION_TOKEN_SECRET: undefined,
   ALLOWED_ORIGINS: 'http://localhost:3000',
   ENABLE_INVITATION_EMAIL: undefined,
   ENABLE_API_DOCS: undefined,
