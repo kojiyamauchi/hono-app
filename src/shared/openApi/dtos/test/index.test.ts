@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { errorResponseDto } from '.'
+import { errorResponseDto } from '..'
 
 describe('errorResponseDto', () => {
   test('統一エラー形式 { error: { message } } をparseできる', () => {
