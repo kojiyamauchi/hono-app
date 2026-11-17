@@ -12,7 +12,7 @@ await mock.module('@/libs/prisma', () => ({
   },
 }))
 
-const { userRepository } = await import('.')
+const { userRepository } = await import('..')
 
 const createdAt = new Date('2026-06-18T00:00:00.000Z')
 const input = {
