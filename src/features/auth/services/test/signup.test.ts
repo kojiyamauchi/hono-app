@@ -27,7 +27,7 @@ const { create: createRefreshToken } = refreshTokens.mocks
 const { findByEmail, create } = users.mocks
 const { sendEmailVerificationBestEffort } = emailVerificationService.mocks
 
-const { signupService, signupRateLimiter, SIGNUP_IP_RATE_LIMIT } = await import('./signup')
+const { signupService, signupRateLimiter, SIGNUP_IP_RATE_LIMIT } = await import('../signup')
 
 beforeEach(() => {
   refreshTokens.reset()

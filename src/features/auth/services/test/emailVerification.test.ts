@@ -27,7 +27,7 @@ const { findById } = users.mocks
 const { sendEmailVerificationBestEffort } = emailVerificationNotifier.mocks
 
 const { emailVerificationService, emailVerificationRequestRateLimiter, EMAIL_VERIFICATION_USER_RATE_LIMIT, EMAIL_VERIFICATION_USER_RATE_LIMIT_WINDOW_MS } =
-  await import('./emailVerification')
+  await import('../emailVerification')
 
 const user: User = {
   id: 1,

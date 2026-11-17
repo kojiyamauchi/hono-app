@@ -11,7 +11,7 @@ await installUserRepositoryMock(users.mocks)
 const { changePassword } = credentials.mocks
 const { findById } = users.mocks
 
-const { changePasswordService } = await import('./changePassword')
+const { changePasswordService } = await import('../changePassword')
 
 const user: User = {
   id: 1,

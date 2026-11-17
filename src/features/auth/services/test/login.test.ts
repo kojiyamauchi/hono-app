@@ -29,8 +29,8 @@ const { create: createRefreshToken } = refreshTokens.mocks
 const { findByEmail } = users.mocks
 
 const { loginService, loginRateLimiter, LOGIN_IP_RATE_LIMIT, LOGIN_IP_RATE_LIMIT_WINDOW_MS, LOGIN_EMAIL_RATE_LIMIT, LOGIN_EMAIL_RATE_LIMIT_WINDOW_MS } =
-  await import('./login')
-const { SIGNUP_IP_RATE_LIMIT, SIGNUP_IP_RATE_LIMIT_WINDOW_MS } = await import('./signup')
+  await import('../login')
+const { SIGNUP_IP_RATE_LIMIT, SIGNUP_IP_RATE_LIMIT_WINDOW_MS } = await import('../signup')
 
 const user: User = {
   id: 1,

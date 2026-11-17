@@ -6,7 +6,7 @@ const refreshTokens = createRefreshTokenRepositoryMock()
 await installRefreshTokenRepositoryMock(refreshTokens.mocks)
 const { findActiveSessionsByUserId, revokeByUserIdAndFamilyId } = refreshTokens.mocks
 
-const { sessionsService } = await import('./sessions')
+const { sessionsService } = await import('../sessions')
 
 beforeEach(() => {
   refreshTokens.reset()

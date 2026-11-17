@@ -21,7 +21,7 @@ await installUserRepositoryMock(users.mocks)
 const { findByTokenHash, revokeById, revokeFamily, rotate } = refreshTokens.mocks
 const { findById } = users.mocks
 
-const { refreshService } = await import('./refresh')
+const { refreshService } = await import('../refresh')
 
 const user: User = {
   id: 1,

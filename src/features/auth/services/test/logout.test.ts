@@ -11,7 +11,7 @@ const refreshTokens = createRefreshTokenRepositoryMock()
 await installRefreshTokenRepositoryMock(refreshTokens.mocks)
 const { findByTokenHash, revokeFamily } = refreshTokens.mocks
 
-const { logoutService } = await import('./logout')
+const { logoutService } = await import('../logout')
 
 const refreshToken: RefreshToken = {
   id: 10,

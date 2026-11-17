@@ -6,7 +6,7 @@ const refreshTokens = createRefreshTokenRepositoryMock()
 await installRefreshTokenRepositoryMock(refreshTokens.mocks)
 const { revokeAllByUserId } = refreshTokens.mocks
 
-const { logoutAllService } = await import('./logoutAll')
+const { logoutAllService } = await import('../logoutAll')
 
 beforeEach(() => {
   refreshTokens.reset()

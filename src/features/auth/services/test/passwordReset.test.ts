@@ -40,7 +40,7 @@ const { findByEmail } = users.mocks
 const { send: notifierSend } = notifier.mocks
 const { passwordResetRequestDelayMs } = delay.mocks
 
-const { passwordResetService, passwordResetRequestRateLimiter } = await import('./passwordReset')
+const { passwordResetService, passwordResetRequestRateLimiter } = await import('../passwordReset')
 
 const user: User = {
   id: 1,
