@@ -13,7 +13,7 @@ await mock.module('@/libs/prisma', () => ({
   prisma: { $transaction: transaction, membership: { deleteMany, findUnique } },
 }))
 
-const { leaveOrganizationResults, memberRemovalResults, memberRoleChangeResults, membersRepository } = await import('./members')
+const { leaveOrganizationResults, memberRemovalResults, memberRoleChangeResults, membersRepository } = await import('../members')
 
 type MembershipRow = {
   id: number

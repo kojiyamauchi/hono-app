@@ -8,7 +8,7 @@ await mock.module('@/libs/prisma', () => ({
   prisma: { $queryRaw: queryRaw },
 }))
 
-const { auditLogsRepository } = await import('./auditLogs')
+const { auditLogsRepository } = await import('../auditLogs')
 
 describe('auditLogsRepository.findPage', () => {
   const createdAt = new Date('2026-01-01T00:00:00.000Z')

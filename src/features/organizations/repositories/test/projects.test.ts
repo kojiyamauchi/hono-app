@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, mock, test } from 'bun:test'
 import type { Prisma } from '@/generated/prisma/client'
 import type { Role } from '@/shared/membership/entities'
 
-import type { Project } from '../entities/projects'
+import type { Project } from '../../entities/projects'
 
 const queryRaw = mock()
 const pageQueryRaw = mock()
@@ -18,7 +18,7 @@ await mock.module('@/libs/prisma', () => ({
   prisma: { $transaction: transaction, $queryRaw: pageQueryRaw, project: { findFirst: projectFindFirst } },
 }))
 
-const { projectsRepository, projectWriteResults } = await import('./projects')
+const { projectsRepository, projectWriteResults } = await import('../projects')
 
 const project: Project = {
   id: 7,

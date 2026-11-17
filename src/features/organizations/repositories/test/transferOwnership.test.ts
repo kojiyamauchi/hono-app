@@ -11,7 +11,7 @@ await mock.module('@/libs/prisma', () => ({
   prisma: { $transaction: transaction },
 }))
 
-const { ownershipTransferResults, transferOwnershipRepository } = await import('./transferOwnership')
+const { ownershipTransferResults, transferOwnershipRepository } = await import('../transferOwnership')
 
 type MembershipRow = {
   id: number
