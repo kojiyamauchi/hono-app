@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { bodySchema } from './signup'
+import { bodySchema } from '../signup'
 
 describe('bodySchema', () => {
   test('正しいトークン・名前・パスワードを受け付ける', () => {

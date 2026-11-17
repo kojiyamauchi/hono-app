@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { bodySchema } from './decline'
+import { bodySchema } from '../decline'
 
 describe('bodySchema', () => {
   test('正しいトークンを受け付ける', () => {
