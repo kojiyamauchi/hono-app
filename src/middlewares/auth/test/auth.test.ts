@@ -11,7 +11,7 @@ await mock.module('@/shared/user/repositories', () => ({
   userRepository: { existsById },
 }))
 
-const { authMiddleware } = await import('.')
+const { authMiddleware } = await import('..')
 
 const JWT_SECRET = 'test-secret'
 
