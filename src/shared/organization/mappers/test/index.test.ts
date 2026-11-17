@@ -3,7 +3,7 @@ import { describe, expect, test } from 'bun:test'
 import { organizationDto } from '@/shared/organization/dtos'
 import type { Organization } from '@/shared/organization/entities'
 
-import { toOrganizationResponse } from '.'
+import { toOrganizationResponse } from '..'
 
 const organization: Organization = {
   id: 1,
