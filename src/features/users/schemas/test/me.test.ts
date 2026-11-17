@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { removeBodySchema, updateBodySchema } from './me'
+import { removeBodySchema, updateBodySchema } from '../me'
 
 describe('updateBodySchema', () => {
   test('正しい入力を受け付ける', () => {
