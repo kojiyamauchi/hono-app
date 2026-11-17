@@ -2,7 +2,7 @@ import { SpanStatusCode } from '@opentelemetry/api'
 import { BasicTracerProvider, InMemorySpanExporter } from '@opentelemetry/sdk-trace-base'
 import { expect, test } from 'bun:test'
 
-import { RedactingSpanProcessor } from './spanProcessor'
+import { RedactingSpanProcessor } from '../spanProcessor'
 
 test('外部送信するspanから機微な値を除き、処理の識別情報と結果を残す', async () => {
   const exporter = new InMemorySpanExporter()

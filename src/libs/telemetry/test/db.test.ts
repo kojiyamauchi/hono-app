@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { createDatabaseSpanInstrumentations } from './db'
+import { createDatabaseSpanInstrumentations } from '../db'
 
 describe('createDatabaseSpanInstrumentations', () => {
   test('Prisma adapter-pg経由のDB spanをpg instrumentationで計測する', () => {

@@ -3,7 +3,7 @@ import { AsyncLocalStorageContextManager } from '@opentelemetry/context-async-ho
 import { BasicTracerProvider, InMemorySpanExporter, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base'
 import { afterEach, describe, expect, test } from 'bun:test'
 
-import { resolveExternalApiHost, resolveExternalApiStatusCode, traceExternalApiCall } from './external'
+import { resolveExternalApiHost, resolveExternalApiStatusCode, traceExternalApiCall } from '../external'
 
 const createExternalApiSpanTest = (): {
   contextManager: AsyncLocalStorageContextManager

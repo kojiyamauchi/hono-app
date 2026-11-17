@@ -4,7 +4,7 @@ import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-proto'
 import type { Instrumentation } from '@opentelemetry/instrumentation'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 
-import { initializeTelemetry, parseOtelHeaders, resetTelemetryForTest, resolveSamplingRatio, resolveTelemetryConfig } from './index'
+import { initializeTelemetry, parseOtelHeaders, resetTelemetryForTest, resolveSamplingRatio, resolveTelemetryConfig } from '../index'
 
 type Dependencies = Parameters<typeof initializeTelemetry>[1]
 

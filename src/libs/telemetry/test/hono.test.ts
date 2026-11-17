@@ -3,7 +3,7 @@ import { BasicTracerProvider, InMemorySpanExporter, SimpleSpanProcessor } from '
 import { describe, expect, test } from 'bun:test'
 import { Hono } from 'hono'
 
-import { createHttpRequestTracingMiddleware } from './hono'
+import { createHttpRequestTracingMiddleware } from '../hono'
 
 const createTelemetryTestApp = (): {
   app: Hono
