@@ -1,26 +1,46 @@
 import { afterAll, beforeEach, describe, expect, test } from 'bun:test'
 
+import type { RouteTestContext } from './testSupport'
 import { createRouteTestContext } from './testSupport'
 
-// context生成前の環境値。helperが既定値で上書きし、cleanupで元へ戻すことを確認する。
+// helperが既定値で上書きする環境値の復元は、helperのcleanupの責務。
+// 一方、このテスト自身が設定する環境値（sentinel）は、元の存在・値を保存してfinallyで戻す責務をテスト側が持つ。
 // （helper検証ではappを同一ファイルで複数回組み立てないため、contextはこのファイルで1回だけ生成する）
 const sentinelKey = 'ENABLE_API_DOCS'
+const originalTestOwnedEnv = new Map([[sentinelKey, process.env[sentinelKey]]])
+const restoreTestOwnedEnv = (): void => {
+  for (const [key, original] of originalTestOwnedEnv) {
+    if (original === undefined) delete process.env[key]
+    else process.env[key] = original
+  }
+}
 const jwtSecretBefore = process.env.JWT_SECRET
 process.env[sentinelKey] = 'sentinel-before-context'
 
-const context = await createRouteTestContext()
+let context: RouteTestContext
+try {
+  context = await createRouteTestContext()
+} catch (error) {
+  // context生成に失敗してもテスト側が変更した環境値を戻す
+  restoreTestOwnedEnv()
+  throw error
+}
 
 beforeEach(() => {
   context.reset()
 })
 
 afterAll(() => {
-  // 未検査の記録がなければ検査に成功し、環境値を復元する
-  context.cleanup()
-  // cleanupは環境値を元の存在・値へ戻す（テスト順に依存しないようafterAllで検証する）
-  expect(process.env[sentinelKey]).toBe('sentinel-before-context')
-  expect(process.env.JWT_SECRET).toBe(jwtSecretBefore)
-  delete process.env[sentinelKey]
+  try {
+    // 未検査の記録がなければ検査に成功し、helperが環境値を復元する
+    context.cleanup()
+    // cleanupは環境値を元の存在・値へ戻す（テスト順に依存しないようafterAllで検証する）
+    expect(process.env[sentinelKey]).toBe('sentinel-before-context')
+    expect(process.env.JWT_SECRET).toBe(jwtSecretBefore)
+  } finally {
+    // cleanupや復元assertが失敗しても、テスト側が変更した環境値を元の存在・値へ戻す
+    restoreTestOwnedEnv()
+  }
 })
 
 describe('testSupport（organizations Route用helper）', () => {
