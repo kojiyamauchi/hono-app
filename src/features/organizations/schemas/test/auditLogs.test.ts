@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 
-import { collectionParamSchema, cursorPayloadSchema, listQuerySchema } from './auditLogs'
-import { idParamSchema, POSTGRES_INT_MAX } from './common'
+import { collectionParamSchema, cursorPayloadSchema, listQuerySchema } from '../auditLogs'
+import { idParamSchema, POSTGRES_INT_MAX } from '../common'
 
 describe('collectionParamSchema', () => {
   test('数値文字列のIDをnumberへ変換する', () => {

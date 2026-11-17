@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { createSchema, listMineQuerySchema, updateSchema } from '.'
+import { createSchema, listMineQuerySchema, updateSchema } from '..'
 
 describe('createSchema', () => {
   test('正しい入力を受け付ける', () => {

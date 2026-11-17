@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 
-import { POSTGRES_INT_MAX } from './common'
-import { collectionParamSchema, createBodySchema, cursorPayloadSchema, itemParamSchema, listQuerySchema, updateBodySchema } from './projects'
+import { POSTGRES_INT_MAX } from '../common'
+import { collectionParamSchema, createBodySchema, cursorPayloadSchema, itemParamSchema, listQuerySchema, updateBodySchema } from '../projects'
 
 describe('collectionParamSchema / itemParamSchema', () => {
   test('1以上INTEGER上限以下の整数を受け付け、数値へ変換する', () => {

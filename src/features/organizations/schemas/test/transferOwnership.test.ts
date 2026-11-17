@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { bodySchema } from './transferOwnership'
+import { bodySchema } from '../transferOwnership'
 
 describe('bodySchema', () => {
   test('正の整数のmembershipIdを受け付ける', () => {

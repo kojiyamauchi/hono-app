@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { idParamSchema } from './common'
+import { idParamSchema } from '../common'
 
 describe('idParamSchema', () => {
   test('数値文字列のIDをnumberへ変換する', () => {

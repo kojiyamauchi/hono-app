@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { createBodySchema, itemParamSchema } from './invitations'
+import { createBodySchema, itemParamSchema } from '../invitations'
 
 describe('createBodySchema', () => {
   test('MEMBERロールを受け付ける', () => {

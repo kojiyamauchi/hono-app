@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { addBodySchema, itemParamSchema, listQuerySchema, updateRoleBodySchema } from './members'
+import { addBodySchema, itemParamSchema, listQuerySchema, updateRoleBodySchema } from '../members'
 
 describe('addBodySchema', () => {
   test('正しい入力を受け付ける', () => {
