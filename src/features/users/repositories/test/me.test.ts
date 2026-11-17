@@ -15,7 +15,7 @@ await mock.module('@/libs/prisma', () => ({
   prisma: { $transaction: transaction },
 }))
 
-const { meRepository, accountDeletionResults } = await import('./me')
+const { meRepository, accountDeletionResults } = await import('../me')
 
 describe('meRepository.remove', () => {
   beforeEach(() => {
