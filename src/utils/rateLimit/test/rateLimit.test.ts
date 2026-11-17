@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { createInMemoryRateLimiter } from '.'
+import { createInMemoryRateLimiter } from '..'
 
 describe('createInMemoryRateLimiter', () => {
   test('閾値未満なら許可し、残り回数を返す', () => {
