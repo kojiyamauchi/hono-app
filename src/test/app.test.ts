@@ -7,7 +7,7 @@ process.env.ALLOWED_ORIGINS = 'http://localhost:3000'
 // 共通ルートのOpenAPI反映を検証するため、app import前にドキュメント公開を有効化する
 process.env.ENABLE_API_DOCS = 'true'
 
-const { app } = await import('./app')
+const { app } = await import('../app')
 
 describe('GET /health', () => {
   test('正常状態を返す', async () => {
