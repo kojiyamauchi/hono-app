@@ -4,12 +4,9 @@ import type { ContentfulStatusCode } from 'hono/utils/http-status'
 
 import { AppError } from '@/utils/errors'
 
-process.env.JWT_SECRET = 'test-secret'
-process.env.REFRESH_TOKEN_SECRET = 'test-refresh-secret'
-
 const requestPasswordReset = mock()
 
-await mock.module('../services/passwordReset', () => ({ passwordResetService: { request: requestPasswordReset, confirm: mock() } }))
+await mock.module('../services/passwordReset', () => ({ passwordResetService: { request: requestPasswordReset } }))
 
 const { passwordResetController } = await import('./passwordReset')
 
