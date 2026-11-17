@@ -12,7 +12,7 @@ await mock.module('@/shared/organization/repositories', () => ({
   organizationRepository: { createWithOwner, findPageByUserId, findById, update, deleteById },
 }))
 
-const { service } = await import('.')
+const { service } = await import('..')
 
 const organization: Organization = {
   id: 1,

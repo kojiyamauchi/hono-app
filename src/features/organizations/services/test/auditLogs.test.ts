@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, mock, test } from 'bun:test'
 
-import type { AuditLog } from '../entities/auditLogs'
-import { encodeAuditLogCursor } from '../mappers/auditLogs'
-import { encodeMemberListCursor } from '../mappers/members'
+import type { AuditLog } from '../../entities/auditLogs'
+import { encodeAuditLogCursor } from '../../mappers/auditLogs'
+import { encodeMemberListCursor } from '../../mappers/members'
 
 const findAuditLogPage = mock()
 
@@ -10,7 +10,7 @@ await mock.module('@/features/organizations/repositories/auditLogs', () => ({
   auditLogsRepository: { findPage: findAuditLogPage },
 }))
 
-const { auditLogsService } = await import('./auditLogs')
+const { auditLogsService } = await import('../auditLogs')
 
 describe('auditLogsService.list', () => {
   const auditLogs = (count: number): AuditLog[] =>

@@ -12,7 +12,7 @@ await mock.module('@/features/organizations/repositories/transferOwnership', () 
   },
 }))
 
-const { transferOwnershipService } = await import('./transferOwnership')
+const { transferOwnershipService } = await import('../transferOwnership')
 
 describe('transferOwnershipService.execute', () => {
   beforeEach(() => {

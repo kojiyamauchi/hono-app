@@ -37,7 +37,7 @@ await mock.module('@/shared/invitation/repositories', () => ({
   },
 }))
 
-const { invitationsService } = await import('./invitations')
+const { invitationsService } = await import('../invitations')
 
 const membership: Membership = {
   id: 10,

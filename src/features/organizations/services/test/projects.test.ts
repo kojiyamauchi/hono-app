@@ -3,8 +3,8 @@ import { beforeEach, describe, expect, mock, test } from 'bun:test'
 import type { Role } from '@/shared/membership/entities'
 import type { AppError } from '@/utils/errors'
 
-import type { Project } from '../entities/projects'
-import { encodeProjectCursor } from '../mappers/projects'
+import type { Project } from '../../entities/projects'
+import { encodeProjectCursor } from '../../mappers/projects'
 
 const findPageByOrganization = mock()
 const findByOrganizationAndId = mock()
@@ -22,7 +22,7 @@ await mock.module('@/features/organizations/repositories/projects', () => ({
   },
 }))
 
-const { projectsService } = await import('./projects')
+const { projectsService } = await import('../projects')
 
 const makeProject = (id: number, createdAt = '2026-01-01T00:00:00.000Z'): Project => ({
   id,

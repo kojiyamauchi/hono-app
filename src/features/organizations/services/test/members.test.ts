@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, mock, test } from 'bun:test'
 import type { Membership, Role } from '@/shared/membership/entities'
 import type { AppError } from '@/utils/errors'
 
-import { encodeMemberListCursor } from '../mappers/members'
+import { encodeMemberListCursor } from '../../mappers/members'
 
 const findPageByOrganization = mock()
 const membershipCreate = mock()
@@ -48,7 +48,7 @@ await mock.module('@/shared/user/repositories', () => ({
   userRepository: { findByEmail },
 }))
 
-const { membersService } = await import('./members')
+const { membersService } = await import('../members')
 
 const membership: Membership = {
   id: 10,
