@@ -22,7 +22,7 @@ await mock.module('@/libs/prisma', () => ({
   prisma: { $transaction: transaction, organization: { findMany: organizationFindMany } },
 }))
 
-const { organizationRepository } = await import('.')
+const { organizationRepository } = await import('..')
 
 const organization: Organization = {
   id: 1,
