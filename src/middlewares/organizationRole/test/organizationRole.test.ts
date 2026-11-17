@@ -5,7 +5,7 @@ import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import type { Membership, Role } from '@/shared/membership/entities'
 import { AppError } from '@/utils/errors'
 
-import { organizationAdminMiddleware } from '.'
+import { organizationAdminMiddleware } from '..'
 
 /**
  * テスト用アプリ: 所属確認済みの状態（contextのmembership）を再現してから、ロール確認を経由する。
