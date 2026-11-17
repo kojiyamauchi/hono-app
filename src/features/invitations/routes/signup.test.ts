@@ -1,55 +1,14 @@
-import { beforeEach, describe, expect, mock, test } from 'bun:test'
+import { afterAll, afterEach, beforeEach, describe, expect, test } from 'bun:test'
 
 import type { Invitation } from '@/shared/invitation/entities'
 import type { User } from '@/shared/user/entities'
 
-process.env.JWT_SECRET = 'test-secret'
-process.env.REFRESH_TOKEN_SECRET = 'test-refresh-secret'
-process.env.ALLOWED_ORIGINS = 'http://localhost:3000'
+import { createRouteTestContext } from './testSupport'
 
-const createRefreshToken = mock()
-
-await mock.module('@/shared/auth/repositories/credential', () => ({
-  authCredentialRepository: {},
-}))
-
-await mock.module('@/shared/auth/repositories/refreshToken', () => ({
-  refreshTokenRepository: { create: createRefreshToken },
-}))
-
-await mock.module('@/shared/auth/repositories/passwordReset', () => ({
-  passwordResetTokenRepository: {},
-}))
-
-await mock.module('@/shared/auth/repositories/emailVerification', () => ({
-  emailVerificationTokenRepository: { create: mock(), deleteByIdAndTokenHash: mock() },
-}))
-
-// repositoryをモックしDB非依存でroute統合を検証する
-const findByToken = mock()
-const findByTokenWithOrganization = mock()
-const markExpired = mock()
-const accept = mock()
-const decline = mock()
-const signup = mock()
-
-const findByUserAndOrganization = mock()
-
-const findById = mock()
-const findByEmail = mock()
-const existsById = mock()
-
-await mock.module('@/shared/invitation/repositories', () => ({
-  invitationRepository: { findByToken, findByTokenWithOrganization, markExpired, accept, decline, signup },
-}))
-await mock.module('@/shared/membership/repositories', () => ({
-  membershipRepository: { findByUserAndOrganization },
-}))
-await mock.module('@/shared/user/repositories', () => ({
-  userRepository: { findById, findByEmail, existsById },
-}))
-
-const { app } = await import('@/app')
+const context = await createRouteTestContext()
+const { app } = context
+const { findByToken, markExpired, signup } = context.mocks.invitations
+const { findByEmail } = context.mocks.users
 
 /** 招待トークン用の固定値 */
 const TOKEN = 'test-token-uuid'
@@ -86,20 +45,18 @@ const inviteeUser: User = {
 /**
  * JWTトークンを生成する。
  */
+
+afterEach(() => {
+  context.assertNoUnexpectedCalls()
+})
+
+afterAll(() => {
+  context.cleanup()
+})
+
 describe('invitations signup routes', () => {
   beforeEach(() => {
-    existsById.mockReset()
-    existsById.mockResolvedValue(true)
-    findByToken.mockReset()
-    findByTokenWithOrganization.mockReset()
-    markExpired.mockReset()
-    accept.mockReset()
-    decline.mockReset()
-    signup.mockReset()
-    findByUserAndOrganization.mockReset()
-    findById.mockReset()
-    findByEmail.mockReset()
-    createRefreshToken.mockReset()
+    context.reset()
   })
 
   test('POST /invitations/signup は有効な招待で新規登録して201とAuthResultDtoTypeを返し、Set-CookieヘッダーにリフレッシュトークンCookieをセットする', async () => {
