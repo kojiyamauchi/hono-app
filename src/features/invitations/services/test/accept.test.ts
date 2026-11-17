@@ -23,7 +23,7 @@ const { findByToken, markExpired, accept } = invitations.mocks
 const { findByUserAndOrganization } = memberships.mocks
 const { findById } = users.mocks
 
-const { acceptService } = await import('./accept')
+const { acceptService } = await import('../accept')
 
 /** 招待トークン用の固定値 */
 const TOKEN = 'test-token-uuid'

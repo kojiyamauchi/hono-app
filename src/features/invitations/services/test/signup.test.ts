@@ -36,7 +36,7 @@ const { findByEmail } = users.mocks
 const { create: createRefreshToken } = refreshTokens.mocks
 const { sendEmailVerificationBestEffort } = emailVerificationService.mocks
 
-const { signupService } = await import('./signup')
+const { signupService } = await import('../signup')
 
 /** 招待トークン用の固定値 */
 const TOKEN = 'test-token-uuid'

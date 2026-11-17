@@ -8,7 +8,7 @@ const invitations = createInvitationRepositoryMock()
 await installInvitationRepositoryMock(invitations.mocks)
 const { findByTokenWithOrganization, markExpired } = invitations.mocks
 
-const { service } = await import('.')
+const { service } = await import('..')
 
 /** 招待トークン用の固定値 */
 const TOKEN = 'test-token-uuid'
