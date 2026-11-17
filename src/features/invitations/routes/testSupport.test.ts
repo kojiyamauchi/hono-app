@@ -79,45 +79,60 @@ describe('testSupport（invitations Route用helper）', () => {
       prisma: { $transaction: () => unknown; unknownModel: { unknownOperation: (arg: unknown) => unknown } }
     }
 
-    expect(() => prisma.unknownModel.unknownOperation({ secret: 'value' })).toThrow('prisma.unknownModel.unknownOperation')
-    expect(() => prisma.$transaction()).toThrow('prisma.$transaction')
-
-    let message = ''
     try {
-      context.assertNoUnexpectedCalls()
-    } catch (error) {
-      message = (error as Error).message
+      expect(() => prisma.unknownModel.unknownOperation({ secret: 'value' })).toThrow('prisma.unknownModel.unknownOperation')
+      expect(() => prisma.$transaction()).toThrow('prisma.$transaction')
+
+      let message = ''
+      try {
+        context.assertNoUnexpectedCalls()
+      } catch (error) {
+        message = (error as Error).message
+      }
+      expect(message).toContain('prisma.unknownModel.unknownOperation')
+      expect(message).toContain('prisma.$transaction')
+      // 引数（認証情報など）は記録に含めない
+      expect(message).not.toContain('value')
+    } finally {
+      // assertが失敗しても遮断の記録を残さない
+      context.reset()
     }
-    expect(message).toContain('prisma.unknownModel.unknownOperation')
-    expect(message).toContain('prisma.$transaction')
-    // 引数（認証情報など）は記録に含めない
-    expect(message).not.toContain('value')
   })
 
   test('例外を握りつぶす呼び出し側でも記録が残り、resetで初期化される', async () => {
     const { supabase } = (await import('@/libs/supabase')) as unknown as { supabase: { auth: { getUser: () => unknown } } }
 
-    // best-effort処理のように例外を捕捉してもassertNoUnexpectedCallsは失敗する
     try {
-      supabase.auth.getUser()
-    } catch {
-      // 握りつぶす
+      // best-effort処理のように例外を捕捉してもassertNoUnexpectedCallsは失敗する
+      try {
+        supabase.auth.getUser()
+      } catch {
+        // 握りつぶす
+      }
+      expect(() => context.assertNoUnexpectedCalls()).toThrow('supabase.auth.getUser')
+
+      context.reset()
+
+      expect(() => context.assertNoUnexpectedCalls()).not.toThrow()
+    } finally {
+      // assertが失敗しても遮断の記録を残さない
+      context.reset()
     }
-    expect(() => context.assertNoUnexpectedCalls()).toThrow('supabase.auth.getUser')
-
-    context.reset()
-
-    expect(() => context.assertNoUnexpectedCalls()).not.toThrow()
   })
 
   test('遮断したresendは実装と同じ値exportを持ち、送信関数は記録して失敗する', async () => {
     const resend = await import('@/libs/resend')
 
-    expect(resend.resendDeliveryTimeoutMs).toBe(10_000)
-    expect(() => resend.sendResendEmail({ from: 'a', to: 'b', subject: 'c', text: 'd' })).toThrow('resend.sendResendEmail')
-    expect(() => resend.deliverResendEmail({ from: 'a', to: 'b', subject: 'c', text: 'd' }, 'key')).toThrow('resend.deliverResendEmail')
-    expect(() => context.assertNoUnexpectedCalls()).toThrow('resend.deliverResendEmail')
+    try {
+      expect(resend.resendDeliveryTimeoutMs).toBe(10_000)
+      expect(() => resend.sendResendEmail({ from: 'a', to: 'b', subject: 'c', text: 'd' })).toThrow('resend.sendResendEmail')
+      expect(() => resend.deliverResendEmail({ from: 'a', to: 'b', subject: 'c', text: 'd' }, 'key')).toThrow('resend.deliverResendEmail')
+      expect(() => context.assertNoUnexpectedCalls()).toThrow('resend.deliverResendEmail')
 
-    context.reset()
+      context.reset()
+    } finally {
+      // assertが失敗しても遮断の記録を残さない
+      context.reset()
+    }
   })
 })
