@@ -2,8 +2,8 @@ import { describe, expect, test } from 'bun:test'
 
 import type { Organization } from '@/shared/organization/entities'
 
-import { listDto as organizationListDto } from '../dtos'
-import { toOrganizationListResponse } from '.'
+import { listDto as organizationListDto } from '../../dtos'
+import { toOrganizationListResponse } from '..'
 
 describe('toOrganizationListResponse', () => {
   const organization: Organization = {

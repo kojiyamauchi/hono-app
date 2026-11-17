@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 
-import { itemDto as projectDto, listDto as projectListDto } from '../dtos/projects'
-import type { Project } from '../entities/projects'
-import { decodeProjectCursor, encodeProjectCursor, toProjectListResponse, toProjectResponse } from './projects'
+import { itemDto as projectDto, listDto as projectListDto } from '../../dtos/projects'
+import type { Project } from '../../entities/projects'
+import { decodeProjectCursor, encodeProjectCursor, toProjectListResponse, toProjectResponse } from '../projects'
 
 const toBase64Url = (value: string): string => Buffer.from(value, 'utf8').toString('base64url')
 

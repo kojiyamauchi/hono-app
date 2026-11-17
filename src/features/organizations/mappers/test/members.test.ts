@@ -2,8 +2,8 @@ import { describe, expect, test } from 'bun:test'
 
 import type { Membership } from '@/shared/membership/entities'
 
-import { listDto as memberListDto } from '../dtos/members'
-import { decodeMemberListCursor, encodeMemberListCursor, toMemberListResponse } from './members'
+import { listDto as memberListDto } from '../../dtos/members'
+import { decodeMemberListCursor, encodeMemberListCursor, toMemberListResponse } from '../members'
 
 const toBase64Url = (value: string): string => Buffer.from(value, 'utf8').toString('base64url')
 

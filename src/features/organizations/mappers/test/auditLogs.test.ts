@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'bun:test'
 
-import { itemDto as auditLogDto, listDto as auditLogListDto } from '../dtos/auditLogs'
-import type { AuditLog } from '../entities/auditLogs'
-import { decodeAuditLogCursor, encodeAuditLogCursor, toAuditLogListResponse, toAuditLogResponse } from './auditLogs'
-import { decodeMemberListCursor, encodeMemberListCursor } from './members'
+import { itemDto as auditLogDto, listDto as auditLogListDto } from '../../dtos/auditLogs'
+import type { AuditLog } from '../../entities/auditLogs'
+import { decodeAuditLogCursor, encodeAuditLogCursor, toAuditLogListResponse, toAuditLogResponse } from '../auditLogs'
+import { decodeMemberListCursor, encodeMemberListCursor } from '../members'
 
 const toBase64Url = (value: string): string => Buffer.from(value, 'utf8').toString('base64url')
 
