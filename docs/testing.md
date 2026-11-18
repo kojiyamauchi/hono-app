@@ -342,3 +342,7 @@ Cloudflare検証用のBunテストも通常のUnit Testへ含め、そのジョ�
 ## Cloudflare本体の実行環境検証
 
 `bun run test:cloudflare` は専用PostgreSQL 17とworkerdで本体API・ハッシュ互換性・transaction・I/O並行実行・接続解放を検証します。Node 24・Bun・Dockerを使用し、既存DBや実クラウドには接続しません。GitHub CIの独立した `Cloudflare Runtime Test` でも実行します。[検証項目と限界](cloudflare-app.md#ローカル実dbworkerd検証)
+
+## Cloudflare CDの検証
+
+本体CDの判定・API/HTTP境界・DB履歴照合・停止順序・実workflow条件は `scripts/test/cloudflare-cd*.test.js` で確認します。`main` の既存 `cd-gcp.yml` から共通CIを一度だけ呼び、Cloudflare配備は全件成功と、有効な場合のGCP配備成功を待ちます。Terraformの3ジョブの並列構成を維持します。本体基盤は既定無効で、providerモックでURL無効の初回構築と検証Worker分離を確認します。[構築・有効化・失敗時の手順](deployment-cloudflare-cd.md)

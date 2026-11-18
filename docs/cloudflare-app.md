@@ -1,6 +1,6 @@
 # 本体アプリのCloudflare実行経路
 
-既存のBun/GCP経路を残したまま、同じ全feature・Prismaモデル・Supabase PostgreSQLをCloudflareから利用します。検証Workerとは別の `hono-app` Workerで、本PRは実行経路・手動設定・検証を対象とします。Cloudflareの自動配備は後続PRです。
+既存のBun/GCP経路を残したまま、同じ全feature・Prismaモデル・Supabase PostgreSQLをCloudflareから利用します。検証Workerとは別のWorkerで実行し、自動配備先は `hono-app-dev` です。[Cloudflare devの自動配備](deployment-cloudflare-cd.md)に起動条件・本体基盤・初回構築・復旧をまとめています。
 
 ## 実行経路
 
@@ -74,7 +74,7 @@ GitHub CIの `Cloudflare Runtime Test` はこの検証を実行します。既�
 
 ローカルworkerdの成功は、実Cloudflare上の本体全ルート・外部サービス実通信・ピーク負荷・最大メモリ・入口CPU・Durable Object CPUの測定を代替しません。通常Workerの10msへ全処理を収めたという意味ではなく、CPUを使う処理はDO側で実行します。圧縮バンドルサイズはFreeの上限内でも、日次quota・メモリ・CPUの全面適合を断定しません。[①の互換性検証と証跡の範囲](cloudflare-compatibility.md)も参照してください。
 
-実Cloudflareへの本体配備、全体負荷/CPU/最大メモリ測定、CloudflareのCDは別途実施します。GCPのインフラ・既存CDを本体対応のために変更しません。
+実Cloudflareへの本体配備、全体負荷/CPU/最大メモリ測定、Cloudflare CDの初回実環境有効化は別途実施します。GCPのインフラ・既存CDを本体対応のために変更しません。
 
 ## 参照
 
