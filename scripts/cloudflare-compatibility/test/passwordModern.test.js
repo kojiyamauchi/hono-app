@@ -6,6 +6,7 @@ import * as Bun from 'bun'
 import { createModernPasswordHasher } from '../passwordModernVerifier.mjs'
 import { prepareHashWasm } from '../prepareHashWasm.mjs'
 
+// 64MiBの既存設定で照合・生成を繰り返すため、共有CIマシンでも設定を弱めず検証する。
 test('静的Wasm化したhash-wasmで既存ハッシュを検証し、異なる並行入力を取り違えない', async () => {
   await prepareHashWasm()
   const { createStaticHashWasm } = await import('../.wrangler/hash-wasm-factory.mjs')
@@ -24,4 +25,4 @@ test('静的Wasm化したhash-wasmで既存ハッシュを検証し、異なる�
     expect(await Bun.password.verify(`${input.password}!incorrect`, generated.workerHash)).toBe(false)
   }
   expect(await Promise.all(inputs.slice(0, 2).map((input) => verify(input)))).toEqual([true, true])
-})
+}, 30_000)
