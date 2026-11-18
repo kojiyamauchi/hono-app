@@ -23,6 +23,7 @@ Bun上で動作するHono.js APIアプリケーションです。TypeScriptを�
 ### アプリケーション構造
 
 - **エントリーポイント**: [src/server.ts](src/server.ts) - `Bun.serve()`を使用してHonoサーバーを起動
+- **Cloudflareエントリーポイント**: [src/cloudflare.ts](src/cloudflare.ts) - Access配下の入口WorkerからSQLite型Durable Objectで同じ本体アプリを実行する。[構成・検証手順](docs/cloudflare-app.md)
 - **招待メールワーカー**: [src/invitationEmailWorker.ts](src/invitationEmailWorker.ts) - 配線層のエントリーポイント。`bun run invitations:deliver` で共有層 `src/shared/invitation/` の配信処理を1回実行する。[設定・配備手順](docs/invitation-email.md)
 - **アプリインスタンス**: [src/app.ts](src/app.ts) - Honoインスタンスを作成し、ルートを登録
 - **ルート登録**: [src/routes/index.ts](src/routes/index.ts) - `registerRoutes(app)`による一元的なルート登録パターン
@@ -122,7 +123,7 @@ Bun上で動作するHono.js APIアプリケーションです。TypeScriptを�
 `src/` 配下の全層を以下の線形レイヤーとして整理し、importは図の下方向のみ許可する。
 
 ```txt
-routes / app.ts / server.ts / invitationEmailWorker.ts   （配線層・最上位）
+routes / app.ts / appFactory.ts / server.ts / cloudflare.ts / invitationEmailWorker.ts   （配線層・最上位）
   ↓
 features                       （機能）
   ↓
@@ -149,7 +150,7 @@ types                          （型宣言のみ・最下層）
 - `shared/`: 複数featureで使う共有ドメイン（前述の定義どおり）。`middlewares`・`features` へのimportは禁止する（HTTP層の関心事をsharedへ持ち込まない。ミドルウェアが設定した値はcontroller/feature側で取り出して引数として渡すこと）。ただし、`src/shared/auth/services/cookie.ts` のcookieヘルパーはCookie入出力に責務を限定し、Controllerから受け取った `Context` を操作する例外とする
 - `middlewares/`: Hono横断ミドルウェア。`shared` のrepositoryの利用は許可する。`features` へのimportは禁止する
 - `features/`: `shared` 以下の層に加え `middlewares` もimport可（feature内routesでのミドルウェア適用）。feature間の相互importは前述のとおり禁止する
-- `routes/` / `app.ts` / `server.ts` / `invitationEmailWorker.ts`: 配線層。全層をimport可（例: `app.ts` でのグローバルミドルウェア適用・CORS設定・telemetry初期化）
+- `routes/` / `app.ts` / `appFactory.ts` / `server.ts` / `cloudflare.ts` / `invitationEmailWorker.ts`: 配線層。全層をimport可（例: `app.ts` でのグローバルミドルウェア適用・CORS設定・telemetry初期化）
 
 ### データベース設定
 

@@ -820,3 +820,7 @@ EMAIL_VERIFICATION_URL_BASE="https://your-frontend.com/verify-email"
 - レート制限の保存先はプロセス内メモリです。プロセス再起動でリセットされ、複数インスタンス間では共有されません。
 - インメモリstoreはTTLで期限切れエントリを掃除し、キーが残り続けないようにします。
 - `x-forwarded-for` を使うIP判定は、信頼できるプロキシ/CDN背後でのみ信頼する前提です。IPを特定できない場合は、全クライアントを同じキーへ束ねないようIP単位の制限をスキップします。
+
+### 本体アプリのCloudflare対応
+
+既存Bun/GCPに加え、Access → Worker → SQLite型Durable Object → Prisma/Hyperdrive → Supabaseで本体を実行できます。[構成・手動設定・ローカル検証と制約](docs/cloudflare-app.md)を参照してください。Cloudflareの自動配備は後続対応です。

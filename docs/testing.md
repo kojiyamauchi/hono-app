@@ -338,3 +338,7 @@ Cloudflare検証用のBunテストも通常のUnit Testへ含め、そのジョ�
 - [ ] transactionを変更した場合、rollbackを確認した
 - [ ] 競合が想定される場合、同時実行を確認した
 - [ ] 外部サービス処理を変更した場合、失敗時の挙動を確認した
+
+## Cloudflare本体の実行環境検証
+
+`bun run test:cloudflare` は専用PostgreSQL 17とworkerdで本体API・ハッシュ互換性・transaction・I/O並行実行・接続解放を検証します。Node 24・Bun・Dockerを使用し、既存DBや実クラウドには接続しません。GitHub CIの独立した `Cloudflare Runtime Test` でも実行します。[検証項目と限界](cloudflare-app.md#ローカル実dbworkerd検証)
