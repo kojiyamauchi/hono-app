@@ -301,6 +301,7 @@ bun run lint-staged  # ステージングされたファイルのチェックを
 - Repositoryのresult unionやenumは成功値を明示的に判定し、未知の値を暗黙の成功として扱わないこと
 - migration、DB制約、transaction、raw SQL、行ロック、同時実行はmockテストだけで完了とせず、実DBで確認すること
 - Bunに組み込まれた`bun test --isolate`を使用
+- 全件テストはCloudflare検証用のWasmも読み込むため、clone後はルートの依存に加えて `bun install --cwd scripts/cloudflare-compatibility --frozen-lockfile --ignore-scripts` を実行すること。CIもUnit Testジョブで同じ依存をインストールし、テストをスキップしない
 - テストファイル: `**/*.test.ts`または`**/*.test.js`
 - テストがない場合は失敗するため、最低限の動作確認テストを維持
 

@@ -380,6 +380,12 @@ OpenAPIを導入しており、入力検証用schemaとレスポンスDTOの責�
 bun install
 ```
 
+全件テストにはCloudflare検証用のWasmも含まれます。テスト実行前に検証用パッケージの依存もインストールしてください（[テストの準備](docs/testing.md#全件テストの準備)）。
+
+```bash
+bun install --cwd scripts/cloudflare-compatibility --frozen-lockfile --ignore-scripts
+```
+
 `.env` を作成します。
 
 ```bash

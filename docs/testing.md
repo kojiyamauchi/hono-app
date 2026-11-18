@@ -4,6 +4,18 @@
 
 テストを機械的に全レイヤーへ追加するのではなく、変更によって発生するリスクに対応したテストを選択します。
 
+## 全件テストの準備
+
+clone後は、ルートの依存に加えてCloudflare検証用の固定した依存もインストールしてください。ルートの全件テストにはWasm実装の互換性テストも含まれ、検証用パッケージ配下の `argon2-browser` と `hash-wasm` を読み込みます。DBやCloudflareの認証情報は不要です。
+
+```bash
+bun ci
+bun install --cwd scripts/cloudflare-compatibility --frozen-lockfile --ignore-scripts
+bun test --isolate
+```
+
+CIのUnit Testジョブでも検証用依存をインストールし、同じテストをスキップせず実行します。
+
 ## 基本方針
 
 - 変更した責務に最も近い層でテストする
@@ -307,7 +319,7 @@ plan検査では、対象Registryの `resource_drift` が `update_time` だけ�
 
 `terraform-aws`・`terraform-gcp`・`terraform-cloudflare` は同じ `ci.yml` 内の独立したジョブとして定義し、互いに `needs` を設定せず並列実行します。Terraformの整形検査は各ジョブのクラウドrootを対象に行います。いずれかの検査が失敗するとCI全体が失敗し、共通CIを前提とするGCPの配備へ進みません。
 
-Cloudflare検証用のBunテストも通常のUnit Testへ含め、そのジョブだけで固定した検証用依存を追加インストールします。lint・スペル検査もCloudflare専用ファイルを含めて全体を対象とします。CloudflareのTerraform検査はbackend・認証情報を使わないモックで実行し、実Cloudflareへの接続・配備は行いません。
+Cloudflare検証用のBunテストも通常のUnit Testへ含め、そのジョブだけで固定した検証用依存を追加インストールします。ローカルでも[全件テストの準備](#全件テストの準備)を済ませてから実行してください。lint・スペル検査もCloudflare専用ファイルを含めて全体を対象とします。CloudflareのTerraform検査はbackend・認証情報を使わないモックで実行し、実Cloudflareへの接続・配備は行いません。
 
 実DB integration testを自動化する場合は、通常のテストとは別のCI jobとして実行します。
 
