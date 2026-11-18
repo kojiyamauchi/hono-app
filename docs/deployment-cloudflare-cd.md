@@ -95,7 +95,7 @@ bun --env-file=.env.cloudflare-app.local scripts/cloudflare-cd.mjs bootstrap
 
 ## 失敗時と復旧
 
-配備前の確認失敗はクラウドを変更せず停止します。配備開始直前に、SHAと復旧用の現行version IDをActions Summaryへ記録します。配備後は100%単一versionのSHAタグ、保護設定、HTTPを確認し、検証済みversion IDを追記します。HTTP成功はDBへの業務書き込み・メール実配達・全ルート負荷の確認を意味しません。
+配備前の確認失敗はクラウドを変更せず停止します。配備開始直前に、SHAと復旧用の現行version IDをActions Summaryへ記録します。配備後は100%単一versionのSHAタグ、保護設定、HTTPを確認し、検証済みversion IDを追記します。OPTIONSはOriginとAccess-Control-Request-Methodを付けた正式なCORS preflightとして送信し、Accessの認証拒否を確認します。ヘッダー不足による400は保護成功として扱いません。HTTP成功はDBへの業務書き込み・メール実配達・全ルート負荷の確認を意味しません。
 
 Wrangler失敗は一部反映の可能性があるため、成功とも未変更とも断定しません。フラグをfalseにして進行中runを確認し、Cloudflareの稼働DeploymentとSummaryのversionを照合します。認証保護の異常ならAccessを外さず、Terraformの本体 `enable_worker_url=false` で入口を閉じます。API/HTTP失敗後の自動rollbackやDBの巻き戻しは行いません。
 

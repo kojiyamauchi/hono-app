@@ -55,6 +55,10 @@ test('AccessヘッダーをアプリBearerへ転用せず、全代表パスの�
     calls.push([url, options])
     expect(options.headers.Authorization).toBeUndefined()
     expect(options.redirect).toBe('manual')
+    if (options.method === 'OPTIONS') {
+      expect(options.headers).toEqual({ Origin: config.origin, 'Access-Control-Request-Method': 'GET' })
+      return new Response(null, { status: 403 })
+    }
     if (!options.headers['CF-Access-Client-Id'])
       return new Response(null, { status: 302, headers: { location: `${config.access_issuer}/cdn-cgi/access/login/test` } })
     expect(options.headers['CF-Access-Client-Secret']).toBe('secret')
@@ -63,6 +67,11 @@ test('AccessヘッダーをアプリBearerへ転用せず、全代表パスの�
   await verifyCloudflareHttp(config, { id: 'id', secret: 'secret' }, request)
   expect(calls).toHaveLength(9)
   expect(calls.filter(([, options]) => options.method === 'OPTIONS')).toHaveLength(1)
+  await expect(
+    verifyCloudflareHttp(config, { id: 'id', secret: 'secret' }, async (url, options) =>
+      options.method === 'OPTIONS' ? new Response(null, { status: 400 }) : request(url, options),
+    ),
+  ).rejects.toThrow()
   await expect(verifyCloudflareHttp(config, { id: 'id', secret: 'secret' }, async () => Response.json({ ok: true }))).rejects.toThrow()
   await expect(
     verifyCloudflareHttp(
