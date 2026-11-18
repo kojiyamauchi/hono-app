@@ -521,7 +521,7 @@ bun run tf:aws:init:no-backend
 bun run tf:aws:lint:init
 ```
 
-Terraformはクラウドごとに独立したrootとstateを使います。AWSは `infra/aws/` と `tf:aws:*`、GCPは `infra/gcp/` と `tf:gcp:*`、Cloudflareは `infra/cloudflare/` と `tf:cloudflare:*` を使い、環境はそれぞれのworkspaceで分離します。CloudflareはGCS backendのprefixをGCPと分け、現時点では `dev` workspaceだけを許可します。CIではbackendなしの初期化とモックテストを使い、実Cloudflareへ接続しません。`tf:fmt` / `tf:fmt:check` だけは `infra/` 全体が対象です。
+Terraformはクラウドごとに独立したrootとstateを使います。AWSは `infra/aws/` と `tf:aws:*`、GCPは `infra/gcp/` と `tf:gcp:*`、Cloudflareは `infra/cloudflare/` と `tf:cloudflare:*` を使い、環境はそれぞれのworkspaceで分離します。CloudflareはGCS backendのprefixをGCPと分け、現時点では `dev` workspaceだけを許可します。検証Workerに加え、本体専用WorkerとAccessは `app_config` の明示設定時だけ構築します。本体CDは共通CI全件成功と有効な場合のGCP配備成功後だけ実行し、共有Supabaseのmigrationは適用せず履歴照合だけを行います。CIではbackendなしの初期化とモックテストを使い、実Cloudflareへ接続しません。`tf:fmt` / `tf:fmt:check` だけは `infra/` 全体が対象です。
 
 GCPを維持してCloudflare Workersを追加するための、パスワード・Prismaの検証結果と再実行手順は [Cloudflare互換性検証](docs/cloudflare-compatibility.md)、TerraformによるAccess保護と検証Workerの配備は [Cloudflare配備手順](docs/deployment-cloudflare.md) を参照してください。実Hyperdrive経由のSupabase接続と、Durable Objectsでの既存ハッシュ・Prismaの並行実行を検証済みです。本体の実行経路と[dev自動配備](docs/deployment-cloudflare-cd.md)も用意しています。
 
