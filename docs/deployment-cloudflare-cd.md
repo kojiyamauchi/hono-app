@@ -22,7 +22,7 @@ Cloudflareの追加ジョブは共通CIとGCP配備の終了を待ちます。GC
 
 CD自身はTerraform apply、Hyperdrive変更、DB migration、DB reset、課金変更を行いません。Terraform出力をEnvironment Secretへ登録し、CDはAPIの現在値と照合します。インフラ変更時は手動plan/apply後に出力を更新してください。APIでAccessのWorker全体保護、AUD、チームissuer、ポリシー内容、専用サービストークン、OPTIONS保護、workers.dev/preview、実サブドメインを確認します。AuthorizationヘッダーをAccessサービス認証へ転用しません。
 
-DB履歴確認用の資格情報は、Hyperdriveと同じhost/port/databaseへの直接接続を使います。専用の読み取り用DBロールに `public._prisma_migrations` のSELECTだけを付与することを推奨します。`sslmode=verify-full`、リポジトリのSupabase CAと標準CA、接続/SQLタイムアウト、`default_transaction_read_only=on` を指定します。アプリのDB接続資格情報をWorkerへbindingしません。
+DB履歴確認用の資格情報は、Hyperdriveと同じhost/port/database、または同じSupabaseプロジェクトのsession pooler（5432番）を使います。直接接続ホストが `db.<project-ref>.supabase.co` の場合に限り、Supabase管理下の `aws-<index>-<region>.pooler.supabase.com` と、ユーザー名 `<role>.<project-ref>` のproject refの完全一致で同じプロジェクトを照合します。databaseとportも一致を要求し、別プロジェクト・任意の外部host・6543番のtransaction poolerを拒否します。Supabaseの無料構成では直接接続がIPv6専用の場合があるため、IPv4のrunnerではこのsession poolerを使います（[公式の接続方式](https://supabase.com/docs/guides/database/connecting-to-postgres)）。Hyperdrive自体の接続先は変更しません。専用の読み取り用DBロールに `public._prisma_migrations` のSELECTだけを付与することを推奨します。`sslmode=verify-full`、リポジトリのSupabase CAと標準CA、接続/SQLタイムアウト、`default_transaction_read_only=on` を指定します。アプリのDB接続資格情報をWorkerへbindingしません。
 
 ローカルの全migration名とSHA-256が適用済み履歴と完全一致し、失敗中・未適用・余分な履歴がない場合だけ配備します。GCP CDが無効のときは、先に既存の手動運用でmigrationを適用してください。GCPとの別runの競合で未適用/実行中を検出した場合も停止するので、適用完了後に最新mainのrunを再実行します。既存のBun用招待outbox配信ワーカーは継続利用します。
 
@@ -34,14 +34,14 @@ Repository variable:
 
 Environment `cloudflare-dev` は配備元をmainに制限し、以下のSecretsを登録します。既存GCPのSecretsや検証Workerの設定を上書きしません。
 
-| Secret                            | 内容                                                             |
-| --------------------------------- | ---------------------------------------------------------------- |
-| `CLOUDFLARE_API_TOKEN`            | 対象アカウント限定の本体CD用APIトークン                          |
-| `CLOUDFLARE_CD_CONFIG`            | 適用済みTerraformの `app_cd_config` のJSON全体                   |
-| `CLOUDFLARE_APP_SECRETS`          | アプリ設定のJSON。以下の許可リストだけを受け取る                 |
-| `CLOUDFLARE_ACCESS_CLIENT_ID`     | 本体専用AccessサービストークンのClient ID                        |
-| `CLOUDFLARE_ACCESS_CLIENT_SECRET` | 同じトークンのClient Secret                                      |
-| `CLOUDFLARE_DATABASE_URL`         | 同じSupabaseのDB履歴確認用接続URL。5432番、`sslmode=verify-full` |
+| Secret                            | 内容                                                                                                        |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `CLOUDFLARE_API_TOKEN`            | 対象アカウント限定の本体CD用APIトークン                                                                     |
+| `CLOUDFLARE_CD_CONFIG`            | 適用済みTerraformの `app_cd_config` のJSON全体                                                              |
+| `CLOUDFLARE_APP_SECRETS`          | アプリ設定のJSON。以下の許可リストだけを受け取る                                                            |
+| `CLOUDFLARE_ACCESS_CLIENT_ID`     | 本体専用AccessサービストークンのClient ID                                                                   |
+| `CLOUDFLARE_ACCESS_CLIENT_SECRET` | 同じトークンのClient Secret                                                                                 |
+| `CLOUDFLARE_DATABASE_URL`         | 同じSupabaseのDB履歴確認用接続URL。直接接続または同一projectのsession pooler、5432番、`sslmode=verify-full` |
 
 APIトークンにはAccountの `Workers Scripts: Edit`、`Access: Apps: Read`、`Access: Policies: Read`、`Access: Organizations: Read`、`Hyperdrive: Read` を付けます。Terraform用は[既存の構築用権限](deployment-cloudflare.md)も必要です。検証Worker向けの既存TerraformトークンにはHyperdrive/Organizationsの読み取り権限がない場合があり、そのままCD用に転用しません。トークンの有効期限・ローテーションは手動管理し、読み取りで403になる場合も保護検査を省略しません。Workers Scriptsの権限は同じアカウントの他Workerにも作用するため、対象固定・Environment保護・main限定を合わせて使います。
 
