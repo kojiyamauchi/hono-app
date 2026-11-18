@@ -214,9 +214,9 @@ bun run prisma:studio        # Prisma Studioを開く
 
 ### Terraform操作
 
-Terraformはクラウド単位で分離し、AWSは `infra/aws/`、GCPは `infra/gcp/` を独立したrootとして管理する。AWSの既存S3 backendの保存先・キーとリソースアドレスは維持する。GCPは別のGCS backendを使い、クラウド内の環境は各rootのworkspaceで分離する。クラウドを切り替えるために同一rootへ複数providerのリソースを混在させないこと。GCPでは既存AWS moduleを無理に共通化せず、最初は責務ごとのtfファイルへ配置する。
+Terraformはクラウド単位で分離し、AWSは `infra/aws/`、GCPは `infra/gcp/`、Cloudflareは `infra/cloudflare/` を独立したrootとして管理する。AWSの既存S3 backendの保存先・キーとリソースアドレスは維持する。GCPは別のGCS backendを使い、クラウド内の環境は各rootのworkspaceで分離する。クラウドを切り替えるために同一rootへ複数providerのリソースを混在させないこと。GCPでは既存AWS moduleを無理に共通化せず、最初は責務ごとのtfファイルへ配置する。
 
-コマンドは `tf:aws:*` / `tf:gcp:*` で対象を明示する。`tf:fmt` / `tf:fmt:check` だけは `infra/` 全体を対象とする。GCPへの公開準備・アクセス制限・無料枠の前提・初回構築の順序は [docs/deployment-gcp.md](docs/deployment-gcp.md) を参照する。GCPのCIと静的検証は `TF_WORKSPACE=dev` とbackendなしの初期化・モックテストを使い、実GCPへ接続しない。
+コマンドは `tf:aws:*` / `tf:gcp:*` / `tf:cloudflare:*` で対象を明示する。`tf:fmt` / `tf:fmt:check` だけは `infra/` 全体を対象とする。GCPへの公開準備・アクセス制限・無料枠の前提・初回構築の順序は [docs/deployment-gcp.md](docs/deployment-gcp.md) を参照する。GCPのCIと静的検証は `TF_WORKSPACE=dev` とbackendなしの初期化・モックテストを使い、実GCPへ接続しない。
 
 ```bash
 TF_WORKSPACE=dev bun run tf:gcp:init:no-backend
@@ -224,6 +224,15 @@ bun run tf:gcp:lint:init
 bun run tf:gcp:lint
 bun run tf:gcp:validate
 TF_WORKSPACE=dev bun run tf:gcp:test
+```
+
+CloudflareはGCS backendを使い、GCPとは異なるstate prefixを指定する。現時点では `dev` workspaceだけを許可し、検証WorkerとAccessを管理する。Hyperdriveは既存IDを参照する。初回構築・Access保護・配備順序は [docs/deployment-cloudflare.md](docs/deployment-cloudflare.md) を参照する。CloudflareのCIと静的検証も `TF_WORKSPACE=dev` とbackendなしの初期化・モックテストを使い、実Cloudflareへ接続しない。
+
+```bash
+TF_WORKSPACE=dev bun run tf:cloudflare:init:no-backend -lockfile=readonly
+bun run tf:cloudflare:lint
+bun run tf:cloudflare:validate
+TF_WORKSPACE=dev bun run tf:cloudflare:test
 ```
 
 clone後の初回セットアップでは、Terraform providerとTFLint pluginを初期化すること。

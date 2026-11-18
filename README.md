@@ -513,7 +513,7 @@ bun run tf:aws:init:no-backend
 bun run tf:aws:lint:init
 ```
 
-Terraformはクラウドごとに独立したrootとstateを使います。AWSは `infra/aws/` と `tf:aws:*`、GCPは `infra/gcp/` と `tf:gcp:*` を使い、環境はそれぞれのworkspaceで分離します。`tf:fmt` / `tf:fmt:check` だけは `infra/` 全体が対象です。
+Terraformはクラウドごとに独立したrootとstateを使います。AWSは `infra/aws/` と `tf:aws:*`、GCPは `infra/gcp/` と `tf:gcp:*`、Cloudflareは `infra/cloudflare/` と `tf:cloudflare:*` を使い、環境はそれぞれのworkspaceで分離します。CloudflareはGCS backendのprefixをGCPと分け、現時点では `dev` workspaceだけを許可します。CIではbackendなしの初期化とモックテストを使い、実Cloudflareへ接続しません。`tf:fmt` / `tf:fmt:check` だけは `infra/` 全体が対象です。
 
 GCPを維持してCloudflare Workersを追加するための、パスワード・Prismaの検証結果と再実行手順は [Cloudflare互換性検証](docs/cloudflare-compatibility.md)、TerraformによるAccess保護と検証Workerの配備は [Cloudflare配備手順](docs/deployment-cloudflare.md) を参照してください。実Hyperdrive経由のSupabase接続と、Durable Objectsでの既存ハッシュ・Prismaの並行実行を検証済みです。アプリ本体のWorkers移植とCDは後続の作業です。
 
