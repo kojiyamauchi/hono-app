@@ -2,12 +2,13 @@ import type { CreateEmailOptions, CreateEmailResponse } from 'resend'
 import { Resend } from 'resend'
 
 import { AppError } from '@/utils/errors'
+import { getEnvironment } from '@/utils/runtime'
 
 /**
  * 環境変数からResend APIキーを取得する。
  */
 const getResendApiKey = (): string => {
-  const key = process.env.RESEND_API_KEY
+  const key = getEnvironment().RESEND_API_KEY
   if (!key) {
     throw new AppError(500, 'RESEND_API_KEYが設定されていません')
   }

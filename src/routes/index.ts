@@ -8,6 +8,7 @@ import { organizationsRoutes } from '@/features/organizations/routes'
 import { supabaseAuthRoutes } from '@/features/supabaseAuth/routes'
 import { usersRoutes } from '@/features/users/routes'
 import { AppError } from '@/utils/errors'
+import { getRuntimePlatform } from '@/utils/runtime'
 
 /** GET /: 動作確認用のテキストを返す。 */
 const rootRoute = createRoute({
@@ -71,7 +72,7 @@ export const registerRoutes = (app: OpenAPIHono): void => {
       return c.json({ error: { message: err.message } }, err.statusCode as ContentfulStatusCode)
     }
 
-    console.error(err)
+    console.error(getRuntimePlatform() === 'cloudflare' ? 'Cloudflareアプリの処理に失敗しました' : err)
     return c.json({ error: { message: 'サーバーエラーが発生しました' } }, 500)
   })
 

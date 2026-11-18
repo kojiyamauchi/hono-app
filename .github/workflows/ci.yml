@@ -64,6 +64,31 @@ jobs:
       - name: Do ${{ matrix.job_name }}
         run: bun run ${{ matrix.script }}
 
+  cloudflare-runtime:
+    name: Cloudflare Runtime Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Execution Environment for Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Execution Environment for Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Install Dependencies
+        run: bun ci
+
+      - name: Verify Application with workerd and Disposable PostgreSQL
+        run: bun run test:cloudflare
+        env:
+          WRANGLER_SEND_METRICS: 'false'
+
   # 各クラウドのTerraform検査はneedsを設定せず、互いに並列実行する。
   terraform-aws:
     name: Terraform AWS Checks

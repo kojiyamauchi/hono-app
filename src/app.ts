@@ -1,26 +1,4 @@
-import { OpenAPIHono } from '@hono/zod-openapi'
-import { cors } from 'hono/cors'
+import { createApp } from './appFactory'
 
-import { createHttpRequestTracingMiddleware } from '@/libs/telemetry/hono'
-import { getAllowedOrigins } from '@/middlewares/origin'
-import { getInvitationEmailConfig } from '@/shared/invitation/services/emailConfig'
-
-import { registerRoutes } from './routes'
-
-getInvitationEmailConfig()
-
-// OpenAPI仕様を全featureのroute定義から集約するため、root appはOpenAPIHonoにする。
-export const app = new OpenAPIHono()
-
-app.use('*', createHttpRequestTracingMiddleware())
-
-// 資格情報付きCORSをappレベルで設定する。
-// originはALLOWED_ORIGINSで管理し、ワイルドカードを使わない。
-app.use(
-  cors({
-    origin: getAllowedOrigins(),
-    credentials: true,
-  }),
-)
-
-registerRoutes(app)
+/** Bunでは起動時に環境変数からアプリを構築する。 */
+export const app = createApp()

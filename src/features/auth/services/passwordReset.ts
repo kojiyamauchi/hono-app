@@ -3,6 +3,7 @@ import { hashPasswordResetToken, issuePasswordResetToken, passwordResetNotifier 
 import { userRepository } from '@/shared/user/repositories'
 import { AppError } from '@/utils/errors'
 import { createInMemoryRateLimiter } from '@/utils/rateLimit'
+import { hashPassword, sleep } from '@/utils/runtime'
 import { passwordResetRequestDelayMs } from '@/utils/timing'
 
 import { normalizeEmailForRateLimit } from './common'
@@ -42,7 +43,7 @@ const passwordResetIpRateLimitKey = (clientIp: string): string => {
 const waitPasswordResetRequestDelay = async (startMs: number): Promise<void> => {
   const delayMs = passwordResetRequestDelayMs(Date.now() - startMs)
   if (delayMs > 0) {
-    await Bun.sleep(delayMs)
+    await sleep(delayMs)
   }
 }
 
@@ -137,7 +138,7 @@ export const passwordResetService = {
       throw new AppError(401, '無効なトークンです')
     }
 
-    const hashedPassword = await Bun.password.hash(password)
+    const hashedPassword = await hashPassword(password)
     const success = await passwordResetTokenRepository.confirm(record.id, record.userId, hashedPassword)
 
     if (!success) {

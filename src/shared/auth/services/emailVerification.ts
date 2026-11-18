@@ -4,6 +4,7 @@ import { sendResendEmail } from '@/libs/resend'
 import { resolveExternalApiErrorType, resolveExternalApiStatusCode, traceExternalApiCall } from '@/libs/telemetry/external'
 import { emailVerificationTokenRepository } from '@/shared/auth/repositories/emailVerification'
 import { AppError } from '@/utils/errors'
+import { getEnvironment } from '@/utils/runtime'
 
 import { createScalarAuthEmail } from './scalarEmail'
 
@@ -14,7 +15,7 @@ export const EMAIL_VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000
  * 環境変数からメールアドレス検証トークンのHMAC鍵を取得する。
  */
 const getEmailVerificationTokenSecret = (): string => {
-  const secret = process.env.EMAIL_VERIFICATION_TOKEN_SECRET
+  const secret = getEnvironment().EMAIL_VERIFICATION_TOKEN_SECRET
   if (!secret) {
     throw new AppError(500, 'EMAIL_VERIFICATION_TOKEN_SECRETが設定されていません')
   }
@@ -62,7 +63,7 @@ export type EmailVerificationNotifier = {
  * 環境変数からメールアドレス検証メールの送信元を取得する。
  */
 const getEmailVerificationFromEmail = (): string => {
-  const from = process.env.EMAIL_VERIFICATION_FROM_EMAIL
+  const from = getEnvironment().EMAIL_VERIFICATION_FROM_EMAIL
   if (!from) {
     throw new AppError(500, 'EMAIL_VERIFICATION_FROM_EMAILが設定されていません')
   }
@@ -73,7 +74,7 @@ const getEmailVerificationFromEmail = (): string => {
  * 環境変数からメールアドレス検証ページのベースURLを取得する。
  */
 const getEmailVerificationUrlBase = (): string => {
-  const urlBase = process.env.EMAIL_VERIFICATION_URL_BASE
+  const urlBase = getEnvironment().EMAIL_VERIFICATION_URL_BASE
   if (!urlBase) {
     throw new AppError(500, 'EMAIL_VERIFICATION_URL_BASEが設定されていません')
   }

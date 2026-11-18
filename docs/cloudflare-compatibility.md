@@ -323,3 +323,7 @@ Workers用Prismaクライアントは `prepare:remote`／`deploy:remote` が生�
 - 通常Workerでは一括・並行実行がCPU上限で未完了でしたが、追加したDurable Objects構成では、同じ実Hyperdrive・Supabaseで全項目と並行実行が成功しました。
 - 並行実行への変更後は、Cloudflare補助コードのBunテスト17件、型チェック、lintが成功しました。使い捨てDBでのSQL重複実行と、実Cloudflareでの最大4件の同時送信も成功しています。
 - 対象ソースは本書と検証スクリプトの作業ツリーです。実Workerのコードは上記Versionで、検証クライアントは失敗を記録する変更後のものを使用しました。
+
+## 本体アプリへの適用
+
+この文書の①の証跡は検証Workerのものであり、本体アプリ全体の実機検証とは区別します。②で追加した本体Worker・Durable Object・ローカルworkerd/実DB検証と残る制約は [本体アプリのCloudflare実行経路](cloudflare-app.md) を参照してください。

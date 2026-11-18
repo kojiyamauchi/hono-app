@@ -1,9 +1,11 @@
 import { z } from 'zod'
 
+import { getEnvironment } from '@/utils/runtime'
+
 import type { InvitationEmailSnapshot } from '../entities/emailDelivery'
 
 /** 招待配信を有効にしたアプリの設定を検証する。 */
-export const getInvitationEmailConfig = (env: NodeJS.ProcessEnv = process.env): InvitationEmailSnapshot | undefined => {
+export const getInvitationEmailConfig = (env: NodeJS.ProcessEnv = getEnvironment()): InvitationEmailSnapshot | undefined => {
   const enabled = env.ENABLE_INVITATION_EMAIL
   if (enabled === undefined || enabled === 'false') return undefined
   if (enabled !== 'true') throw new Error('ENABLE_INVITATION_EMAILにはtrueまたはfalseを指定してください')

@@ -1,4 +1,5 @@
 import { AppError } from '@/utils/errors'
+import { getEnvironment } from '@/utils/runtime'
 
 /** Scalarで手動確認するメールの本文。 */
 type ScalarEmailContent = { text: string; html: string }
@@ -18,7 +19,7 @@ export const createScalarAuthEmail = (params: {
   ttlHours: number
   passwordReset?: boolean
 }): ScalarEmailContent | null => {
-  const mode = process.env.AUTH_EMAIL_MODE
+  const mode = getEnvironment().AUTH_EMAIL_MODE
   if (!mode || mode === 'link') return null
   if (mode !== 'scalar') throw new AppError(500, 'AUTH_EMAIL_MODEはlinkまたはscalarで指定してください')
 

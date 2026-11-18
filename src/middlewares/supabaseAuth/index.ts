@@ -4,6 +4,7 @@ import { createMiddleware } from 'hono/factory'
 import { supabase } from '@/libs/supabase'
 import { resolveExternalApiErrorType, resolveExternalApiHost, resolveExternalApiStatusCode, traceExternalApiCall } from '@/libs/telemetry/external'
 import { AppError } from '@/utils/errors'
+import { getEnvironment } from '@/utils/runtime'
 
 /**
  * Supabase Auth のJWT検証ミドルウェア。
@@ -21,7 +22,7 @@ export const supabaseAuthMiddleware = createMiddleware<{
   const token = authHeader.slice('Bearer '.length)
   const { data, error } = await traceExternalApiCall(
     {
-      host: resolveExternalApiHost(process.env.SUPABASE_URL),
+      host: resolveExternalApiHost(getEnvironment().SUPABASE_URL),
       method: 'GET',
       operation: 'auth.getUser',
       resolveResult: (result: Awaited<ReturnType<typeof supabase.auth.getUser>>) => ({

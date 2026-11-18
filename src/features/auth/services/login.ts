@@ -3,6 +3,7 @@ import { hashPasswordResetToken } from '@/shared/auth/services/passwordReset'
 import { userRepository } from '@/shared/user/repositories'
 import { AppError } from '@/utils/errors'
 import { createInMemoryRateLimiter } from '@/utils/rateLimit'
+import { verifyPassword } from '@/utils/runtime'
 
 import type { BodySchemaType } from '../schemas/login'
 import { issueAuthentication, normalizeEmailForRateLimit } from './common'
@@ -85,7 +86,7 @@ export const loginService = {
       throw new AppError(401, 'メールアドレスまたはパスワードが正しくありません')
     }
 
-    const isValid = await Bun.password.verify(input.password, user.password)
+    const isValid = await verifyPassword(input.password, user.password)
     if (!isValid) {
       throw new AppError(401, 'メールアドレスまたはパスワードが正しくありません')
     }

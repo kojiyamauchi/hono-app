@@ -1,17 +1,22 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.SUPABASE_URL
-// 既存のローカル・AWS設定も利用できるよう、旧anonキー設定をフォールバックとして残す。
-const supabaseKey = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY
+import { getEnvironment } from '@/utils/runtime'
+import { createScopedClient } from '@/utils/runtime/scopedClient'
 
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error('SUPABASE_URL またはSupabaseの公開キーが設定されていません')
+/** セッションを永続化しないサーバー用クライアントを当該環境の設定から生成する。 */
+export const createSupabaseClient = (): ReturnType<typeof createClient> => {
+  const env = getEnvironment()
+  const url = env.SUPABASE_URL
+  const key = env.SUPABASE_PUBLISHABLE_KEY || env.SUPABASE_ANON_KEY
+  if (!url || !key) throw new Error('SUPABASE_URL またはSupabaseの公開キーが設定されていません')
+  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } })
 }
 
-// サーバーサイドで利用するため、セッションの永続化・自動更新は無効化する
-export const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: {
-    persistSession: false,
-    autoRefreshToken: false,
-  },
+// Bunは従来どおりimport時に設定を検証する。Workersでのスコープ外利用は拒否する。
+const bunClient = typeof Bun !== 'undefined' ? createSupabaseClient() : undefined
+const scoped = createScopedClient(() => {
+  if (!bunClient) throw new Error('Cloudflareではリクエスト専用のSupabaseクライアントが必要です')
+  return bunClient
 })
+export const supabase = scoped.client
+export const runWithSupabase = scoped.run
