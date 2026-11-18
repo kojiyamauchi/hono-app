@@ -26,10 +26,7 @@ export function assertCloudflareProtection(config, application, policies, organi
   assert.equal(application.id, config.access_application_id)
   assert.equal(application.aud, config.access_audience)
   assert.equal(application.type, 'self_hosted')
-  assert.deepEqual(
-    application.destinations?.map(({ type, worker_id }) => ({ type, worker_id })),
-    [{ type: 'worker', worker_id: config.worker_id }],
-  )
+  assert.deepEqual(application.destinations, [{ type: 'worker', worker_id: config.worker_id }])
   assert.equal(application.options_preflight_bypass, false)
   assert(!application.read_service_tokens_from_header)
   assert(!application.domain)
@@ -102,6 +99,21 @@ export function cloudflareAppSecrets(input) {
   assert(input.SUPABASE_PUBLISHABLE_KEY || input.SUPABASE_ANON_KEY)
   assert.match(input.SUPABASE_URL, /^https:\/\/[^/]+\.supabase\.co$/)
   assert(['Lax', 'Strict', 'None', undefined].includes(input.COOKIE_SAMESITE))
+  assert(['link', 'scalar', undefined].includes(input.AUTH_EMAIL_MODE))
   for (const key of ['ENABLE_API_DOCS', 'ENABLE_INVITATION_EMAIL']) assert([undefined, 'true', 'false'].includes(input[key]))
-  return { ...input, COOKIE_SECURE: 'true', OTEL_SDK_DISABLED: 'true', OTEL_TRACES_ENABLED: 'false' }
+  // Wranglerは省略された既存Secretを維持するため、任意設定も明示的に既定値へ戻す。
+  return {
+    SUPABASE_PUBLISHABLE_KEY: '',
+    SUPABASE_ANON_KEY: '',
+    AUTH_EMAIL_MODE: 'link',
+    COOKIE_SAMESITE: 'Lax',
+    ENABLE_API_DOCS: 'false',
+    ENABLE_INVITATION_EMAIL: 'false',
+    INVITATION_EMAIL_FROM: '',
+    INVITATION_EMAIL_SCALAR_URL: '',
+    ...input,
+    COOKIE_SECURE: 'true',
+    OTEL_SDK_DISABLED: 'true',
+    OTEL_TRACES_ENABLED: 'false',
+  }
 }

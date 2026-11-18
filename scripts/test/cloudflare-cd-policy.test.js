@@ -26,6 +26,12 @@ describe('Cloudflare本体の配備境界', () => {
       },
     ],
     [
+      '余分なdestination属性',
+      (f) => {
+        f[1].destinations[0].uri = '/health'
+      },
+    ],
+    [
       'AUD相違',
       (f) => {
         f[1].aud = '5'.repeat(64)
@@ -129,6 +135,9 @@ describe('Cloudflare本体の配備境界', () => {
     )
     Object.assign(secrets, { SUPABASE_URL: 'https://example.supabase.co', SUPABASE_ANON_KEY: 'test' })
     expect(cloudflareAppSecrets(secrets).COOKIE_SECURE).toBe('true')
+    expect(cloudflareAppSecrets(secrets).ENABLE_API_DOCS).toBe('false')
+    expect(cloudflareAppSecrets(secrets).SUPABASE_PUBLISHABLE_KEY).toBe('')
+    expect(() => cloudflareAppSecrets({ ...secrets, AUTH_EMAIL_MODE: 'unknown' })).toThrow()
     for (const key of ['DATABASE_URL', 'SPIKE_TOKEN', 'ACCESS_ISSUER', 'CLOUDFLARE_API_TOKEN', 'COOKIE_SECURE'])
       expect(() => cloudflareAppSecrets({ ...secrets, [key]: 'test' })).toThrow()
     expect(() => cloudflareAppSecrets({ ...secrets, JWT_SECRET: '' })).toThrow()
