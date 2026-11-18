@@ -3,6 +3,7 @@ import { sendEmailVerificationBestEffort } from '@/shared/auth/services/emailVer
 import { userRepository } from '@/shared/user/repositories'
 import { AppError } from '@/utils/errors'
 import { createInMemoryRateLimiter } from '@/utils/rateLimit'
+import { hashPassword } from '@/utils/runtime'
 
 import type { BodySchemaType } from '../schemas/signup'
 import { issueAuthentication } from './common'
@@ -55,7 +56,7 @@ export const signupService = {
       throw new AppError(409, 'このメールアドレスは既に登録されています')
     }
 
-    const hashedPassword = await Bun.password.hash(input.password)
+    const hashedPassword = await hashPassword(input.password)
     const user = await userRepository.create({
       name: input.name,
       email: input.email,

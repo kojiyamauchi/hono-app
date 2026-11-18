@@ -6,6 +6,7 @@ import { invitationRepository } from '@/shared/invitation/repositories'
 import { toUserResponse } from '@/shared/user/mappers'
 import { userRepository } from '@/shared/user/repositories'
 import { AppError } from '@/utils/errors'
+import { hashPassword } from '@/utils/runtime'
 
 import { findPendingValidInvitation } from './common'
 
@@ -33,7 +34,7 @@ export const signupService = {
     }
 
     // 3. パスワードをハッシュ化
-    const hashedPassword = await Bun.password.hash(password)
+    const hashedPassword = await hashPassword(password)
 
     // 4. トランザクションでユーザー作成、membership作成、招待ACCEPTED更新
     const user = await invitationRepository.signup(invitation.id, invitation.organizationId, invitation.email, name, hashedPassword, invitation.role)

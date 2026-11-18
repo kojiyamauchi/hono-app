@@ -1,6 +1,7 @@
 import { supabase } from '@/libs/supabase'
 import { resolveExternalApiErrorType, resolveExternalApiHost, resolveExternalApiStatusCode, traceExternalApiCall } from '@/libs/telemetry/external'
 import { AppError } from '@/utils/errors'
+import { getEnvironment } from '@/utils/runtime'
 
 import type { BodySchemaType } from '../schemas/signup'
 import type { AuthResult } from './common'
@@ -17,7 +18,7 @@ export const signupService = {
   execute: async (input: BodySchemaType): Promise<AuthResult> => {
     const { data, error } = await traceExternalApiCall(
       {
-        host: resolveExternalApiHost(process.env.SUPABASE_URL),
+        host: resolveExternalApiHost(getEnvironment().SUPABASE_URL),
         method: 'POST',
         operation: 'auth.signUp',
         resolveResult: (result: Awaited<ReturnType<typeof supabase.auth.signUp>>) => ({

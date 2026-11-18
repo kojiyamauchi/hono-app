@@ -2,6 +2,7 @@ import type { UserDtoType } from '@/shared/user/dtos'
 import { toUserResponse } from '@/shared/user/mappers'
 import { userRepository } from '@/shared/user/repositories'
 import { AppError } from '@/utils/errors'
+import { verifyPassword } from '@/utils/runtime'
 
 import { accountDeletionResults, meRepository } from '../repositories/me'
 import type { UpdateBodySchemaType } from '../schemas/me'
@@ -43,7 +44,7 @@ export const meService = {
    * 現在のパスワードで本人確認し、認証済みユーザー自身のアカウントを削除する。
    */
   remove: async (userId: number, currentPassword: string): Promise<void> => {
-    const result = await meRepository.remove(userId, (passwordHash) => Bun.password.verify(currentPassword, passwordHash))
+    const result = await meRepository.remove(userId, (passwordHash) => verifyPassword(currentPassword, passwordHash))
 
     // 成功（DELETED）だけを先頭で通し、未知の結果値はエラー側へ倒す（fail-closed）
     if (result === accountDeletionResults.deleted) {

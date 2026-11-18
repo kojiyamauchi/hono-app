@@ -1,6 +1,7 @@
 import { authCredentialRepository } from '@/shared/auth/repositories/credential'
 import { userRepository } from '@/shared/user/repositories'
 import { AppError } from '@/utils/errors'
+import { hashPassword, verifyPassword } from '@/utils/runtime'
 
 /**
  * パスワード変更のビジネスロジック。
@@ -16,7 +17,7 @@ export const changePasswordService = {
       throw new AppError(404, 'ユーザーが見つかりません')
     }
 
-    const isCurrentPasswordValid = await Bun.password.verify(currentPassword, user.password)
+    const isCurrentPasswordValid = await verifyPassword(currentPassword, user.password)
     if (!isCurrentPasswordValid) {
       throw new AppError(401, '現在のパスワードが正しくありません')
     }
@@ -25,7 +26,7 @@ export const changePasswordService = {
       throw new AppError(400, '新しいパスワードは現在のパスワードと異なる値を入力してください')
     }
 
-    const hashedPassword = await Bun.password.hash(newPassword)
+    const hashedPassword = await hashPassword(newPassword)
     const changed = await authCredentialRepository.changePassword(userId, hashedPassword)
 
     if (!changed) {
