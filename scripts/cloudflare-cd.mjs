@@ -23,6 +23,12 @@ export function isCurrentCloudflareSha(sha, run = executeCloudflare) {
   return remote.split(/\s+/)[0] === sha
 }
 
+/** ローカル初回配備も、タグのSHAとクリーンなcheckoutの一致を要求する。 */
+export function assertCloudflareCheckout(sha, run = executeCloudflare) {
+  assert.equal(run('git', ['rev-parse', 'HEAD']), sha)
+  assert.equal(run('git', ['status', '--porcelain']), '')
+}
+
 /** URL無効の初回配備と、有効化済み本体への通常配備を同じ確認経路で実行する。 */
 export async function deployCloudflare({ config, secrets, sha, directory, bootstrap = false, credentials, databaseUrl, summaryPath }, dependencies = {}) {
   const run = dependencies.run ?? executeCloudflare
@@ -34,6 +40,7 @@ export async function deployCloudflare({ config, secrets, sha, directory, bootst
   assertCloudflareConfig(config)
   assert.equal(config.enable_worker_url, !bootstrap)
   assert.match(sha ?? '', /^[a-f0-9]{40}$/)
+  assertCloudflareCheckout(sha, run)
   assert(directory && resolve(directory) !== process.cwd())
   const appSecrets = cloudflareAppSecrets(secrets)
   if (!bootstrap && !isCurrentCloudflareSha(sha, run)) return 'outdated'
@@ -52,6 +59,7 @@ export async function deployCloudflare({ config, secrets, sha, directory, bootst
     run('bun', ['x', '--no-install', 'wrangler', 'deploy', '--config', configPath, '--dry-run', '--outdir', resolve(directory, 'build')])
     // ビルド中に新mainが出た場合も、まだクラウドへ変更を加えず省略できる。
     if (!bootstrap && !isCurrentCloudflareSha(sha, run)) return 'outdated'
+    assertCloudflareCheckout(sha, run)
     await database(databaseUrl, await infrastructure(config, api))
     await writeFile(secretPath, JSON.stringify(appSecrets), { mode: 0o600 })
     // コードとSecretを同じversionへ配備し、URL/previewは承認済みの値を維持する。

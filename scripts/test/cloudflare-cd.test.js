@@ -27,6 +27,8 @@ async function deploymentFixture(fail = '') {
     api: async () => {},
     run: (command, args) => {
       if (command === 'git') {
+        if (args[0] === 'rev-parse') return parameters.sha
+        if (args[0] === 'status') return ''
         checks++
         return `${fail === `outdated-${checks}` ? 'b'.repeat(40) : parameters.sha}\trefs/heads/main`
       }
@@ -146,3 +148,24 @@ test('最終確認では再取得したHyperdrive接続先をDB照合へ渡す',
     await rm(f.directory, { recursive: true, force: true })
   }
 })
+
+for (const bootstrap of [false, true]) {
+  for (const kind of ['wrong-sha', 'dirty'])
+    test(`${bootstrap ? '初回' : '通常'}配備で${kind}のcheckoutを変更前に拒否する`, async () => {
+      const f = await deploymentFixture()
+      f.parameters.bootstrap = bootstrap
+      f.parameters.config.enable_worker_url = !bootstrap
+      const original = f.dependencies.run
+      f.dependencies.run = (command, args) => {
+        if (command === 'git' && kind === 'wrong-sha' && args[0] === 'rev-parse') return 'b'.repeat(40)
+        if (command === 'git' && kind === 'dirty' && args[0] === 'status') return ' M src/cloudflare.ts'
+        return original(command, args)
+      }
+      try {
+        await expect(deployCloudflare(f.parameters, f.dependencies)).rejects.toThrow()
+        expect(f.events).toEqual([])
+      } finally {
+        await rm(f.directory, { recursive: true, force: true })
+      }
+    })
+}
