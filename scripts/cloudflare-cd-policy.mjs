@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import { resolve } from 'node:path'
 
+import { getInvitationEmailConfig } from '../src/shared/invitation/services/emailConfig.ts'
+
 /** 対象を本体devと、Terraformで承認したAccess設定だけに固定する。 */
 export function assertCloudflareConfig(config) {
   assert.match(config.account_id ?? '', /^[a-f0-9]{32}$/)
@@ -101,6 +103,8 @@ export function cloudflareAppSecrets(input) {
   assert(['Lax', 'Strict', 'None', undefined].includes(input.COOKIE_SAMESITE))
   assert(['link', 'scalar', undefined].includes(input.AUTH_EMAIL_MODE))
   for (const key of ['ENABLE_API_DOCS', 'ENABLE_INVITATION_EMAIL']) assert([undefined, 'true', 'false'].includes(input[key]))
+  // 招待有効時の組合せは、本体と同じ検証を配備前にも適用する。
+  getInvitationEmailConfig(input)
   // Wranglerは省略された既存Secretを維持するため、任意設定も明示的に既定値へ戻す。
   return {
     SUPABASE_PUBLISHABLE_KEY: '',

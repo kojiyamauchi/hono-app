@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { assertCloudflareProtection, cloudflareAppSecrets, createCloudflareConfig } from '../cloudflare-cd-policy.mjs'
 
-import { protectionFixture } from './cloudflare-cd-fixtures.js'
+import { appSecretsFixture, protectionFixture } from './cloudflare-cd-fixtures.js'
 
 describe('Cloudflare本体の配備境界', () => {
   test('本体dev・全パス・完全一致ポリシーを許可する', () => expect(() => assertCloudflareProtection(...protectionFixture())).not.toThrow())
@@ -142,4 +142,16 @@ describe('Cloudflare本体の配備境界', () => {
       expect(() => cloudflareAppSecrets({ ...secrets, [key]: 'test' })).toThrow()
     expect(() => cloudflareAppSecrets({ ...secrets, JWT_SECRET: '' })).toThrow()
   })
+})
+
+test('招待配信を有効にするときは本体と同じ設定の組合せを要求する', () => {
+  const input = { ...appSecretsFixture(), ENABLE_INVITATION_EMAIL: 'true' }
+  expect(() => cloudflareAppSecrets(input)).toThrow()
+  input.ENABLE_API_DOCS = 'true'
+  expect(() => cloudflareAppSecrets(input)).toThrow()
+  input.INVITATION_EMAIL_FROM = 'sender@example.com'
+  input.INVITATION_EMAIL_SCALAR_URL = 'https://example.com/open-api/scalar'
+  expect(cloudflareAppSecrets(input).ENABLE_INVITATION_EMAIL).toBe('true')
+  input.INVITATION_EMAIL_SCALAR_URL += '?token=example'
+  expect(() => cloudflareAppSecrets(input)).toThrow()
 })
