@@ -17,3 +17,7 @@ infra/**/modules/**/.terraform.lock.hcl
 *.tfplan
 crash.log
 crash.*.log
+
+# Cloudflareの検証用生成物とローカルシークレット
+**/.wrangler/
+**/.dev.vars*

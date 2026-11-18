@@ -186,3 +186,22 @@ GCPのdev環境では、以下を含む全エンドポイントへのアクセ�
 | POST   | `/invitations/accept`  | 必要 | 招待トークンを指定して招待を受諾し、組織メンバーになる                               |
 | POST   | `/invitations/decline` | 不要 | 招待トークンを指定して招待を辞退する                                                 |
 | POST   | `/invitations/signup`  | 不要 | 招待トークンを指定して新規登録し、組織メンバーになる（リフレッシュトークンはCookie） |
+
+## Cloudflare互換性検証Worker
+
+以下は本体アプリとは別に配備する検証用WorkerのAPIです。公開配備時はCloudflare Accessと検証専用のBearerトークン（`SPIKE_TOKEN`）を併用します。本体の認証APIとはトークンを共有しません。
+
+| Method | Path                     | 概要                                                                              |
+| ------ | ------------------------ | --------------------------------------------------------------------------------- |
+| GET    | `/ready`                 | 検証Workerの稼働状態と実行プロファイルを確認する                                  |
+| POST   | `/password`              | 既存ハッシュとの相互互換性と誤パスワードの拒否を確認する                          |
+| POST   | `/database`              | PrismaによるDB接続・transaction・行ロック・一意制約を確認し、検証データを残さない |
+| POST   | `/measure/ready`         | 計測用の基準リクエストを実行する                                                  |
+| POST   | `/measure/password`      | パスワード照合を1回実行する                                                       |
+| POST   | `/measure/password-fast` | 実験用nativeプロファイルのパスワード照合を1回実行する                             |
+| POST   | `/measure/database`      | PrismaのモデルAPIで合成メールアドレスを1回検索する                                |
+| POST   | `/measure/database-row`  | PrismaのモデルAPIでIDだけを1件取得し、存在の有無だけを返す                        |
+| POST   | `/measure/database-raw`  | Prismaのパラメーター化SQLで合成メールアドレスを1回検索する                        |
+| POST   | `/measure/database-wait` | 固定200msの待機を含む読み取り専用SQLで、DB処理の重なりを計測する                  |
+
+`/measure/*` はUUID形式の `sample` クエリを必要とします。DB用APIは `ENABLE_DATABASE_CHECK=true` のときだけ有効です。nativeプロファイルでは `/password` と `/measure/password` を無効にし、ほかのパスワード実装では `/measure/password-fast` を無効にします。軽量プロファイルでは公開するAPIをさらに限定します。配備方法・プロファイル・検証範囲は[Cloudflare互換性検証](cloudflare-compatibility.md)を参照してください。

@@ -1,6 +1,8 @@
 node_modules
 dist
 src/generated
+**/.wrangler
+.env.*.local
 infra/**/.terraform
 infra/**/*.tf
 infra/**/*.tfvars

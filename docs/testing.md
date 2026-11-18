@@ -4,6 +4,18 @@
 
 テストを機械的に全レイヤーへ追加するのではなく、変更によって発生するリスクに対応したテストを選択します。
 
+## 全件テストの準備
+
+clone後は、ルートの依存に加えてCloudflare検証用の固定した依存もインストールしてください。ルートの全件テストにはWasm実装の互換性テストも含まれ、検証用パッケージ配下の `argon2-browser` と `hash-wasm` を読み込みます。DBやCloudflareの認証情報は不要です。
+
+```bash
+bun ci
+bun install --cwd scripts/cloudflare-compatibility --frozen-lockfile --ignore-scripts
+bun test --isolate
+```
+
+CIのUnit Testジョブでも検証用依存をインストールし、同じテストをスキップせず実行します。
+
 ## 基本方針
 
 - 変更した責務に最も近い層でテストする
@@ -299,11 +311,15 @@ bun run build
 
 通常のCIテストはDB非依存とし、Repositoryと外部サービスをmockします。
 
-PRでは検査専用の `ci.yml` を実行し、ChecksにCDジョブを含めません。mainへのpushでは `cd-gcp.yml` から同じ `ci.yml` を呼び出します。GCP devの配備は全CI成功後、明示的に有効化された場合だけ動きます。配備前のコンテナ検証は通常のUnit Testとは分離し、使い捨てDBで行います。CDのplan許可範囲・migration失敗時の停止・IAP検証・イメージ保持は `scripts/test/gcp-cd*.test.js` とGCPのTerraformモックテストで確認します。[GCP devの自動配備](deployment-gcp-cd.md)
+PRでは検査専用の `ci.yml` を実行し、ChecksにCDジョブを含めません。mainへのpushでは `cd-gcp.yml` から同じ `ci.yml` を呼び出します。GCP devの配備は `ci.yml` 内の全ジョブ成功後、明示的に有効化された場合だけ動きます。配備前のコンテナ検証は通常のUnit Testとは分離し、使い捨てDBで行います。CDのplan許可範囲・migration失敗時の停止・IAP検証・イメージ保持は `scripts/test/gcp-cd*.test.js` とGCPのTerraformモックテストで確認します。[GCP devの自動配備](deployment-gcp-cd.md)
 
 GCPのCIは `init -backend=false -lockfile=readonly` の後にvalidate・モックテストを実行します。初期化時にlockfileへハッシュを自動追加して成功扱いにせず、Mac/ARM64とLinux/AMD64の両方が記録されていることを前提にします。platformやproviderを更新する手順は[lockfile管理](deployment-gcp-cd.md#providerのlockfile管理)を参照してください。
 
 plan検査では、対象Registryの `resource_drift` が `update_time` だけの場合を配備前後で許容し、cleanup設定・IAM・他の属性・別リソース・未確定値・作成削除を引き続き拒否することを回帰テストで確認します。`resource_changes` のRegistry更新を許可するものではありません。Terraformのモックテストでは、WIF poolのrefresh用roleに `getAttestationRules` を含め、`setAttestationRules` を付けないことを確認します。モックは実APIの認可を再現しないため、実際のSAによるplanと配備全体の検証は、確認済みのクラウド設定適用後に別途行います。
+
+`terraform-aws`・`terraform-gcp`・`terraform-cloudflare` は同じ `ci.yml` 内の独立したジョブとして定義し、互いに `needs` を設定せず並列実行します。Terraformの整形検査は各ジョブのクラウドrootを対象に行います。いずれかの検査が失敗するとCI全体が失敗し、共通CIを前提とするGCPの配備へ進みません。
+
+Cloudflare検証用のBunテストも通常のUnit Testへ含め、そのジョブだけで固定した検証用依存を追加インストールします。ローカルでも[全件テストの準備](#全件テストの準備)を済ませてから実行してください。lint・スペル検査もCloudflare専用ファイルを含めて全体を対象とします。CloudflareのTerraform検査はbackend・認証情報を使わないモックで実行し、実Cloudflareへの接続・配備は行いません。
 
 実DB integration testを自動化する場合は、通常のテストとは別のCI jobとして実行します。
 

@@ -16,5 +16,11 @@ export default {
     () => 'bun run tf:gcp:lint',
     () => 'bun run tf:gcp:validate',
   ],
+  './infra/cloudflare/**/*.{tf,tfvars}': [
+    /** Cloudflare変更時はCloudflare rootの静的検証を実行する。 */
+    () => 'bun run tf:fmt',
+    () => 'bun run tf:cloudflare:lint',
+    () => 'bun run tf:cloudflare:validate',
+  ],
   './**/*': 'bunx cspell --dot --no-must-find-files',
 }

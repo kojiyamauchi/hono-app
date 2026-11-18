@@ -19,13 +19,16 @@ words:
   - dotenv
   - dtos
   - eips
+  - Emscripten
   - esbenp
   - extname
   - HMAC
   - hono
   - Hono
   - hostnames
+  - hyperdrive
   - iamcredentials
+  - idps
   - isready
   - keyout
   - kojiyamauchi
@@ -36,6 +39,7 @@ words:
   - noout
   - octocat
   - oneline
+  - onetimepin
   - opencontainers
   - pooler
   - postgresql
@@ -54,12 +58,14 @@ words:
   - tfvars
   - tonumber
   - userinfo
+  - workerd
 flagWords:
   - null
 ignorePaths:
   - certificates/**/*.crt
   - ./**/.terraform/**
   - infra/gcp/.terraform.lock.hcl
+  - infra/cloudflare/.terraform.lock.hcl
   - ./**/*.tfstate*
   - ./**/node_modules/**
   - .claude/settings.local.json
@@ -68,9 +74,14 @@ ignorePaths:
   - .history/**
   - dist/**
   - src/generated/**
+  - ./**/.wrangler/**
+  - scripts/cloudflare-compatibility/bun.lock
   - prisma/migrations/**
   - supabase/**
   - .env
+  - '**/.env.*.local'
+  - infra/**/env/*.local.tfvars
+  - infra/**/env/*.local.hcl
   - cspell.yml
   - bun.lock
   - tsconfig.tsbuildinfo

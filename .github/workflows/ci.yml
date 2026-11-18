@@ -53,12 +53,18 @@ jobs:
       - name: Install Dependencies
         run: bun ci
 
+      - name: Install Cloudflare Verification Dependencies
+        if: matrix.script == 'test'
+        working-directory: scripts/cloudflare-compatibility
+        run: bun install --frozen-lockfile --ignore-scripts
+
       - name: Generate Prisma Client
         run: bun run prisma:generate
 
       - name: Do ${{ matrix.job_name }}
         run: bun run ${{ matrix.script }}
 
+  # 各クラウドのTerraform検査はneedsを設定せず、互いに並列実行する。
   terraform-aws:
     name: Terraform AWS Checks
     runs-on: ubuntu-latest
@@ -93,7 +99,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
 
       - name: Check Terraform Formatting
-        run: bun run tf:fmt:check
+        run: terraform -chdir=infra/aws fmt -recursive -check -diff
 
       - name: Run TFLint
         run: bun run tf:aws:lint
@@ -150,7 +156,10 @@ jobs:
 
       # Google認証やbackend接続を使わず、providerのモックで構成を検証する。
       # CDと同じreadonly初期化で、Linux用ハッシュの記録漏れも検出する。
-      # 整形検査はAWSジョブのtf:fmt:checkでinfra全体を対象に実行する。
+      # 整形検査もこのジョブが担当するクラウドのrootに限定する。
+      - name: Check Terraform Formatting
+        run: terraform -chdir=infra/gcp fmt -recursive -check -diff
+
       - name: Initialize Terraform Without Backend
         run: bun run tf:gcp:init:no-backend -lockfile=readonly
 
@@ -167,6 +176,47 @@ jobs:
 
       - name: Test Terraform
         run: bun run tf:gcp:test
+
+  terraform-cloudflare:
+    name: Terraform Cloudflare Checks
+    runs-on: ubuntu-latest
+    env:
+      TF_WORKSPACE: dev
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Execution Environment for Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v6
+        with:
+          tflint_version: ${{ env.TFLINT_VERSION }}
+          cache: true
+
+      - name: Check Terraform Formatting
+        run: terraform -chdir=infra/cloudflare fmt -recursive -check -diff
+
+      # 実CloudflareのAPI・backend・認証情報を使わず、providerをモックする。
+      - name: Initialize Terraform Without Backend
+        run: bun run tf:cloudflare:init:no-backend -lockfile=readonly
+
+      - name: Run TFLint
+        run: bun run tf:cloudflare:lint
+
+      - name: Validate Terraform
+        run: bun run tf:cloudflare:validate
+
+      - name: Test Terraform
+        run: bun run tf:cloudflare:test
 
   build:
     name: Build Test

@@ -4,8 +4,8 @@ mainへのマージをdevへの配備判断とし、追加承認なしで配備�
 
 ## 実行範囲
 
-- `ci.yml` は `pull_request` と `workflow_call` を受け付ける検査専用workflowです。PRのChecksにはCIの7項目だけを表示し、CDジョブは定義しません。
-- `cd-gcp.yml` はmainへのpushで起動し、先に `ci.yml` を呼び出します。全検査成功後に配備ジョブを実行します。mainへの直接pushも同じ起動条件です。
+- `ci.yml` は `pull_request` と `workflow_call` を受け付ける検査専用workflowです。共通のコード検査・ビルドと、AWS・GCP・CloudflareのTerraform検査を実行し、CDジョブは定義しません。3つのTerraformジョブは互いに依存させず並列実行します。
+- `cd-gcp.yml` はmainへのpushで起動し、先に `ci.yml` を呼び出します。`ci.yml` 内の全検査成功後に配備ジョブを実行します。Cloudflareを含むいずれかの検査が失敗した場合は配備へ進みません。mainへの直接pushも同じ起動条件です。
 - repository variable `GCP_DEV_CD_ENABLED` が文字列 `true` の場合だけ配備ジョブを実行します。未設定・falseでもCIは実行しますが、配備用認証・Dockerビルド・イメージpush・migration・applyは行いません。
 - 対象は `hono-app-dev-512908-f3`、`asia-northeast1`、Terraform workspace `dev`、既存サービス `hono-app-dev` です。AWS用CD、prod用CD、一般公開への変更は含みません。
 - CIは各pushで実行し、配備待ちで止めません。配備ジョブだけを `gcp-dev-deployment` concurrency groupで直列化し、新しいpushで実行中のmigration・applyをキャンセルしません。待機後の配備ジョブはmainのSHAと照合し、古い対象を省略します。

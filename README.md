@@ -146,7 +146,7 @@ flowchart LR
 |-- .github/
 |   |-- pull_request_template.md     # PRテンプレート
 |   `-- workflows/
-|       |-- ci.yml                   # GitHub Actions CI
+|       |-- ci.yml                   # GCPの配備前にも使う共通CI
 |       |-- cd-aws.yml               # ECRへのイメージ登録
 |       `-- comment-ops.yml          # PRコメント操作
 |-- .husky/
@@ -380,6 +380,12 @@ OpenAPIを導入しており、入力検証用schemaとレスポンスDTOの責�
 bun install
 ```
 
+全件テストにはCloudflare検証用のWasmも含まれます。テスト実行前に検証用パッケージの依存もインストールしてください（[テストの準備](docs/testing.md#全件テストの準備)）。
+
+```bash
+bun install --cwd scripts/cloudflare-compatibility --frozen-lockfile --ignore-scripts
+```
+
 `.env` を作成します。
 
 ```bash
@@ -513,7 +519,9 @@ bun run tf:aws:init:no-backend
 bun run tf:aws:lint:init
 ```
 
-Terraformはクラウドごとに独立したrootとstateを使います。AWSは `infra/aws/` と `tf:aws:*`、GCPは `infra/gcp/` と `tf:gcp:*` を使い、環境はそれぞれのworkspaceで分離します。`tf:fmt` / `tf:fmt:check` だけは `infra/` 全体が対象です。
+Terraformはクラウドごとに独立したrootとstateを使います。AWSは `infra/aws/` と `tf:aws:*`、GCPは `infra/gcp/` と `tf:gcp:*`、Cloudflareは `infra/cloudflare/` と `tf:cloudflare:*` を使い、環境はそれぞれのworkspaceで分離します。CloudflareはGCS backendのprefixをGCPと分け、現時点では `dev` workspaceだけを許可します。CIではbackendなしの初期化とモックテストを使い、実Cloudflareへ接続しません。`tf:fmt` / `tf:fmt:check` だけは `infra/` 全体が対象です。
+
+GCPを維持してCloudflare Workersを追加するための、パスワード・Prismaの検証結果と再実行手順は [Cloudflare互換性検証](docs/cloudflare-compatibility.md)、TerraformによるAccess保護と検証Workerの配備は [Cloudflare配備手順](docs/deployment-cloudflare.md) を参照してください。実Hyperdrive経由のSupabase接続と、Durable Objectsでの既存ハッシュ・Prismaの並行実行を検証済みです。アプリ本体のWorkers移植とCDは後続の作業です。
 
 GCPの無料枠を優先したCloud RunとSupabase Freeの構成、IAMによるアクセス制限、初回の前提リソース作成から公開までの操作は [GCPデプロイ手順](docs/deployment-gcp.md) を参照してください。クラウドへ接続しない検証は以下です。
 
@@ -683,7 +691,7 @@ bun run start               # サーバーを起動
 bun run build               # TypeScriptの型チェック
 bun run typecheck           # TypeScriptの型チェック
 bun run lint                # ESLintによる自動修正
-bun run lint:check          # ESLintによるチェックのみ（--fixなし・CIで使用）
+bun run lint:check          # ESLintによるチェックのみ（--fixなし・全体対象）
 bun run format              # Prettierによるフォーマット
 bun run spellcheck          # cspellによるスペルチェック
 bun test --isolate          # Bun Testを分離実行
