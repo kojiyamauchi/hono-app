@@ -18,8 +18,13 @@ jobs:
       cancel-in-progress: false
     env:
       WRANGLER_SEND_METRICS: 'false'
-      CLOUDFLARE_CD_DIR: ${{ runner.temp }}/hono-cloudflare-dev-cd
     steps:
+      - name: Prepare private runner directory
+        run: |
+          umask 077
+          mkdir -p "$RUNNER_TEMP/hono-cloudflare-dev-cd"
+          printf 'CLOUDFLARE_CD_DIR=%s/hono-cloudflare-dev-cd\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+
       - name: Checkout deployment SHA
         uses: actions/checkout@v6
         with:
