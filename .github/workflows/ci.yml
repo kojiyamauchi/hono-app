@@ -1,3 +1,4 @@
+# cspell:words rhysd shellcheck pyflakes
 name: Pull Request CI
 
 on:
@@ -63,6 +64,15 @@ jobs:
 
       - name: Do ${{ matrix.job_name }}
         run: bun run ${{ matrix.script }}
+
+      # mainでしか起動しないCDもPR中に構文とコンテキストの有効性を検査する。
+      - name: Validate CD workflow syntax
+        if: matrix.script == 'lint:check'
+        run: >-
+          docker run --rm --network none
+          --volume "$GITHUB_WORKSPACE:/repo:ro" --workdir /repo
+          rhysd/actionlint:1.7.12 -shellcheck= -pyflakes=
+          .github/workflows/cd-gcp.yml .github/workflows/cd-cloudflare.yml
 
   cloudflare-runtime:
     name: Cloudflare Runtime Test

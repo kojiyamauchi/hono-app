@@ -227,7 +227,7 @@ bun run tf:gcp:validate
 TF_WORKSPACE=dev bun run tf:gcp:test
 ```
 
-CloudflareはGCS backendを使い、GCPとは異なるstate prefixを指定する。現時点では `dev` workspaceだけを許可し、検証WorkerとAccessを管理する。Hyperdriveは既存IDを参照する。初回構築・Access保護・配備順序は [docs/deployment-cloudflare.md](docs/deployment-cloudflare.md) を参照する。CloudflareのCIと静的検証も `TF_WORKSPACE=dev` とbackendなしの初期化・モックテストを使い、実Cloudflareへ接続しない。
+CloudflareはGCS backendを使い、GCPとは異なるstate prefixを指定する。現時点では `dev` workspaceだけを許可し、検証Workerと、明示設定時の本体専用Worker・Accessを管理する。本体は `app_config = null` で既定無効とし、CDは共通CI全件成功と有効な場合のGCP配備成功後だけ実行する。共有SupabaseのmigrationはGCP側または手動運用で適用し、Cloudflare CDは履歴照合だけを行う。Hyperdriveは既存IDを参照する。検証基盤の初回構築・Access保護・配備順序は [docs/deployment-cloudflare.md](docs/deployment-cloudflare.md)、本体の初回非公開構築・CD有効化・復旧は [docs/deployment-cloudflare-cd.md](docs/deployment-cloudflare-cd.md) を参照する。CloudflareのCIと静的検証も `TF_WORKSPACE=dev` とbackendなしの初期化・モックテストを使い、実Cloudflareへ接続しない。
 
 ```bash
 TF_WORKSPACE=dev bun run tf:cloudflare:init:no-backend -lockfile=readonly

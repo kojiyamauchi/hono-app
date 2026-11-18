@@ -202,3 +202,14 @@ jobs:
       - name: Remove private temporary files
         if: always()
         run: rm -rf -- "$GCP_CD_DIR" "$TF_DATA_DIR" "$CLOUDSDK_CONFIG" "$DOCKER_CONFIG"
+
+  cloudflare:
+    needs: [ci, deploy]
+    # 共通CI全件と、有効な場合のGCP配備（共有DB migration）を待つ。
+    # GCP無効時はスキップを許可するが、失敗・キャンセルを成功扱いしない。
+    if: >-
+      always() && !cancelled() &&
+      needs.ci.result == 'success' &&
+      (needs.deploy.result == 'success' || (vars.GCP_DEV_CD_ENABLED != 'true' && needs.deploy.result == 'skipped')) &&
+      vars.CLOUDFLARE_DEV_CD_ENABLED == 'true'
+    uses: ./.github/workflows/cd-cloudflare.yml

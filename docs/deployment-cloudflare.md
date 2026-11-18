@@ -150,8 +150,8 @@ TF_WORKSPACE=dev bun run tf:cloudflare:test
 bun test --isolate scripts/cloudflare-compatibility/test
 ```
 
-Terraformはproviderをモックし、クラウド認証なしで検証します。共通の `ci.yml` で、CloudflareのTerraform検査をAWS・GCPと並列実行します。補助コード・Wasmの単体テスト、Cloudflare専用ファイルのlint・スペル検査も共通CIへ含めます。Cloudflareを含むいずれかの検査が失敗した場合は共通CIが失敗し、GCPの配備へ進みません。Cloudflare自体の配備は現在手動で、CDはまだ追加していません。検証Workerの実Workers・Hyperdrive検証はCIへ追加しません。本体アプリは別ジョブでローカルworkerdと使い捨てPostgreSQLを検証します。固定providerは `cloudflare/cloudflare 5.29.0` とし、macOS ARMとLinux AMD64のチェックサムをlockfileへ記録します。
+Terraformはproviderをモックし、クラウド認証なしで検証します。共通の `ci.yml` で、CloudflareのTerraform検査をAWS・GCPと並列実行します。補助コード・Wasmの単体テスト、Cloudflare専用ファイルのlint・スペル検査も共通CIへ含めます。Cloudflareを含むいずれかの検査が失敗した場合は共通CIが失敗し、GCPの配備へ進みません。検証Workerの配備は引き続き手動です。本体専用CDは[別手順](deployment-cloudflare-cd.md)を参照してください。検証Workerの実Workers・Hyperdrive検証はCIへ追加しません。本体アプリは別ジョブでローカルworkerdと使い捨てPostgreSQLを検証します。固定providerは `cloudflare/cloudflare 5.29.0` とし、macOS ARMとLinux AMD64のチェックサムをlockfileへ記録します。
 
 ## 本体アプリ
 
-本体アプリの別Worker・Durable Object・設定・実DB/workerd検証は [本体アプリのCloudflare実行経路](cloudflare-app.md) を参照してください。検証Workerの配備コマンドは本体用ではありません。本体の自動配備は後続PRです。
+本体アプリの別Worker・Durable Object・設定・実DB/workerd検証は [本体アプリのCloudflare実行経路](cloudflare-app.md) を参照してください。検証Workerの配備コマンドは本体用ではありません。本体の自動配備は[Cloudflare dev CD](deployment-cloudflare-cd.md)を参照してください。
