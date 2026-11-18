@@ -28,3 +28,21 @@ export function protectionFixture() {
   ]
   return [config, application, policies, { auth_domain: 'example.cloudflareaccess.com' }, { enabled: true, previews_enabled: false }]
 }
+
+/** 実資格情報を使わず、必須bindingを満たす入力を作る。 */
+export function appSecretsFixture() {
+  return {
+    JWT_SECRET: 'test-jwt',
+    REFRESH_TOKEN_SECRET: 'test-refresh',
+    PASSWORD_RESET_TOKEN_SECRET: 'test-reset',
+    EMAIL_VERIFICATION_TOKEN_SECRET: 'test-email',
+    RESEND_API_KEY: 'test-resend',
+    PASSWORD_RESET_FROM_EMAIL: 'noreply@example.com',
+    PASSWORD_RESET_URL_BASE: 'https://example.com/reset',
+    EMAIL_VERIFICATION_FROM_EMAIL: 'noreply@example.com',
+    EMAIL_VERIFICATION_URL_BASE: 'https://example.com/verify',
+    ALLOWED_ORIGINS: 'https://example.com',
+    SUPABASE_URL: 'https://example.supabase.co',
+    SUPABASE_ANON_KEY: 'test-key',
+  }
+}
