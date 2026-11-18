@@ -3,6 +3,7 @@ import { createHmac, randomBytes } from 'node:crypto'
 import { sendResendEmail } from '@/libs/resend'
 import { resolveExternalApiErrorType, resolveExternalApiStatusCode, traceExternalApiCall } from '@/libs/telemetry/external'
 import { AppError } from '@/utils/errors'
+import { getEnvironment } from '@/utils/runtime'
 
 import { createScalarAuthEmail } from './scalarEmail'
 
@@ -13,7 +14,7 @@ export const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000
  * 環境変数からパスワードリセットトークンのHMAC鍵を取得する。未設定なら500エラー。
  */
 const getPasswordResetTokenSecret = (): string => {
-  const secret = process.env.PASSWORD_RESET_TOKEN_SECRET
+  const secret = getEnvironment().PASSWORD_RESET_TOKEN_SECRET
   if (!secret) {
     throw new AppError(500, 'PASSWORD_RESET_TOKEN_SECRETが設定されていません')
   }
@@ -70,7 +71,7 @@ export type PasswordResetNotifier = {
  * 環境変数からパスワードリセットメールの送信元アドレスを取得する。未設定なら500エラー。
  */
 const getPasswordResetFromEmail = (): string => {
-  const from = process.env.PASSWORD_RESET_FROM_EMAIL
+  const from = getEnvironment().PASSWORD_RESET_FROM_EMAIL
   if (!from) {
     throw new AppError(500, 'PASSWORD_RESET_FROM_EMAILが設定されていません')
   }
@@ -81,7 +82,7 @@ const getPasswordResetFromEmail = (): string => {
  * 環境変数からパスワードリセットページのベースURLを取得する。未設定なら500エラー。
  */
 const getPasswordResetUrlBase = (): string => {
-  const urlBase = process.env.PASSWORD_RESET_URL_BASE
+  const urlBase = getEnvironment().PASSWORD_RESET_URL_BASE
   if (!urlBase) {
     throw new AppError(500, 'PASSWORD_RESET_URL_BASEが設定されていません')
   }

@@ -1,6 +1,8 @@
 import type { Context } from 'hono'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 
+import { getEnvironment } from '@/utils/runtime'
+
 import { REFRESH_TOKEN_TTL_MS } from './common'
 
 /** リフレッシュトークンCookieの名前。 */
@@ -12,7 +14,7 @@ export const REFRESH_TOKEN_COOKIE_NAME = 'refreshToken'
  * フロントエンドとAPIがcross-siteになる構成では 'None' を指定する（その場合Secureが必須）。
  */
 const getCookieSameSite = (): 'Strict' | 'Lax' | 'None' => {
-  const value = process.env.COOKIE_SAMESITE
+  const value = getEnvironment().COOKIE_SAMESITE
   if (value === 'Strict' || value === 'None') {
     return value
   }
@@ -28,7 +30,7 @@ const isCookieSecure = (): boolean => {
   if (getCookieSameSite() === 'None') {
     return true
   }
-  return process.env.COOKIE_SECURE !== 'false'
+  return getEnvironment().COOKIE_SECURE !== 'false'
 }
 
 /**

@@ -3,6 +3,7 @@ import { createHmac, randomBytes, randomUUID } from 'node:crypto'
 import { sign } from 'hono/jwt'
 
 import { AppError } from '@/utils/errors'
+import { getEnvironment } from '@/utils/runtime'
 
 import { REFRESH_TOKEN_TTL_MS } from './common'
 
@@ -10,7 +11,7 @@ import { REFRESH_TOKEN_TTL_MS } from './common'
  * 環境変数からJWT署名用のシークレットを取得する。未設定なら500エラー。
  */
 const getJwtSecret = (): string => {
-  const secret = process.env.JWT_SECRET
+  const secret = getEnvironment().JWT_SECRET
   if (!secret) {
     throw new AppError(500, 'JWT_SECRETが設定されていません')
   }
@@ -21,7 +22,7 @@ const getJwtSecret = (): string => {
  * 環境変数からリフレッシュトークンのHMAC鍵を取得する。未設定なら500エラー。
  */
 const getRefreshTokenSecret = (): string => {
-  const secret = process.env.REFRESH_TOKEN_SECRET
+  const secret = getEnvironment().REFRESH_TOKEN_SECRET
   if (!secret) {
     throw new AppError(500, 'REFRESH_TOKEN_SECRETが設定されていません')
   }
