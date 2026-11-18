@@ -69,7 +69,10 @@
     "tf:cloudflare:apply": "terraform -chdir=infra/cloudflare apply",
     "tf:cloudflare:validate": "terraform -chdir=infra/cloudflare validate",
     "tf:cloudflare:test": "terraform -chdir=infra/cloudflare test",
-    "tf:cloudflare:lint": "tflint --chdir=infra/cloudflare"
+    "tf:cloudflare:lint": "tflint --chdir=infra/cloudflare",
+    "cloudflare:prepare": "bun scripts/cloudflare-app/prepare.mjs",
+    "cloudflare:build": "bun run cloudflare:prepare && wrangler deploy --dry-run --outdir scripts/cloudflare-app/.wrangler/build",
+    "test:cloudflare": "node scripts/cloudflare-app/verify.mjs"
   },
   "dependencies": {
     "@hono/otel": "1.1.2",
