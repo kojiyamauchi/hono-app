@@ -4,6 +4,7 @@ import { PrismaClient } from './.wrangler/prisma/client.ts'
 import { checkPasswordCompatibility, verifyPasswordOnce } from './password.mjs'
 import { verifyPasswordOnceFast } from './passwordFast.mjs'
 import { checkPasswordCompatibilityModern, verifyPasswordOnceModern } from './passwordModern.mjs'
+import { isSpikeRequestAuthorized } from './spikeAuthorization.mjs'
 
 let measurementIsolateId
 const measurementCounts = new Map()
@@ -91,7 +92,7 @@ const checkDatabase = async (connectionString) => {
 export default {
   /** 本番アプリから独立した検証API。秘密値・接続先・例外本文を応答へ含めない。 */
   async fetch(request, env) {
-    if (!env.SPIKE_TOKEN || request.headers.get('authorization') !== `Bearer ${env.SPIKE_TOKEN}`) return new Response(null, { status: 401 })
+    if (!isSpikeRequestAuthorized(request, env.SPIKE_TOKEN)) return new Response(null, { status: 401 })
     const path = new URL(request.url).pathname
     try {
       if (

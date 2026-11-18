@@ -1,5 +1,6 @@
 import { DurableObject } from 'cloudflare:workers'
 
+import { isSpikeRequestAuthorized } from './spikeAuthorization.mjs'
 import worker from './worker.mjs'
 
 /** 無料のSQLite型namespaceを実行場所として使い、データはSupabaseに置いたままにする。 */
@@ -44,7 +45,7 @@ export class CompatibilityExecutor extends DurableObject {
 export default {
   /** 入口のWorkerは認証と内部転送だけを行う。Durable Objectに公開URLは作らない。 */
   async fetch(request, env) {
-    if (!env.SPIKE_TOKEN || request.headers.get('authorization') !== `Bearer ${env.SPIKE_TOKEN}`) return new Response(null, { status: 401 })
+    if (!isSpikeRequestAuthorized(request, env.SPIKE_TOKEN)) return new Response(null, { status: 401 })
     const url = new URL(request.url)
     if (url.pathname === '/ready' && request.method === 'GET')
       return Response.json({ ok: true, profile: 'durable', passwordVerifier: env.PASSWORD_VERIFIER ?? 'legacy', requestConcurrency: 'concurrent' })

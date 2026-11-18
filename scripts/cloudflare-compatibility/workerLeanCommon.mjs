@@ -1,5 +1,7 @@
 import { PrismaPg } from '@prisma/adapter-pg'
 
+import { isSpikeRequestAuthorized } from './spikeAuthorization.mjs'
+
 /** ソケットを開かず、スキーマとWasmのCPU初期化だけを起動時に完了させる。 */
 export const createLeanMeasurementWorker = async (Client, compilerBuild) => {
   const startupClient = new Client({
@@ -15,7 +17,7 @@ export const createLeanMeasurementWorker = async (Client, compilerBuild) => {
   return {
     /** 同じ接続を使い回さず、型付きモデルAPIの単一取得を計測する。 */
     async fetch(request, env) {
-      if (!env.SPIKE_TOKEN || request.headers.get('authorization') !== `Bearer ${env.SPIKE_TOKEN}`) return new Response(null, { status: 401 })
+      if (!isSpikeRequestAuthorized(request, env.SPIKE_TOKEN)) return new Response(null, { status: 401 })
       const url = new URL(request.url)
       if (url.pathname === '/ready') return Response.json({ ok: true, compilerBuild, profile: 'lean' })
       if (!['/measure/ready', '/measure/database-row', '/measure/database'].includes(url.pathname) || request.method !== 'POST')
