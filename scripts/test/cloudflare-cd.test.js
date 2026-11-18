@@ -10,7 +10,6 @@ async function deploymentFixture(fail = '') {
   const directory = await mkdtemp(join(tmpdir(), 'hono-cloudflare-cd-'))
   const events = []
   let checks = 0
-  let activeCalls = 0
   const parameters = {
     config: protectionFixture()[0],
     secrets: appSecretsFixture(),
@@ -43,7 +42,6 @@ async function deploymentFixture(fail = '') {
     },
     active: async (_config, _api, sha) => {
       event(sha ? 'active-new' : 'active-old')
-      activeCalls++
       return sha ? 'new-version' : 'old-version'
     },
     http: async () => {
@@ -55,9 +53,6 @@ async function deploymentFixture(fail = '') {
     dependencies,
     events,
     directory,
-    get activeCalls() {
-      return activeCalls
-    },
   }
 }
 
@@ -134,4 +129,20 @@ test('mainの読み取り失敗・不正応答を配備許可として扱わな�
       throw new Error('network')
     }),
   ).toThrow()
+})
+
+test('最終確認では再取得したHyperdrive接続先をDB照合へ渡す', async () => {
+  const f = await deploymentFixture()
+  let count = 0
+  const checked = []
+  f.dependencies.infrastructure = async () => ({ host: `host-${++count}` })
+  f.dependencies.database = async (_url, origin) => {
+    checked.push(origin.host)
+  }
+  try {
+    await deployCloudflare(f.parameters, f.dependencies)
+    expect(checked).toEqual(['host-1', 'host-2'])
+  } finally {
+    await rm(f.directory, { recursive: true, force: true })
+  }
 })

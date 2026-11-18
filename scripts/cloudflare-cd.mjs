@@ -52,8 +52,7 @@ export async function deployCloudflare({ config, secrets, sha, directory, bootst
     run('bun', ['x', '--no-install', 'wrangler', 'deploy', '--config', configPath, '--dry-run', '--outdir', resolve(directory, 'build')])
     // ビルド中に新mainが出た場合も、まだクラウドへ変更を加えず省略できる。
     if (!bootstrap && !isCurrentCloudflareSha(sha, run)) return 'outdated'
-    await infrastructure(config, api)
-    await database(databaseUrl, origin)
+    await database(databaseUrl, await infrastructure(config, api))
     await writeFile(secretPath, JSON.stringify(appSecrets), { mode: 0o600 })
     // コードとSecretを同じversionへ配備し、URL/previewは承認済みの値を維持する。
     await writeFile(resolve(directory, 'release.json'), JSON.stringify(record), { mode: 0o600 })
