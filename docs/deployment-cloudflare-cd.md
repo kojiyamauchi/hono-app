@@ -4,7 +4,7 @@
 
 ## 起動と成功条件
 
-`main` へのpushで既存の `cd-gcp.yml` が共通 `ci.yml` を一度呼び出します。Terraform AWS/GCP/Cloudflareの3ジョブは独立した並列検査のままです。Cloudflare Runtime Testを含む全9ジョブ成功が、GCPとCloudflareの両CDの前提です。PRから配備しません。
+`main` へのpushで既存の `cd-gcp.yml` が共通 `ci.yml` を一度呼び出します。Terraform AWS/GCP/Cloudflareの3ジョブは独立した並列検査のままです。Cloudflare Runtime Testを含む全9ジョブ成功が、GCPとCloudflareの両CDの前提です。PRから配備しません。ESLintジョブでは固定版actionlintをネットワーク無効・checkout読み取り専用のコンテナで実行し、両CD workflowの構文・利用可能なコンテキストも検査します。
 
 Cloudflareの追加ジョブは共通CIとGCP配備の終了を待ちます。GCP CDが有効ならその配備成功が必要です。無効ならGCPジョブのスキップだけを許容し、失敗・キャンセルは許容しません。Repository variable `CLOUDFLARE_DEV_CD_ENABLED=true` のときだけ `cd-cloudflare.yml` を呼び出します。未設定・falseでは本体基盤もSecretも不要です。
 
@@ -53,9 +53,9 @@ APIトークンにはAccountの `Workers Scripts: Edit`、`Access: Apps: Read`�
 - `SUPABASE_URL` / `ALLOWED_ORIGINS`
 - `SUPABASE_PUBLISHABLE_KEY` または `SUPABASE_ANON_KEY` の少なくとも一方
 
-任意キーは `AUTH_EMAIL_MODE`、`COOKIE_SAMESITE`、`ENABLE_API_DOCS`、`ENABLE_INVITATION_EMAIL`、`INVITATION_EMAIL_FROM`、`INVITATION_EMAIL_SCALAR_URL` です。設定の意味・組合せは `.env.example` と各機能の文書に従います。Supabase URLは既存クラウドのHTTPS Originを指定します。JWT/HMACは既存Bunと同じ値を使い、両認証方式の意味を維持します。Cookie Secureはtrue、Node telemetryは無効へ固定します。`DATABASE_URL`、Access設定、CD資格情報、`SPIKE_TOKEN` など未知キーは拒否します。
+任意キーは `AUTH_EMAIL_MODE`、`COOKIE_SAMESITE`、`ENABLE_API_DOCS`、`ENABLE_INVITATION_EMAIL`、`INVITATION_EMAIL_FROM`、`INVITATION_EMAIL_SCALAR_URL` です。招待配信を有効にする組合せは本体の `getInvitationEmailConfig` でも配備前に検証します。設定の意味・組合せは `.env.example` と各機能の文書に従います。Supabase URLは既存クラウドのHTTPS Originを指定します。JWT/HMACは既存Bunと同じ値を使い、両認証方式の意味を維持します。Cookie Secureはtrue、Node telemetryは無効へ固定します。`DATABASE_URL`、Access設定、CD資格情報、`SPIKE_TOKEN` など未知キーは拒否します。
 
-Secret JSONは環境変数から読み、runnerの所有者限定一時ファイルにだけ保存します。Wranglerの生出力・API本文・SQL例外はログへ出しません。コードとSecretは `wrangler deploy --secrets-file` で同じversionへ配備します。Secretを含むartifactはアップロードしません。成功/失敗にかかわらずSecretファイルとrunnerの生成物・Wranglerログを削除します。
+Secret JSONは環境変数から読み、runnerの所有者限定一時ファイルにだけ保存します。Wranglerの生出力・API本文・SQL例外はログへ出しません。コードとSecretは `wrangler deploy --secrets-file` で同じversionへ配備します。空の任意設定も明示送信するため、初回bootstrapではCloudflare APIが空のsecret_textを受理することも確認します。実APIで未検証のため、拒否された場合はURL無効のまま停止し、設定反映を確認してから修正します。Secretを含むartifactはアップロードしません。成功/失敗にかかわらずSecretファイルとrunnerの生成物・Wranglerログを削除します。
 
 ## 安全な初回構築
 
@@ -81,7 +81,7 @@ TF_WORKSPACE=dev bun --env-file=.env.cloudflare.local run tf:cloudflare:apply ap
 
 Worker作成直後のAccess反映待ちの場合はURL無効を維持して新しいplanで再実行します。適用済みWorker/Accessを削除してやり直しません。
 
-3. `terraform -chdir=infra/cloudflare output -json app_cd_config` を所有者限定ファイルへ保存し、Git管理外の環境ファイルへJSONとして設定します。上表の同名環境変数に実値を準備します。`CLOUDFLARE_CD_DIR` は所有者限定の一時ディレクトリ、`GITHUB_SHA` は配備するcheckoutの完全SHAです。アプリJSONは `.env.example` から必要なキーだけを選びます。既存 `.env.cloudflare.local` をコピーで上書きしません。
+3. `terraform -chdir=infra/cloudflare output -json app_cd_config` を所有者限定ファイルへ保存し、Git管理外の環境ファイルへJSONとして設定します。上表の同名環境変数に実値を準備します。`CLOUDFLARE_CD_DIR` は所有者限定の一時ディレクトリ、`GITHUB_SHA` は配備するcheckoutの完全SHAです。初回・通常配備ともHEADとの一致とクリーンな作業ツリーを開始時・更新直前に確認し、不一致や未コミット変更では停止します。アプリJSONは `.env.example` から必要なキーだけを選びます。既存 `.env.cloudflare.local` をコピーで上書きしません。
 4. 依存を固定インストールした後、URL無効の本体だけへ初回コード・DO・Secretを配備します。APIのAccess保護確認とDB履歴照合は通常配備と同じです。
 
 ```bash
