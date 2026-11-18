@@ -30,7 +30,8 @@ export async function verifyCloudflareInfrastructure(config, api) {
   const hyperdrive = await api(`hyperdrive/configs/${config.hyperdrive_id}`)
   assert.equal(hyperdrive.caching?.disabled, true)
   assert.equal(hyperdrive.origin?.scheme, 'postgres')
-  assert.equal(hyperdrive.origin?.sslmode, 'verify-full')
+  assert.equal(hyperdrive.mtls?.sslmode, 'verify-full')
+  assert(hyperdrive.mtls?.ca_certificate_id)
   return hyperdrive.origin
 }
 
