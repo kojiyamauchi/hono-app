@@ -1,0 +1,14 @@
+account_id    = "REPLACE_WITH_ACCOUNT_ID"
+hyperdrive_id = "REPLACE_WITH_HYPERDRIVE_ID"
+allowed_emails = [
+  "developer@example.com",
+]
+
+# 登録済みのOne-time PINがある場合はそのIDを指定する。
+existing_otp_identity_provider_id = null
+
+# 手動作成したサービストークンの管理用UUID。Client ID・Secretは書かない。
+access_service_token_id = null
+
+# 初回適用はfalse。Access保護とコード・Secretの配備後にtrueへ変更する。
+enable_worker_url = false

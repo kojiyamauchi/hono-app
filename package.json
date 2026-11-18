@@ -61,7 +61,15 @@
     "tf:gcp:lint:init": "tflint --chdir=infra/gcp --init",
     "tf:gcp:lint": "tflint --chdir=infra/gcp",
     "tf:gcp:validate": "terraform -chdir=infra/gcp validate",
-    "tf:gcp:test": "terraform -chdir=infra/gcp test"
+    "tf:gcp:test": "terraform -chdir=infra/gcp test",
+    "tf:cloudflare:init": "terraform -chdir=infra/cloudflare init -backend-config=env/backend.local.hcl",
+    "tf:cloudflare:init:no-backend": "terraform -chdir=infra/cloudflare init -backend=false",
+    "tf:cloudflare:workspace:dev": "terraform -chdir=infra/cloudflare workspace select -or-create dev",
+    "tf:cloudflare:plan": "terraform -chdir=infra/cloudflare plan -var-file=env/dev.local.tfvars",
+    "tf:cloudflare:apply": "terraform -chdir=infra/cloudflare apply",
+    "tf:cloudflare:validate": "terraform -chdir=infra/cloudflare validate",
+    "tf:cloudflare:test": "terraform -chdir=infra/cloudflare test",
+    "tf:cloudflare:lint": "tflint --chdir=infra/cloudflare"
   },
   "dependencies": {
     "@hono/otel": "1.1.2",
