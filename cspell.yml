@@ -1,6 +1,10 @@
 version: 0.2
 language: en
 words:
+  - miniflare
+  - hyperdrives
+  - datname
+  - cloudflareaccess
   - accesstoken
   - addext
   - artifactregistry
