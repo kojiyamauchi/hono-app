@@ -41,7 +41,7 @@ test('100%単一バージョンとソースSHAを照合し、段階配備や古�
   const api = async (path) =>
     path.endsWith('/deployments')
       ? { deployments: [{ versions: [{ version_id: id, percentage }] }] }
-      : { metadata: { annotations: { 'workers/tag': 'a'.repeat(40) } } }
+      : { metadata: { created_on: '2026-11-18T00:00:00Z' }, annotations: { 'workers/tag': 'a'.repeat(40) } }
   expect(await activeCloudflareVersion(config, api, 'a'.repeat(40))).toBe(id)
   await expect(activeCloudflareVersion(config, api, 'b'.repeat(40))).rejects.toThrow()
   percentage = 50

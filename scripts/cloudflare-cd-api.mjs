@@ -45,7 +45,7 @@ export async function activeCloudflareVersion(config, api, sha) {
   assert.match(id, /^[a-f0-9-]{36}$/)
   if (sha) {
     const version = await api(`workers/scripts/${config.worker_name}/versions/${id}`)
-    assert.equal(version.metadata?.annotations?.['workers/tag'], sha)
+    assert.equal(version.annotations?.['workers/tag'], sha)
   }
   return id
 }
