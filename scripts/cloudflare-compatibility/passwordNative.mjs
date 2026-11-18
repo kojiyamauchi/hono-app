@@ -6,7 +6,7 @@ export const createNativePasswordVerifier = (wasmModule) => {
   let memory
   const initialize = () => {
     if (instance) return instance.exports
-    instance = new WebAssembly.Instance(wasmModule, {
+    const candidate = new WebAssembly.Instance(wasmModule, {
       a: {
         // 固定したEmscriptenバイナリが必要とするメモリ操作だけを提供する。
         a: (destination, source, size) => {
@@ -25,10 +25,17 @@ export const createNativePasswordVerifier = (wasmModule) => {
         },
       },
     })
-    memory = instance.exports.c
-    if (!(memory instanceof WebAssembly.Memory) || typeof instance.exports.m !== 'function') throw new Error('固定したWasmのインターフェースが異なります')
-    instance.exports.d()
-    return instance.exports
+    try {
+      memory = candidate.exports.c
+      if (!(memory instanceof WebAssembly.Memory) || typeof candidate.exports.m !== 'function') throw new Error('固定したWasmのインターフェースが異なります')
+      candidate.exports.d()
+      // 検査と初期化が完了したインスタンスだけを、次のリクエストで再利用する。
+      instance = candidate
+      return instance.exports
+    } catch (error) {
+      memory = undefined
+      throw error
+    }
   }
   return ({ password, bunHash }) => {
     validatePasswordVerification({ password, bunHash })
