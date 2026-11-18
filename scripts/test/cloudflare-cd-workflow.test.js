@@ -1,3 +1,4 @@
+// cspell:words rhysd
 import { expect, test } from 'bun:test'
 
 /** 実際のworkflow式で、共通CI・GCP・フラグの組合せを評価する。 */
@@ -29,6 +30,10 @@ test('共通CI全件を共有し、CI失敗・GCP失敗・キャンセル・未�
   const ci = Bun.YAML.parse(await Bun.file('.github/workflows/ci.yml').text())
   for (const name of ['terraform-aws', 'terraform-gcp', 'terraform-cloudflare']) expect(ci.jobs[name].needs).toBeUndefined()
   expect(Object.keys(ci.jobs)).toContain('cloudflare-runtime')
+  const syntax = ci.jobs.checks.steps.find((step) => step.name === 'Validate CD workflow syntax')
+  expect(syntax.if).toBe("matrix.script == 'lint:check'")
+  expect(syntax.run).toContain('rhysd/actionlint:1.7.12')
+  expect(syntax.run).toContain('.github/workflows/cd-gcp.yml .github/workflows/cd-cloudflare.yml')
 })
 
 test('PRから配備せず、環境の資格情報・固定依存・中断しない排他・削除を指定する', async () => {
