@@ -34,6 +34,8 @@ Repository variable:
 
 Environment `cloudflare-dev` は配備元をmainに制限し、以下のSecretsを登録します。既存GCPのSecretsや検証Workerの設定を上書きしません。
 
+呼び出し元の `cd-gcp.yml` から6件のSecret名を明示的に渡し、値は受け側の `environment: cloudflare-dev` を指定したjob内で環境Secretとして解決します。`workflow_call.secrets` の `required: true` は呼び出し元での指定の有無だけを検査し、値が空でないことは配備スクリプトで検証します（[GitHub公式仕様](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows)）。
+
 | Secret                            | 内容                                                                                                        |
 | --------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | `CLOUDFLARE_API_TOKEN`            | 対象アカウント限定の本体CD用APIトークン                                                                     |

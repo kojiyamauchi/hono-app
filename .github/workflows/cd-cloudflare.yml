@@ -2,6 +2,19 @@ name: Cloudflare dev CD
 
 on:
   workflow_call:
+    secrets:
+      CLOUDFLARE_API_TOKEN:
+        required: true
+      CLOUDFLARE_CD_CONFIG:
+        required: true
+      CLOUDFLARE_APP_SECRETS:
+        required: true
+      CLOUDFLARE_ACCESS_CLIENT_ID:
+        required: true
+      CLOUDFLARE_ACCESS_CLIENT_SECRET:
+        required: true
+      CLOUDFLARE_DATABASE_URL:
+        required: true
 
 permissions:
   contents: read

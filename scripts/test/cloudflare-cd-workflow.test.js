@@ -55,3 +55,27 @@ test('PRから配備せず、環境の資格情報・固定依存・中断しな
   expect(job.steps.at(-1).if).toBe('always()')
   expect(job.steps.at(-1).run).toContain('"$CLOUDFLARE_CD_DIR"')
 })
+
+test('Cloudflare用の6件だけを呼び出し元から必須Secretとして渡し、環境内の配備ステップへ接続する', async () => {
+  const caller = Bun.YAML.parse(await Bun.file('.github/workflows/cd-gcp.yml').text())
+  const callee = Bun.YAML.parse(await Bun.file('.github/workflows/cd-cloudflare.yml').text())
+  const names = [
+    'CLOUDFLARE_API_TOKEN',
+    'CLOUDFLARE_CD_CONFIG',
+    'CLOUDFLARE_APP_SECRETS',
+    'CLOUDFLARE_ACCESS_CLIENT_ID',
+    'CLOUDFLARE_ACCESS_CLIENT_SECRET',
+    'CLOUDFLARE_DATABASE_URL',
+  ]
+  const forwarded = caller.jobs.cloudflare.secrets
+  const required = callee.on.workflow_call.secrets
+  const deploy = callee.jobs.deploy.steps.find((step) => step.run?.includes('cloudflare-cd.mjs deploy'))
+  expect(typeof forwarded).toBe('object')
+  for (const boundary of [forwarded, required, deploy.env]) expect(Object.keys(boundary).sort()).toEqual([...names].sort())
+  for (const name of names) {
+    expect(forwarded[name]).toBe('${{ secrets.' + name + ' }}')
+    expect(required[name]).toEqual({ required: true })
+    expect(deploy.env[name]).toBe('${{ secrets.' + name + ' }}')
+  }
+  expect(callee.jobs.deploy.environment).toBe('cloudflare-dev')
+})
