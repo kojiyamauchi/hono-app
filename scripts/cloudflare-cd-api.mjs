@@ -70,7 +70,9 @@ export async function verifyCloudflareHttp(config, credentials, request = fetch)
     ['/open-api/scalar', 'GET'],
     ['/health', 'OPTIONS'],
   ]) {
-    const response = await get(path, {}, method)
+    // Originと要求methodを付け、認証拒否と不正なOPTIONSの400を区別する。
+    const headers = method === 'OPTIONS' ? { Origin: config.origin, 'Access-Control-Request-Method': 'GET' } : {}
+    const response = await get(path, headers, method)
     assert([302, 401, 403].includes(response.status))
     if (response.status === 302) {
       const target = new URL(response.headers.get('location'))
