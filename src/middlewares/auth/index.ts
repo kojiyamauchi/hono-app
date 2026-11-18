@@ -4,6 +4,7 @@ import { verify } from 'hono/jwt'
 import { authSubjectSchema } from '@/shared/auth/schemas'
 import { userRepository } from '@/shared/user/repositories'
 import { AppError } from '@/utils/errors'
+import { getEnvironment } from '@/utils/runtime'
 
 /**
  * JWT検証ミドルウェア。
@@ -18,7 +19,7 @@ export const authMiddleware = createMiddleware<{
   }
 
   const token = authHeader.slice('Bearer '.length)
-  const secret = process.env.JWT_SECRET
+  const secret = getEnvironment().JWT_SECRET
   if (!secret) {
     throw new AppError(500, 'JWT_SECRETが設定されていません')
   }

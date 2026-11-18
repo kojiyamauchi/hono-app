@@ -1,13 +1,14 @@
 import { createMiddleware } from 'hono/factory'
 
 import { AppError } from '@/utils/errors'
+import { getEnvironment } from '@/utils/runtime'
 
 /**
  * 環境変数ALLOWED_ORIGINSからカンマ区切りで許可OriginのリストをStringの配列で返す。
  * 未設定の場合は空配列を返す。
  */
 export const getAllowedOrigins = (): string[] => {
-  const raw = process.env.ALLOWED_ORIGINS
+  const raw = getEnvironment().ALLOWED_ORIGINS
   if (!raw) return []
   return raw
     .split(',')
