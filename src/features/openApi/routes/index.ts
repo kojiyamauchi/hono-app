@@ -1,6 +1,7 @@
 import type { OpenAPIHono } from '@hono/zod-openapi'
 
 import { bearerAuthScheme, cookieAuthScheme, SECURITY_SCHEME } from '@/shared/openApi/schemes'
+import { getEnvironment } from '@/utils/runtime'
 
 import { registerDocRoute } from './doc'
 import { registerScalarRoute } from './scalar'
@@ -16,7 +17,7 @@ import { registerScalarRoute } from './scalar'
 
 /** ENABLE_API_DOCS=true のときだけ /open-api/doc(OpenAPI JSON) と /open-api/scalar(Scalar UI) を root app へ登録する。 */
 export const registerOpenApiRoutes = (app: OpenAPIHono): void => {
-  if (process.env.ENABLE_API_DOCS !== 'true') {
+  if (getEnvironment().ENABLE_API_DOCS !== 'true') {
     return
   }
 
