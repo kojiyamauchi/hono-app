@@ -169,7 +169,9 @@ flowchart LR
 |   |-- schema.prisma                # Prismaスキーマ
 |   `-- migrations/                  # Prisma migration
 |-- src/
-|   |-- app.ts                       # Honoアプリインスタンス
+|   |-- app.ts                       # Bun用Honoアプリインスタンス
+|   |-- appFactory.ts                # 実行環境のスコープ内で本体アプリを構築
+|   |-- cloudflare.ts                # Access配下のWorker・Durable Objectの配線
 |   |-- server.ts                    # APIサーバーのエントリーポイント
 |   |-- invitationEmailWorker.ts     # 招待メールワーカーのエントリーポイント
 |   |-- routes/
@@ -316,7 +318,7 @@ services/
 `src/` 配下の全層を以下の線形レイヤーとして整理し、importは図の下方向のみ許可します。
 
 ```txt
-routes / app.ts / server.ts / invitationEmailWorker.ts   （配線層・最上位）
+routes / app.ts / appFactory.ts / server.ts / cloudflare.ts / invitationEmailWorker.ts   （配線層・最上位）
   ↓
 features                       （機能）
   ↓
@@ -343,7 +345,7 @@ types                          （型宣言のみ・最下層）
 - `shared/`: 複数featureで使う共有ドメイン（前述の定義どおり）です。`middlewares`・`features` へのimportは禁止です（HTTP層の関心事をsharedへ持ち込まず、ミドルウェアが設定した値はcontroller/feature側で取り出して引数として渡します）。ただし、`src/shared/auth/services/cookie.ts` のcookieヘルパーはCookie入出力に責務を限定し、Controllerから受け取った `Context` を操作する例外とします。
 - `middlewares/`: Hono横断ミドルウェアです。`shared` のrepositoryの利用は許可します。`features` へのimportは禁止です。
 - `features/`: `shared` 以下の層に加え `middlewares` もimport可（feature内routesでのミドルウェア適用）です。feature間の相互importは前述のとおり禁止です。
-- `routes/` / `app.ts` / `server.ts` / `invitationEmailWorker.ts`: 配線層です。全層をimport可（例: `app.ts` でのグローバルミドルウェア適用・CORS設定・telemetry初期化）です。
+- `routes/` / `app.ts` / `appFactory.ts` / `server.ts` / `cloudflare.ts` / `invitationEmailWorker.ts`: 配線層です。全層をimport可（例: `app.ts` でのグローバルミドルウェア適用・CORS設定・telemetry初期化）です。
 
 ## Schema命名
 
