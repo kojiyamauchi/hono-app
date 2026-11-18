@@ -64,7 +64,7 @@ GCPのdev環境では、以下を含む全エンドポイントへのアクセ�
 | GET    | `/organizations`                        | 必要 | 自分が所属する組織一覧をオフセット式ページネーションで取得する（`limit` / `offset`、詳細は [pagination.md](pagination.md)） |
 | GET    | `/organizations/:id`                    | 必要 | 所属している組織の詳細を取得する                                                                                            |
 | PATCH  | `/organizations/:id`                    | 必要 | OWNERまたはADMINが組織情報を更新する                                                                                        |
-| DELETE | `/organizations/:id`                    | 必要 | OWNERのみ、組織を削除する（メンバーシップ・招待・監査ログ・プロジェクトも同時に削除される）                                |
+| DELETE | `/organizations/:id`                    | 必要 | OWNERのみ、組織を削除する（メンバーシップ・招待・監査ログ・プロジェクトも同時に削除される）                                 |
 | POST   | `/organizations/:id/transfer-ownership` | 必要 | OWNERが既存のADMINまたはMEMBERへ組織の所有権を移譲する（成立時は監査ログ `OWNERSHIP_TRANSFERRED` を記録する）               |
 
 ## Organization Members
@@ -81,13 +81,13 @@ GCPのdev環境では、以下を含む全エンドポイントへのアクセ�
 
 組織が所有するプロジェクトのCRUDです。すべてBearerアクセストークンが必要で、組織のメンバーシップを確認します。プロジェクトは組織の資産として扱い、作成したユーザーが脱退・アカウント削除をしても残ります。同名のプロジェクトも作成できます（IDで識別します）。
 
-| Method | Path                                     | 認証 | 概要                                                                                                                                          |
-| ------ | ---------------------------------------- | ---- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| POST   | `/organizations/:id/projects`            | 必要 | OWNERまたはADMINがプロジェクトを作成する（201、作成したProject）                                                                              |
+| Method | Path                                     | 認証 | 概要                                                                                                                                            |
+| ------ | ---------------------------------------- | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/organizations/:id/projects`            | 必要 | OWNERまたはADMINがプロジェクトを作成する（201、作成したProject）                                                                                |
 | GET    | `/organizations/:id/projects`            | 必要 | 組織の全メンバーがプロジェクト一覧を新しい順にカーソル式ページネーションで取得する（`limit` / `cursor`、詳細は [pagination.md](pagination.md)） |
-| GET    | `/organizations/:id/projects/:projectId` | 必要 | 組織の全メンバーがプロジェクトを1件取得する                                                                                                   |
-| PATCH  | `/organizations/:id/projects/:projectId` | 必要 | OWNERまたはADMINがプロジェクトを部分更新する（200、更新後のProject）                                                                          |
-| DELETE | `/organizations/:id/projects/:projectId` | 必要 | OWNERまたはADMINがプロジェクトを完全削除する（204、本文なし。復元不可）                                                                       |
+| GET    | `/organizations/:id/projects/:projectId` | 必要 | 組織の全メンバーがプロジェクトを1件取得する                                                                                                     |
+| PATCH  | `/organizations/:id/projects/:projectId` | 必要 | OWNERまたはADMINがプロジェクトを部分更新する（200、更新後のProject）                                                                            |
+| DELETE | `/organizations/:id/projects/:projectId` | 必要 | OWNERまたはADMINがプロジェクトを完全削除する（204、本文なし。復元不可）                                                                         |
 
 仕様は次のとおりです。
 
@@ -149,6 +149,7 @@ GCPのdev環境では、以下を含む全エンドポイントへのアクセ�
   - プロジェクト操作3種: `id`・`organizationId`・`action`・`actorUserId`・`createdAt`・`projectId`・`before`・`after`。メンバー向けのキーは含みません。
 
   DBのCHECK制約で、イベントごとの必須項目・null条件・スナップショットの形状を担保します。氏名・メールアドレス・認証情報は保存せず、ユーザー・メンバーシップ・プロジェクトのIDは記録時点の値です。
+
 - クライアントへの影響は次の2点を分けて確認してください。
   - 既存3イベントの実行時のJSON（項目・値の意味）は変わりません。
   - `action` の値が3種から6種に増え、OpenAPIの `AuditLog` コンポーネントは単一のobjectから6つのコンポーネント（`MemberRoleChangedAuditLog` / `OwnershipTransferredAuditLog` / `MemberRemovedAuditLog` / `ProjectCreatedAuditLog` / `ProjectUpdatedAuditLog` / `ProjectDeletedAuditLog`）の `oneOf`（`action` が判別子）に変わります。生成クライアントでは型の構造・参照先が変わり得るため、enumや `action` の網羅判定（未知の `action` を想定した分岐）の更新と、型の再生成が必要です。
@@ -186,3 +187,22 @@ GCPのdev環境では、以下を含む全エンドポイントへのアクセ�
 | POST   | `/invitations/accept`  | 必要 | 招待トークンを指定して招待を受諾し、組織メンバーになる                               |
 | POST   | `/invitations/decline` | 不要 | 招待トークンを指定して招待を辞退する                                                 |
 | POST   | `/invitations/signup`  | 不要 | 招待トークンを指定して新規登録し、組織メンバーになる（リフレッシュトークンはCookie） |
+
+## Cloudflare互換性検証Worker
+
+以下は本体アプリとは別に配備する検証用WorkerのAPIです。公開配備時はCloudflare Accessと検証専用のBearerトークン（`SPIKE_TOKEN`）を併用します。本体の認証APIとはトークンを共有しません。
+
+| Method | Path                     | 概要                                                                              |
+| ------ | ------------------------ | --------------------------------------------------------------------------------- |
+| GET    | `/ready`                 | 検証Workerの稼働状態と実行プロファイルを確認する                                  |
+| POST   | `/password`              | 既存ハッシュとの相互互換性と誤パスワードの拒否を確認する                          |
+| POST   | `/database`              | PrismaによるDB接続・transaction・行ロック・一意制約を確認し、検証データを残さない |
+| POST   | `/measure/ready`         | 計測用の基準リクエストを実行する                                                  |
+| POST   | `/measure/password`      | パスワード照合を1回実行する                                                       |
+| POST   | `/measure/password-fast` | 実験用nativeプロファイルのパスワード照合を1回実行する                             |
+| POST   | `/measure/database`      | PrismaのモデルAPIで合成メールアドレスを1回検索する                                |
+| POST   | `/measure/database-row`  | PrismaのモデルAPIでIDだけを1件取得し、存在の有無だけを返す                        |
+| POST   | `/measure/database-raw`  | Prismaのパラメーター化SQLで合成メールアドレスを1回検索する                        |
+| POST   | `/measure/database-wait` | 固定200msの待機を含む読み取り専用SQLで、DB処理の重なりを計測する                  |
+
+`/measure/*` はUUID形式の `sample` クエリを必要とします。DB用APIは `ENABLE_DATABASE_CHECK=true` のときだけ有効です。nativeプロファイルでは `/password` と `/measure/password` を無効にし、ほかのパスワード実装では `/measure/password-fast` を無効にします。軽量プロファイルでは公開するAPIをさらに限定します。配備方法・プロファイル・検証範囲は[Cloudflare互換性検証](cloudflare-compatibility.md)を参照してください。
