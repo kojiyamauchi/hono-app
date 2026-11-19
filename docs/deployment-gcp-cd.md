@@ -5,13 +5,12 @@ mainへのマージをdevへの配備判断とし、追加承認なしで配備�
 ## 実行範囲
 
 - `ci.yml` は `pull_request` と `workflow_call` を受け付ける検査専用workflowです。共通のコード検査・ビルドと、AWS・GCP・CloudflareのTerraform検査を実行し、CDジョブは定義しません。3つのTerraformジョブは互いに依存させず並列実行します。
-- `cd-gcp.yml` はmainへのpushで起動し、先に `ci.yml` を呼び出します。`ci.yml` 内の全検査成功後に配備ジョブを実行します。Cloudflareを含むいずれかの検査が失敗した場合は配備へ進みません。mainへの直接pushも同じ起動条件です。
-- repository variable `GCP_DEV_CD_ENABLED` が文字列 `true` の場合だけ配備ジョブを実行します。未設定・falseでもCIは実行しますが、配備用認証・Dockerビルド・イメージpush・migration・applyは行いません。
-- 対象は `hono-app-dev-512908-f3`、`asia-northeast1`、Terraform workspace `dev`、既存サービス `hono-app-dev` です。AWS用CD、prod用CD、一般公開への変更は含みません。
-- CIは各pushで実行し、配備待ちで止めません。配備ジョブだけを `gcp-dev-deployment` concurrency groupで直列化し、新しいpushで実行中のmigration・applyをキャンセルしません。待機後の配備ジョブはmainのSHAと照合し、古い対象を省略します。
+- `cd.yml` はmainへのpushで共通CIを呼び、全検査成功後にAWSのECR公開と共有DBを使うdevリリースを開始します。
+- `GCP_DEV_CD_ENABLED=true` の場合は、コンテナ検証・候補イメージ公開・Terraform planの検査後に共有DBのmigrationを実行します。GCPが無効でもCloudflareが有効なら、共有DBのmigrationを実行します。
+- 共有DBを使うリリースは、最新SHAの確認から配備完了まで直列です。migration成功後、GCPとCloudflareは同じリリース内で並列に配備します。新しいpushで実行中のリリースは中断しません。待機中の実行は置き換わる場合があるため、最新SHAの成功runと稼働状態を照合してください。
 - devのGitHub Environment `gcp-dev` はmainだけを許可し、required reviewersを設定しません。将来prodを作る場合は別Environmentでmigration前の承認を設け、DB・Secret・state・サービスも分離します。prodブランチやprodリソースは今回作りません。
 
-CIとCDの入口を分ける理由は、PRのChecksへ配備ジョブのskip項目を出さず、レビュー時の検査とマージ後の配備を区別するためです。`cd-gcp.yml` から共通CIを呼ぶことで検査定義を重複させず、`main.yml` も追加しません。mainへの直接pushは既存のPR必須・承認・必須CIのルールで制限し、CDではmainへのpushを起点として維持します。
+CIとCDの入口を分ける理由は、PRのChecksへ配備ジョブのskip項目を出さず、レビュー時の検査とマージ後の配備を区別するためです。`cd.yml` から同じ共通CIを呼びます。mainへの直接pushは既存のPR必須・承認・必須CIのルールで制限し、CDではmainへのpushを起点として維持します。
 
 ## 配備の順序
 
@@ -53,7 +52,14 @@ Registryのcleanup設定・IAM・他の属性の変更や、`resource_changes` �
 
 Cloud Runの作成・削除・IAM変更、WIF変更、Secret値の更新権限はCDへ渡しません。Cloud Runの更新権限はフィールド単位にimageだけへ限定できず、任意コードをruntime SAで動かせる権限でもあるため、mainのレビューとplan検査も信頼境界になります。SAの切り替えは完全な信頼分離ではなく、直接取得する権限とログ誤出力の範囲を減らすためのものです。
 
-WIFはGitHub issuerに対し、repository ID `1251281818`、owner ID `13247377`、`refs/heads/main`、pushイベント、起動元workflow（`workflow_ref`）`kojiyamauchi/hono-app/.github/workflows/cd-gcp.yml@refs/heads/main`、Environment `gcp-dev` をすべて検査します。長期鍵は保存しません。CI・ビルドの後、用途ごとに短命認証を取り直します。
+WIFはGitHub issuerに対し、repository ID `1251281818`、owner ID `13247377`、`refs/heads/main`、pushイベント、Environment `gcp-dev` を検査します。新経路では起動元の `workflow_ref` を `cd.yml`、`job_workflow_ref` を `cd-gcp.yml` または `cd-migration.yml` のmainに制限します。移行中は旧 `cd-gcp.yml` の直接起動も許可します。長期鍵は保存しません。CI・ビルドの後、用途ごとに短命認証を取り直します。
+
+### 共通CDへの切り替え
+
+1. GitHub Environment `gcp-dev` に、ランダムな32バイト以上をエンコードした値を `GCP_CD_PLAN_KEY` として登録します。事前検証ジョブは保存planと配備記録を暗号化し、同じrun・試行の配備ジョブだけが取得します。成果物の保持期間は1日です。失敗時は最新mainに対して全ジョブを再実行し、planを作り直します。
+2. GCP・Cloudflareの自動配備を一時停止し、旧経路の実行中・待機中の共有DBリリースが終了したことを確認します。切り替えコミットのTerraformを手動でplanし、WIFの新旧併存だけが変更されることを確認して適用します。
+3. `cd.yml` への切り替えをマージし、利用する配備フラグを再度有効化します。切り替えコミットが最新ならActionsから全ジョブを再実行し、最新mainのrunでmigration認証、GCP認証、Cloud RunのdigestとIAPヘルス、Cloudflare有効時はWorkerのSHAとAccess保護を確認します。
+4. 新経路での認証と実配備の成功を記録した後、別PRで旧 `workflow_ref` の許可を削除し、実行中のCDと重ならないタイミングでTerraformを適用します。それまでは、新経路を止めて実行中のリリースを待ってから旧構成に戻せます。
 
 IAP検証には検証用SAの `openid` / `userinfo.email` scope付きアクセストークンを使います。既存のユーザー用アクセストークンやCloud Run URL向けIDトークンでの成功を前提にしません。プログラム用OAuth client allowlistをCDが書き換えることもありません。[IAPのサービスアカウント認証](https://docs.cloud.google.com/iap/docs/authentication-howto#authenticate_with_a_service_account_access_token)
 
@@ -84,7 +90,7 @@ Cloud Runのoperationはサービス配下ではないため、`run.operations.g
 
 ## 初回CDの検証記録（2026-10-30）
 
-以下は特定のソースとworkflowに紐づく初回配備時の記録です。以後の配備でrevision・digest・保持タグは変わるため、最新状態は [GCP dev CDのActions一覧](https://github.com/kojiyamauchi/hono-app/actions/workflows/cd-gcp.yml)の成功run・配備サマリーとCloud RunのReady revisionで確認してください。API・Scalarへのアクセス先は[dev環境の案内](deployment-gcp.md#dev環境のアクセス先)を参照してください。
+以下は特定のソースとworkflowに紐づく初回配備時の記録です。以後の配備でrevision・digest・保持タグは変わるため、最新状態は [GCP dev CDのActions一覧](https://github.com/kojiyamauchi/hono-app/actions/workflows/cd.yml)の成功run・配備サマリーとCloud RunのReady revisionで確認してください。API・Scalarへのアクセス先は[dev環境の案内](deployment-gcp.md#dev環境のアクセス先)を参照してください。
 
 - 対象: project `hono-app-dev-512908-f3`、`asia-northeast1`、Terraform workspace `dev`、Cloud Run `hono-app-dev`。
 - 検証日時: 2026-10-30 19:41 JST。
@@ -137,7 +143,7 @@ terraform -chdir=infra/gcp providers lock -platform=darwin_arm64 -platform=linux
 - CI・ビルド・plan検査・migrationが失敗した場合はCloud Runを更新しません。migration途中の障害はDB状態を確認し、`resolve` やresetを自動実行しません。
 - applyや配備後検証の失敗では新revisionがすでに配信中の場合があります。自動で成功扱いにせず、保護タグを維持して停止します。
 - 復旧は、配備サマリーに記録した直前digestと現行設定からplanを作り、内容を確認して適用します。DBは戻らないため、通常CDへ載せるmigrationは旧アプリと後方互換を保つことが前提です。破壊的変更は段階的に分けるか個別手順へ切り出します。
-- CDを一時停止する場合は `GCP_DEV_CD_ENABLED=false` とします。実行中のmigration・applyを強制停止する操作ではありません。インフラ手動変更も実行中CDと重ねません。手順は[インフラ変更の手動適用](#インフラ変更の手動適用)に従います。
+- 共有DBへの自動migrationも含めてCDを一時停止する場合は、`GCP_DEV_CD_ENABLED=false` と `CLOUDFLARE_DEV_CD_ENABLED=false` を設定します。実行中のmigration・applyを強制停止する操作ではありません。インフラ手動変更も実行中CDと重ねません。手順は[インフラ変更の手動適用](#インフラ変更の手動適用)に従います。
 
 ## インフラ変更の手動適用
 
@@ -145,7 +151,7 @@ terraform -chdir=infra/gcp providers lock -platform=darwin_arm64 -platform=linux
 
 招待メールJobの実行回数と直近実行の参照は、配信のたびにGCPが更新する属性です。通常CDのrefreshでは、この2項目だけが変わる場合を許容します。Jobのイメージ、実行設定、Schedulerの設定、IAMの差分は手動適用の対象です。
 
-1. マージ前に配備ジョブを一時停止し（repository variable `GCP_DEV_CD_ENABLED=false`）、実行中の配備ジョブが終了したことを確認します。その後に対象の変更をmainへマージします。
+1. マージ前に `GCP_DEV_CD_ENABLED=false` と `CLOUDFLARE_DEV_CD_ENABLED=false` を設定し、実行中・待機中の共有DBリリースが終了したことを確認します。その後に対象の変更をmainへマージします。
 2. マージ済みmainで対象プロジェクトと、Git管理外の `infra/gcp/env/backend.local.hcl` の接続先を確認します。リポジトリルートから `bun run tf:gcp:init` でGCS backendを初期化し、`bun run tf:gcp:workspace:dev` でdev workspaceを選びます。`terraform -chdir=infra/gcp workspace show` の出力が `dev` であることを確認し、現在のReady revisionのdigestを取得します。
 3. `<現在のdigest>` を取得した `sha256:...` に、`<保存先の絶対パス>` をGit管理外のplanファイルパスへ置き換えて、リポジトリルートで全体planを作ります。`bun run tf:gcp:plan` / `tf:gcp:apply` は変数を渡さないため、そのままでは使いません。
 
@@ -165,13 +171,13 @@ terraform -chdir=infra/gcp providers lock -platform=darwin_arm64 -platform=linux
    ```
 
 5. 追加したリソースを配備用SAが全体planでrefreshできることを確認します。読み取り権限が不足する場合は読み取りroleへ参照権限だけを追加し、同じ手順で適用します。
-6. 稼働中のdigestを使った全体再planで設定差分がないことを確認し、repository variableを `GCP_DEV_CD_ENABLED=true` へ戻します。最新mainの `GCP dev CD` で配備ジョブまで成功したことを確認してから、次の変更へ進みます。
+6. 稼働中のdigestを使った全体再planで設定差分がないことを確認し、利用していた配備フラグを元に戻します。最新mainの `Main CD` で配備ジョブまで成功したことを確認してから、次の変更へ進みます。
 
 ## 秘密値と費用
 
 Cloud Runに注入する数値Secret参照は、OTLP無効時は既存の6件、有効時は `OTEL_EXPORTER_OTLP_TRACES_HEADERS` を加えた7件です。Git管理の `env/dev.cd.tfvars.json` は送信無効と6件の参照を保持します。OTLP用の入れ物と実行用SAの参照権限を先に手動適用し、実値とversionをSecret Managerで登録した後、別の保存planでCloud Runの参照と送信を有効にします。検証時の一時設定と通常CDに戻す手順は[GCP devでの実送信検証](observability.md#gcp-devでの実送信検証)を参照してください。
 
-秘密値・認証レスポンス・外部CLIの生出力は表示しません。DB値は権限700の一時ディレクトリ内の600ファイルを経由し、migrationの成否にかかわらず削除します。plan・state・認証ファイルをActions artifactへアップロードせず、runnerの一時領域を終了時に削除します。認証Actionの `gha-creds-*.json` はGitとDockerの対象から除外します。
+秘密値・認証レスポンス・外部CLIの生出力は表示しません。DB値は権限700の一時ディレクトリ内の600ファイルを経由し、migrationの成否にかかわらず削除します。Actions artifactには保存planと配備記録を暗号化して渡します。stateや認証ファイルは成果物に含めず、runnerの一時領域を終了時に削除します。認証Actionの `gha-creds-*.json` はGitとDockerの対象から除外します。
 
 現行と直前digestは `release-<digestの64桁>` で保護します。検証成功時だけ、それ以外の既知の保護タグを外します。既存の短いSHAのreleaseタグも、同じdigestが稼働・復旧対象なら維持します。cleanup policyによる削除には時間差があり、候補・失敗run・削除待ちイメージや共有レイヤーも含めた実容量で無料枠0.5 GBを確認します。容量の上限を保証する処理ではありません。
 

@@ -4,9 +4,9 @@
 
 ## 起動と成功条件
 
-`main` へのpushで既存の `cd-gcp.yml` が共通 `ci.yml` を一度呼び出します。Terraform AWS/GCP/Cloudflareの3ジョブは独立した並列検査のままです。Cloudflare Runtime Testを含む全9ジョブ成功が、GCPとCloudflareの両CDの前提です。PRから配備しません。ESLintジョブでは固定版actionlintをネットワーク無効・checkout読み取り専用のコンテナで実行し、両CD workflowの構文・利用可能なコンテキストも検査します。
+`main` へのpushで`cd.yml` が共通 `ci.yml` を一度呼び出します。Terraform AWS/GCP/Cloudflareの3ジョブは独立した並列検査のままです。Cloudflare Runtime Testを含む全9ジョブ成功が、GCPとCloudflareの両CDの前提です。PRから配備しません。ESLintジョブでは固定版actionlintをネットワーク無効・checkout読み取り専用のコンテナで実行し、全workflowの構文・利用可能なコンテキストも検査します。
 
-Cloudflareの追加ジョブは共通CIとGCP配備の終了を待ちます。GCP CDが有効ならその配備成功が必要です。無効ならGCPジョブのスキップだけを許容し、失敗・キャンセルは許容しません。Repository variable `CLOUDFLARE_DEV_CD_ENABLED=true` のときだけ `cd-cloudflare.yml` を呼び出します。未設定・falseでは本体基盤もSecretも不要です。
+Cloudflare配備は共有DBのmigration成功を待ちます。GCP CDが有効な場合はmigrationの前にGCPの事前検証を行い、migration成功後の両配備は並列です。Repository variable `CLOUDFLARE_DEV_CD_ENABLED=true` のときだけ `cd-cloudflare.yml` を呼び出します。Cloudflareだけを有効にする場合も共有DBのmigrationにGCPのWIF・migration用サービスアカウント・Secret Managerが必要です。
 
 `cloudflare-dev` Environmentを使い、配備から検証まで `cloudflare-dev-deployment` のconcurrency groupで直列化します。新しいpushは実行中の配備をキャンセルしません。待機順には依存せず、開始時とバンドル生成後にGitHubのmain SHAを確認し、古いSHAはクラウドを更新せず省略します。更新開始後にmainが進んだ場合は現在の配備・検証を終え、次の配備へ進みます。手動配備・復旧中は先にフラグをfalseにし、進行中の配備の終了を待ってください。
 
@@ -24,7 +24,7 @@ CD自身はTerraform apply、Hyperdrive変更、DB migration、DB reset、課金
 
 DB履歴確認用の資格情報は、Hyperdriveと同じhost/port/database、または同じSupabaseプロジェクトのsession pooler（5432番）を使います。直接接続ホストが `db.<project-ref>.supabase.co` の場合に限り、Supabase管理下の `aws-<index>-<region>.pooler.supabase.com` と、ユーザー名 `<role>.<project-ref>` のproject refの完全一致で同じプロジェクトを照合します。databaseとportも一致を要求し、別プロジェクト・任意の外部host・6543番のtransaction poolerを拒否します。Supabaseの無料構成では直接接続がIPv6専用の場合があるため、IPv4のrunnerではこのsession poolerを使います（[公式の接続方式](https://supabase.com/docs/guides/database/connecting-to-postgres)）。Hyperdrive自体の接続先は変更しません。専用の読み取り用DBロールに `public._prisma_migrations` のSELECTだけを付与することを推奨します。`sslmode=verify-full`、リポジトリのSupabase CAと標準CA、接続/SQLタイムアウト、`default_transaction_read_only=on` を指定します。アプリのDB接続資格情報をWorkerへbindingしません。
 
-ローカルの全migration名とSHA-256が適用済み履歴と完全一致し、失敗中・未適用・余分な履歴がない場合だけ配備します。GCP CDが無効のときは、先に既存の手動運用でmigrationを適用してください。GCPとの別runの競合で未適用/実行中を検出した場合も停止するので、適用完了後に最新mainのrunを再実行します。既存のBun用招待outbox配信ワーカーは継続利用します。
+ローカルの全migration名とSHA-256が適用済み履歴と完全一致し、失敗中・未適用・余分な履歴がない場合だけ配備します。自動配備では同じ共有リリースのmigrationジョブが先に適用します。履歴照合に失敗した場合は、対象DBと適用履歴を確認してから最新mainの全ジョブを再実行します。既存のBun用招待outbox配信ワーカーは継続利用します。
 
 ## 必要なGitHub設定
 
@@ -34,7 +34,7 @@ Repository variable:
 
 Environment `cloudflare-dev` は配備元をmainに制限し、以下のSecretsを登録します。既存GCPのSecretsや検証Workerの設定を上書きしません。
 
-呼び出し元の `cd-gcp.yml` から6件のSecret名を明示的に渡し、値は受け側の `environment: cloudflare-dev` を指定したjob内で環境Secretとして解決します。`workflow_call.secrets` の `required: true` は呼び出し元での指定の有無だけを検査し、値が空でないことは配備スクリプトで検証します（[GitHub公式仕様](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows)）。
+呼び出し元の `cd-shared-dev.yml` から6件のSecret名を明示的に渡し、値は受け側の `environment: cloudflare-dev` を指定したjob内で環境Secretとして解決します。`workflow_call.secrets` の `required: true` は呼び出し元での指定の有無だけを検査し、値が空でないことは配備スクリプトで検証します（[GitHub公式仕様](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows)）。
 
 | Secret                            | 内容                                                                                                        |
 | --------------------------------- | ----------------------------------------------------------------------------------------------------------- |
