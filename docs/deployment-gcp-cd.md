@@ -98,13 +98,13 @@ Cloud Runのoperationはサービス配下ではないため、`run.operations.g
 4. ユーザーがそのplanを確認した後にだけ、保存planをapplyします。この文書の追加や通常CDの承認省略を、初回IAM変更への承認として扱いません。
 5. IAP検証用SAの短命認証と、固定Originの未認証拒否・認証付きhealthを実測します。トークンは保護された一時ファイルまたはプロセス内だけで扱い、コマンド引数・ログへ出しません。
 6. GitHub側の変更も内容を提示して確認後、`gcp-dev` Environmentを作り、mainだけを許可・required reviewersなしとします。repository variable `GCP_DEV_CD_ENABLED=true` を設定します。
-7. 最新mainへのpushで起動した `GCP dev CD` workflowを再実行します。全CIとCDが成功したこと、revision・digest・再plan・IAP・イメージ保持を記録します。実クラウドでの初回CD成功は、ローカル検証の成功とは分けて記録します。
+7. 最新mainへのpushで起動した `Main CD` を全ジョブ再実行します。全CIとCDが成功したこと、revision・digest・再plan・IAP・イメージ保持を記録します。実クラウドでの初回CD成功は、ローカル検証の成功とは分けて記録します。
 
 手動のインフラ変更・復旧時も `dev.cd.tfvars.json` を使い、現在のdigestまたは明示した復旧digestを引数で渡します。古い `dev.local.tfvars` のdigestを不用意にapplyして、アプリを巻き戻さないでください。
 
 ## 初回CDの検証記録（2026-10-30）
 
-以下は特定のソースとworkflowに紐づく初回配備時の記録です。以後の配備でrevision・digest・保持タグは変わるため、最新状態は [GCP dev CDのActions一覧](https://github.com/kojiyamauchi/hono-app/actions/workflows/cd.yml)の成功run・配備サマリーとCloud RunのReady revisionで確認してください。API・Scalarへのアクセス先は[dev環境の案内](deployment-gcp.md#dev環境のアクセス先)を参照してください。
+以下は特定のソースとworkflowに紐づく初回配備時の記録です。以後の配備でrevision・digest・保持タグは変わるため、最新状態は [Main CDのActions一覧](https://github.com/kojiyamauchi/hono-app/actions/workflows/cd.yml)の成功run・配備サマリーとCloud RunのReady revisionで確認してください。API・Scalarへのアクセス先は[dev環境の案内](deployment-gcp.md#dev環境のアクセス先)を参照してください。
 
 - 対象: project `hono-app-dev-512908-f3`、`asia-northeast1`、Terraform workspace `dev`、Cloud Run `hono-app-dev`。
 - 検証日時: 2026-10-30 19:41 JST。
@@ -139,7 +139,7 @@ Cloud Runのoperationはサービス配下ではないため、`run.operations.g
 1. 停止原因に対する修正をマージした最新mainで、現在のReady revisionのdigestを取得し、`dev.cd.tfvars.json` を使って全体planを作ります。上の初回構築用コマンドと同じ入力を使い、保存先は `cd-resume.tfplan` などで区別します。
 2. インフラ修正がなければ設定変更なしを確認します。設定変更が必要なら、レビュー済みの修正に対応する差分だけかを確認し、ユーザーへplanを提示します。初回の読み取りrole修正では `google_project_iam_custom_role.cd_read[0]` のpermissionsへの `iam.workloadIdentityPools.getAttestationRules` 追加が対象でした。lockfileのハッシュ追加自体にクラウド設定の適用は不要です。
 3. 設定変更がある場合はユーザー確認後にその保存planを手動適用します。配備用SAによるplanは、次のActions実行でWIF経由の認証を使って確認します。承認済みIAM操作に伴うetagなどをstateへ同期する場合も、差分を個別確認してから行い、未確認のdriftを一括で取り込まないでください。
-4. ユーザー確認後にrepository variableを `GCP_DEV_CD_ENABLED=true` に戻し、最新mainの `GCP dev CD` workflowを再実行します。
+4. ユーザー確認後にrepository variableを `GCP_DEV_CD_ENABLED=true` に戻し、最新mainの `Main CD` を全ジョブ再実行します。
 5. CI・migration・配備・IAP・再plan・保持タグ整理の成功と、SHA・revision・配備/復旧用digestを記録します。権限不足やハッシュ不足を解消しただけで再開後のCD検証を完了とは扱いません。
 
 ## providerのlockfile管理
