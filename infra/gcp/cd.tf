@@ -66,12 +66,11 @@ resource "google_iam_workload_identity_pool_provider" "github" {
     "assertion.ref == 'refs/heads/main'",
     "assertion.event_name == 'push'",
     "assertion.environment == 'gcp-dev'",
+    "assertion.workflow_ref == '${var.github_cd.repository}/.github/workflows/cd.yml@refs/heads/main'",
     join(" ", [
-      "(assertion.workflow_ref == '${var.github_cd.repository}/.github/workflows/cd-gcp.yml@refs/heads/main' ||",
-      "(assertion.workflow_ref == '${var.github_cd.repository}/.github/workflows/cd.yml@refs/heads/main' &&",
       "has(assertion.job_workflow_ref) && assertion.job_workflow_ref in [",
       "'${var.github_cd.repository}/.github/workflows/cd-gcp.yml@refs/heads/main',",
-      "'${var.github_cd.repository}/.github/workflows/cd-migration.yml@refs/heads/main']))",
+      "'${var.github_cd.repository}/.github/workflows/cd-migration.yml@refs/heads/main']",
     ]),
   ])
   oidc {
