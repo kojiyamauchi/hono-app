@@ -55,17 +55,18 @@ run "cd_scoped_to_main_and_dev" {
     condition = (
       length(google_service_account.cd) == 3 &&
       google_iam_workload_identity_pool_provider.github[0].oidc[0].issuer_uri == "https://token.actions.githubusercontent.com" &&
-      alltrue([for condition in [
-        "assertion.repository_id == '1234'", "assertion.repository_owner_id == '5678'",
-        "assertion.ref == 'refs/heads/main'", "assertion.event_name == 'push'",
-        "assertion.workflow_ref == 'owner/repository/.github/workflows/cd-gcp.yml@refs/heads/main'",
-        "assertion.workflow_ref == 'owner/repository/.github/workflows/cd.yml@refs/heads/main' &&",
-        "has(assertion.job_workflow_ref) && assertion.job_workflow_ref in [",
-        "'owner/repository/.github/workflows/cd-migration.yml@refs/heads/main'",
+      google_iam_workload_identity_pool_provider.github[0].attribute_condition == join(" && ", [
+        "assertion.repository_id == '1234'",
+        "assertion.repository_owner_id == '5678'",
+        "assertion.ref == 'refs/heads/main'",
+        "assertion.event_name == 'push'",
         "assertion.environment == 'gcp-dev'",
-      ] : strcontains(google_iam_workload_identity_pool_provider.github[0].attribute_condition, condition)])
+        "assertion.workflow_ref == 'owner/repository/.github/workflows/cd.yml@refs/heads/main'",
+        "has(assertion.job_workflow_ref)",
+        "assertion.job_workflow_ref in [ 'owner/repository/.github/workflows/cd-gcp.yml@refs/heads/main', 'owner/repository/.github/workflows/cd-migration.yml@refs/heads/main']",
+      ])
     )
-    error_message = "GitHubの数値ID・main・push・対象workflow・dev Environmentで信頼範囲を制限する必要があります。"
+    error_message = "GitHubの数値ID・main・push・gcp-devとcd.yml起点の再利用workflowだけを許可し、旧直接起動を受け入れてはいけません。"
   }
   assert {
     condition = (

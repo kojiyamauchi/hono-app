@@ -52,14 +52,28 @@ Registryのcleanup設定・IAM・他の属性の変更や、`resource_changes` �
 
 Cloud Runの作成・削除・IAM変更、WIF変更、Secret値の更新権限はCDへ渡しません。Cloud Runの更新権限はフィールド単位にimageだけへ限定できず、任意コードをruntime SAで動かせる権限でもあるため、mainのレビューとplan検査も信頼境界になります。SAの切り替えは完全な信頼分離ではなく、直接取得する権限とログ誤出力の範囲を減らすためのものです。
 
-WIFはGitHub issuerに対し、repository ID `1251281818`、owner ID `13247377`、`refs/heads/main`、pushイベント、Environment `gcp-dev` を検査します。新経路では起動元の `workflow_ref` を `cd.yml`、`job_workflow_ref` を `cd-gcp.yml` または `cd-migration.yml` のmainに制限します。移行中は旧 `cd-gcp.yml` の直接起動も許可します。長期鍵は保存しません。CI・ビルドの後、用途ごとに短命認証を取り直します。
+WIFはGitHub issuerに対し、repository ID `1251281818`、owner ID `13247377`、`refs/heads/main`、pushイベント、Environment `gcp-dev` を検査します。起動元の `workflow_ref` は `cd.yml` のmainだけを許可し、`job_workflow_ref` の存在と、`cd-gcp.yml` または `cd-migration.yml` のmainであることを要求します。旧 `cd-gcp.yml` の直接起動は許可しません。`cd-gcp.yml` 自体は再利用workflowとして残します。長期鍵は保存しません。CI・ビルドの後、用途ごとに短命認証を取り直します。
 
-### 共通CDへの切り替え
+GitHub Environment `gcp-dev` の `GCP_CD_PLAN_KEY` には、ランダムな32バイト以上をエンコードした値を登録します。事前検証ジョブは保存planと配備記録を暗号化し、同じrun・試行の配備ジョブだけが取得します。成果物の保持期間は1日です。失敗時は最新mainに対して全ジョブを再実行し、planを作り直します。
 
-1. GitHub Environment `gcp-dev` に、ランダムな32バイト以上をエンコードした値を `GCP_CD_PLAN_KEY` として登録します。事前検証ジョブは保存planと配備記録を暗号化し、同じrun・試行の配備ジョブだけが取得します。成果物の保持期間は1日です。失敗時は最新mainに対して全ジョブを再実行し、planを作り直します。
-2. GCP・Cloudflareの自動配備を一時停止し、旧経路の実行中・待機中の共有DBリリースが終了したことを確認します。切り替えコミットのTerraformを手動でplanし、WIFの新旧併存だけが変更されることを確認して適用します。
-3. `cd.yml` への切り替えをマージし、利用する配備フラグを再度有効化します。切り替えコミットが最新ならActionsから全ジョブを再実行し、最新mainのrunでmigration認証、GCP認証、Cloud RunのdigestとIAPヘルス、Cloudflare有効時はWorkerのSHAとAccess保護を確認します。
-4. 新経路での認証と実配備の成功を記録した後、別PRで旧 `workflow_ref` の許可を削除し、実行中のCDと重ならないタイミングでTerraformを適用します。それまでは、新経路を止めて実行中のリリースを待ってから旧構成に戻せます。
+### 共通CDへの切り替え記録（2026-11-19）
+
+[PR #228](https://github.com/kojiyamauchi/hono-app/pull/228)で共通CDへ切り替え、[PR #229](https://github.com/kojiyamauchi/hono-app/pull/229)でplan暗号化Secretの連携を修正しました。[Main CD run 44498986380](https://github.com/kojiyamauchi/hono-app/actions/runs/44498986380)は、mainの `0fb1115ca9f3adfe7dfe177eab663fad04468a29` へのpushを起点として、2026-11-19 18:49 JSTに成功しました。
+
+- GCPの事前検証・配備・IAP検証用のWIF認証と、保存planの暗号化・復元が成功しました。
+- 共有DBのmigration用WIF認証、未適用migrationの適用工程、DB履歴・チェックサム・読み取りの検証が成功しました。
+- Cloud Runの保存plan適用・revision検証・未認証拒否・IAP認証付きhealthと、Cloudflare Workerの配備・SHA検証・Access保護検証が成功しました。
+- 2026-11-19 18:52 JSTのActions照会では、旧直接起動の最新run [44301595360](https://github.com/kojiyamauchi/hono-app/actions/runs/44301595360)は完了済みで、実行中・キュー待ちのrunはありませんでした。配備フラグはGCP・Cloudflareともに `true` でした。手動適用前には再照会が必要です。
+
+### 旧起動元許可の削除を手動適用する手順
+
+リポジトリの条件変更だけでは実環境のWIFは更新されません。以下はPRレビュー後の別作業として実施します。新経路の成功証跡を確認してから旧 `workflow_ref` 許可を削除し、通常CDと重ねず、WIF providerの条件だけを手動適用します。
+
+1. [インフラ変更の手動適用](#インフラ変更の手動適用)に従い、利用中の両配備フラグを記録して一時停止し、通常PRのマージと過去のCDの再実行を止めます。`Main CD` と旧 `GCP dev CD` の実行中・待機中のrunがすべて完了したことを確認します。キュー待ちだけでなくEnvironment待ちなども確認し、実行中のmigration・applyを強制停止しません。
+2. 対象PRをマージし、マージ済みmainを取得します。`gcloud --configuration=hono-app-dev` の対象アカウント・projectとGCS backend・dev workspaceを確認し、現在のReady revisionのdigestと `env/dev.cd.tfvars.json` を明示して全体planを保存します。コマンドは[手動適用手順のステップ2・3](#インフラ変更の手動適用)と同じです。`-target` で差分を隠しません。
+3. managed resourceの変更が `google_iam_workload_identity_pool_provider.github[0]` の `attribute_condition` のupdate 1件だけであり、旧起動元のOR許可だけを削除することを確認します。`cd.yml` 起点・両 `job_workflow_ref`・数値repository ID・owner ID・main・push・`gcp-dev` の制約は維持します。Cloud Runのimage、IAM、Secret、他リソースの作成・削除・置換・設定変更があれば中止し、別件として確認します。
+4. ユーザーがplanを確認した後に同じ保存planだけを手動applyし、稼働中digestで全体再planの設定差分なしを確認します。WIF更新権限をCD用SAへ追加せず、旧workflowの再実行による動作確認も行いません。
+5. 記録した配備フラグを戻し、最新mainの `Main CD` を全ジョブ再実行します。共有migrationのWIF認証・DB検証、GCPのWIF認証・Cloud RunのdigestとIAP health、WorkerのSHAとAccess保護の成功を記録してから、次の通常PRへ進みます。旧構成への復旧が必要な場合も、両配備を停止して実行完了を待ち、レビューしたWIF復旧planを手動適用する必要があります。
 
 IAP検証には検証用SAの `openid` / `userinfo.email` scope付きアクセストークンを使います。既存のユーザー用アクセストークンやCloud Run URL向けIDトークンでの成功を前提にしません。プログラム用OAuth client allowlistをCDが書き換えることもありません。[IAPのサービスアカウント認証](https://docs.cloud.google.com/iap/docs/authentication-howto#authenticate_with_a_service_account_access_token)
 
@@ -84,13 +98,13 @@ Cloud Runのoperationはサービス配下ではないため、`run.operations.g
 4. ユーザーがそのplanを確認した後にだけ、保存planをapplyします。この文書の追加や通常CDの承認省略を、初回IAM変更への承認として扱いません。
 5. IAP検証用SAの短命認証と、固定Originの未認証拒否・認証付きhealthを実測します。トークンは保護された一時ファイルまたはプロセス内だけで扱い、コマンド引数・ログへ出しません。
 6. GitHub側の変更も内容を提示して確認後、`gcp-dev` Environmentを作り、mainだけを許可・required reviewersなしとします。repository variable `GCP_DEV_CD_ENABLED=true` を設定します。
-7. 最新mainへのpushで起動した `GCP dev CD` workflowを再実行します。全CIとCDが成功したこと、revision・digest・再plan・IAP・イメージ保持を記録します。実クラウドでの初回CD成功は、ローカル検証の成功とは分けて記録します。
+7. 最新mainへのpushで起動した `Main CD` を全ジョブ再実行します。全CIとCDが成功したこと、revision・digest・再plan・IAP・イメージ保持を記録します。実クラウドでの初回CD成功は、ローカル検証の成功とは分けて記録します。
 
 手動のインフラ変更・復旧時も `dev.cd.tfvars.json` を使い、現在のdigestまたは明示した復旧digestを引数で渡します。古い `dev.local.tfvars` のdigestを不用意にapplyして、アプリを巻き戻さないでください。
 
 ## 初回CDの検証記録（2026-10-30）
 
-以下は特定のソースとworkflowに紐づく初回配備時の記録です。以後の配備でrevision・digest・保持タグは変わるため、最新状態は [GCP dev CDのActions一覧](https://github.com/kojiyamauchi/hono-app/actions/workflows/cd.yml)の成功run・配備サマリーとCloud RunのReady revisionで確認してください。API・Scalarへのアクセス先は[dev環境の案内](deployment-gcp.md#dev環境のアクセス先)を参照してください。
+以下は特定のソースとworkflowに紐づく初回配備時の記録です。以後の配備でrevision・digest・保持タグは変わるため、最新状態は [Main CDのActions一覧](https://github.com/kojiyamauchi/hono-app/actions/workflows/cd.yml)の成功run・配備サマリーとCloud RunのReady revisionで確認してください。API・Scalarへのアクセス先は[dev環境の案内](deployment-gcp.md#dev環境のアクセス先)を参照してください。
 
 - 対象: project `hono-app-dev-512908-f3`、`asia-northeast1`、Terraform workspace `dev`、Cloud Run `hono-app-dev`。
 - 検証日時: 2026-10-30 19:41 JST。
@@ -125,7 +139,7 @@ Cloud Runのoperationはサービス配下ではないため、`run.operations.g
 1. 停止原因に対する修正をマージした最新mainで、現在のReady revisionのdigestを取得し、`dev.cd.tfvars.json` を使って全体planを作ります。上の初回構築用コマンドと同じ入力を使い、保存先は `cd-resume.tfplan` などで区別します。
 2. インフラ修正がなければ設定変更なしを確認します。設定変更が必要なら、レビュー済みの修正に対応する差分だけかを確認し、ユーザーへplanを提示します。初回の読み取りrole修正では `google_project_iam_custom_role.cd_read[0]` のpermissionsへの `iam.workloadIdentityPools.getAttestationRules` 追加が対象でした。lockfileのハッシュ追加自体にクラウド設定の適用は不要です。
 3. 設定変更がある場合はユーザー確認後にその保存planを手動適用します。配備用SAによるplanは、次のActions実行でWIF経由の認証を使って確認します。承認済みIAM操作に伴うetagなどをstateへ同期する場合も、差分を個別確認してから行い、未確認のdriftを一括で取り込まないでください。
-4. ユーザー確認後にrepository variableを `GCP_DEV_CD_ENABLED=true` に戻し、最新mainの `GCP dev CD` workflowを再実行します。
+4. ユーザー確認後にrepository variableを `GCP_DEV_CD_ENABLED=true` に戻し、最新mainの `Main CD` を全ジョブ再実行します。
 5. CI・migration・配備・IAP・再plan・保持タグ整理の成功と、SHA・revision・配備/復旧用digestを記録します。権限不足やハッシュ不足を解消しただけで再開後のCD検証を完了とは扱いません。
 
 ## providerのlockfile管理
