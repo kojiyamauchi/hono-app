@@ -65,8 +65,14 @@ resource "google_iam_workload_identity_pool_provider" "github" {
     "assertion.repository_owner_id == '${var.github_cd.owner_id}'",
     "assertion.ref == 'refs/heads/main'",
     "assertion.event_name == 'push'",
-    "assertion.workflow_ref == '${var.github_cd.repository}/.github/workflows/cd-gcp.yml@refs/heads/main'",
     "assertion.environment == 'gcp-dev'",
+    join(" ", [
+      "(assertion.workflow_ref == '${var.github_cd.repository}/.github/workflows/cd-gcp.yml@refs/heads/main' ||",
+      "(assertion.workflow_ref == '${var.github_cd.repository}/.github/workflows/cd.yml@refs/heads/main' &&",
+      "has(assertion.job_workflow_ref) && assertion.job_workflow_ref in [",
+      "'${var.github_cd.repository}/.github/workflows/cd-gcp.yml@refs/heads/main',",
+      "'${var.github_cd.repository}/.github/workflows/cd-migration.yml@refs/heads/main']))",
+    ]),
   ])
   oidc {
     issuer_uri = "https://token.actions.githubusercontent.com"
