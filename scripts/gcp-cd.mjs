@@ -38,6 +38,8 @@ export async function createDeployment(run = execute) {
     const result = JSON.parse(await readFile(recordPath, 'utf8'))
     if (
       result.sha !== sha ||
+      result.runId !== runId ||
+      result.attempt !== attempt ||
       result.image !== `${imagePath}@${result.digest}` ||
       !/^sha256:[a-f0-9]{64}$/.test(result.digest) ||
       !/^sha256:[a-f0-9]{64}$/.test(result.previous)
@@ -100,7 +102,7 @@ export async function createDeployment(run = execute) {
       terraform('init', '-input=false', '-lockfile=readonly', `-backend-config=bucket=${config.github_cd.state_bucket}`, '-backend-config=prefix=hono-app/gcp')
       terraform(...planArgs(digest))
       assertDeploymentPlan(readPlan(), image)
-      await writeFile(recordPath, JSON.stringify({ sha, digest, image, previous }), { mode: 0o600 })
+      await writeFile(recordPath, JSON.stringify({ sha, runId, attempt, digest, image, previous }), { mode: 0o600 })
       if (process.env.GITHUB_STEP_SUMMARY) {
         await writeFile(process.env.GITHUB_STEP_SUMMARY, `\n配備対象SHA: \`${sha}\` / 候補digest: \`${digest}\` / 直前digest: \`${previous}\`\n`, { flag: 'a' })
       }
@@ -109,7 +111,6 @@ export async function createDeployment(run = execute) {
     /** DB用の短命認証に切り替えた後、固定Secretの数値versionだけでmigrationを実行する。 */
     async migrate() {
       await Promise.all(['migration-ok', 'verified'].map((name) => rm(`${directory}/${name}`, { force: true })))
-      await record()
       const secretPath = `${directory}/database.value`
       const envPath = `${directory}/migration.env`
       try {

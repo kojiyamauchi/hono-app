@@ -72,7 +72,7 @@ jobs:
           docker run --rm --network none
           --volume "$GITHUB_WORKSPACE:/repo:ro" --workdir /repo
           rhysd/actionlint:1.7.12 -shellcheck= -pyflakes=
-          .github/workflows/cd-gcp.yml .github/workflows/cd-cloudflare.yml
+          .github/workflows/*.yml
 
   cloudflare-runtime:
     name: Cloudflare Runtime Test

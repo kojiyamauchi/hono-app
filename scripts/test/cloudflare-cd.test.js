@@ -110,6 +110,17 @@ for (const check of [1, 2])
     }
   })
 
+test('共有DBの準備済みリリースは、途中でmainが進んでも同じSHAを配備する', async () => {
+  const f = await deploymentFixture('outdated-1')
+  try {
+    f.parameters.sharedRelease = true
+    expect(await deployCloudflare(f.parameters, f.dependencies)).not.toBe('outdated')
+    expect(f.events).toContain('upload')
+  } finally {
+    await rm(f.directory, { recursive: true, force: true })
+  }
+})
+
 test('初回配備はURL無効だけを許可し、既存versionとHTTP検証を要求しない', async () => {
   const f = await deploymentFixture()
   try {

@@ -30,7 +30,10 @@ export function assertCloudflareCheckout(sha, run = executeCloudflare) {
 }
 
 /** URL無効の初回配備と、有効化済み本体への通常配備を同じ確認経路で実行する。 */
-export async function deployCloudflare({ config, secrets, sha, directory, bootstrap = false, credentials, databaseUrl, summaryPath }, dependencies = {}) {
+export async function deployCloudflare(
+  { config, secrets, sha, directory, bootstrap = false, sharedRelease = false, credentials, databaseUrl, summaryPath },
+  dependencies = {},
+) {
   const run = dependencies.run ?? executeCloudflare
   const api = dependencies.api ?? cloudflareApi(config, process.env.CLOUDFLARE_API_TOKEN)
   const infrastructure = dependencies.infrastructure ?? verifyCloudflareInfrastructure
@@ -43,7 +46,7 @@ export async function deployCloudflare({ config, secrets, sha, directory, bootst
   assertCloudflareCheckout(sha, run)
   assert(directory && resolve(directory) !== process.cwd())
   const appSecrets = cloudflareAppSecrets(secrets)
-  if (!bootstrap && !isCurrentCloudflareSha(sha, run)) return 'outdated'
+  if (!bootstrap && !sharedRelease && !isCurrentCloudflareSha(sha, run)) return 'outdated'
   if (!bootstrap) assert(credentials?.id && credentials?.secret)
   await mkdir(directory, { recursive: true, mode: 0o700 })
   const configPath = resolve(directory, 'wrangler.json')
@@ -57,8 +60,8 @@ export async function deployCloudflare({ config, secrets, sha, directory, bootst
     if (!bootstrap) record.previous = await active(config, api)
     run('bun', ['run', 'cloudflare:prepare'])
     run('bun', ['x', '--no-install', 'wrangler', 'deploy', '--config', configPath, '--dry-run', '--outdir', resolve(directory, 'build')])
-    // ビルド中に新mainが出た場合も、まだクラウドへ変更を加えず省略できる。
-    if (!bootstrap && !isCurrentCloudflareSha(sha, run)) return 'outdated'
+    // 共有リリースではmigrationを開始したSHAを配備する。従来経路は変更前に再照合する。
+    if (!bootstrap && !sharedRelease && !isCurrentCloudflareSha(sha, run)) return 'outdated'
     assertCloudflareCheckout(sha, run)
     await database(databaseUrl, await infrastructure(config, api))
     await writeFile(secretPath, JSON.stringify(appSecrets), { mode: 0o600 })
@@ -83,13 +86,14 @@ export async function deployCloudflare({ config, secrets, sha, directory, bootst
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    assert(['deploy', 'bootstrap'].includes(process.argv[2]))
+    assert(['deploy', 'deploy-shared', 'bootstrap'].includes(process.argv[2]))
     const result = await deployCloudflare({
       config: JSON.parse(process.env.CLOUDFLARE_CD_CONFIG),
       secrets: JSON.parse(process.env.CLOUDFLARE_APP_SECRETS),
       sha: process.env.GITHUB_SHA,
       directory: process.env.CLOUDFLARE_CD_DIR,
       bootstrap: process.argv[2] === 'bootstrap',
+      sharedRelease: process.argv[2] === 'deploy-shared',
       credentials: { id: process.env.CLOUDFLARE_ACCESS_CLIENT_ID, secret: process.env.CLOUDFLARE_ACCESS_CLIENT_SECRET },
       databaseUrl: process.env.CLOUDFLARE_DATABASE_URL,
       summaryPath: process.env.GITHUB_STEP_SUMMARY,
