@@ -56,7 +56,10 @@ test('共通CI後にAWSと共有リリースへ分岐し、共有リリース内
     { cancelled: true },
   ])
     expect(allowed(migration.if, options)).toBe(false)
-  for (const cloud of ['gcp', 'cloudflare']) expect(shared.jobs[cloud].needs).toBe('migration')
+  for (const cloud of ['gcp', 'cloudflare']) {
+    expect(shared.jobs[cloud].needs).toBe('migration')
+    expect(shared.jobs[cloud].if).toContain("!cancelled() && needs.migration.result == 'success'")
+  }
   const ci = Bun.YAML.parse(await Bun.file('.github/workflows/ci.yml').text())
   for (const name of ['terraform-aws', 'terraform-gcp', 'terraform-cloudflare']) expect(ci.jobs[name].needs).toBeUndefined()
   expect(Object.keys(ci.jobs)).toContain('cloudflare-runtime')

@@ -78,6 +78,8 @@ export async function createDeployment(run = execute) {
     if (!/^sha256:[a-f0-9]{64}$/.test(digest)) throw new DeploymentError('稼働中digestが不正です。')
     return digest
   }
+  const initTerraform = () =>
+    terraform('init', '-input=false', '-lockfile=readonly', `-backend-config=bucket=${config.github_cd.state_bucket}`, '-backend-config=prefix=hono-app/gcp')
   const readPlan = () => JSON.parse(terraform('show', '-json', planPath))
   const planArgs = (digest) => [
     'plan',
@@ -99,7 +101,7 @@ export async function createDeployment(run = execute) {
       const digest = gcloud('artifacts', 'docker', 'images', 'describe', `${imagePath}:${tag}`, '--format=value(image_summary.digest)')
       if (!/^sha256:[a-f0-9]{64}$/.test(digest)) throw new DeploymentError('登録済みdigestを確認できません。')
       const image = `${imagePath}@${digest}`
-      terraform('init', '-input=false', '-lockfile=readonly', `-backend-config=bucket=${config.github_cd.state_bucket}`, '-backend-config=prefix=hono-app/gcp')
+      initTerraform()
       terraform(...planArgs(digest))
       assertDeploymentPlan(readPlan(), image)
       await writeFile(recordPath, JSON.stringify({ sha, runId, attempt, digest, image, previous }), { mode: 0o600 })
@@ -140,10 +142,12 @@ export async function createDeployment(run = execute) {
       await writeFile(`${directory}/migration-ok`, sha, { mode: 0o600 })
       console.info('migrationとDB読み取りの確認成功')
     },
-    /** migration成功印と保存planを再検査し、同じplanを適用する。 */
+    /** 成功したmigrationのSHAと保存planを再検査し、同じplanを適用する。 */
     async apply() {
       const release = await record()
-      if ((await readFile(`${directory}/migration-ok`, 'utf8')) !== sha) throw new DeploymentError('migration成功を確認できません。')
+      const migratedSha = process.env.GCP_CD_MIGRATED_SHA ?? (await readFile(`${directory}/migration-ok`, 'utf8'))
+      if (migratedSha !== sha) throw new DeploymentError('migration成功を確認できません。')
+      initTerraform()
       assertDeploymentPlan(readPlan(), release.image)
       if (readyDigest(serviceState()) !== release.previous) throw new DeploymentError('plan作成後に配備状態が変わりました。')
       for (const digest of new Set([release.previous, release.digest])) {

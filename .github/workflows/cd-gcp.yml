@@ -7,6 +7,8 @@ on:
       prepare:
         type: boolean
         required: true
+      migrated-sha:
+        type: string
     outputs:
       prepared-attempt:
         value: ${{ jobs.prepare.outputs.attempt }}
@@ -199,7 +201,6 @@ jobs:
           test -n "$PLAN_KEY"
           printf '%s\n' "$PLAN_KEY" | gpg --batch --pinentry-mode loopback --passphrase-fd 0 --output "$GCP_CD_DIR/plan.tar" --decrypt "$GCP_CD_DIR/plan.gpg"
           tar -C "$GCP_CD_DIR" -xf "$GCP_CD_DIR/plan.tar" release.tfplan release.json
-          printf '%s' "$GITHUB_SHA" > "$GCP_CD_DIR/migration-ok"
 
       - name: Refresh deployment authentication
         uses: google-github-actions/auth@v3
@@ -209,9 +210,9 @@ jobs:
           service_account: hono-app-dev-cd-deploy@hono-app-dev-512908-f3.iam.gserviceaccount.com
 
       - name: Apply saved plan and verify revision
-        run: |
-          terraform -chdir=infra/gcp init -input=false -lockfile=readonly -backend-config=bucket="$(jq -r '.github_cd.state_bucket' infra/gcp/env/dev.cd.tfvars.json)" -backend-config=prefix=hono-app/gcp
-          bun scripts/gcp-cd.mjs apply
+        env:
+          GCP_CD_MIGRATED_SHA: ${{ inputs.migrated-sha }}
+        run: bun scripts/gcp-cd.mjs apply
 
       - name: Authenticate IAP verification only
         id: iap-auth

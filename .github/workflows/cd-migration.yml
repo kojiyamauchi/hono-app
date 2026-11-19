@@ -3,6 +3,8 @@ name: Shared dev database migration
 on:
   workflow_call:
     outputs:
+      migrated-sha:
+        value: ${{ jobs.migrate.outputs.sha }}
       migrated-attempt:
         value: ${{ jobs.migrate.outputs.attempt }}
 
@@ -10,6 +12,7 @@ jobs:
   migrate:
     outputs:
       attempt: ${{ steps.migrated.outputs.attempt }}
+      sha: ${{ steps.migrated.outputs.sha }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     environment: gcp-dev
@@ -91,7 +94,8 @@ jobs:
 
       - name: Record successful migration
         id: migrated
-        run: echo "attempt=$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+        run: |
+          printf 'attempt=%s\nsha=%s\n' "$GITHUB_RUN_ATTEMPT" "$(cat "$GCP_CD_DIR/migration-ok")" >> "$GITHUB_OUTPUT"
 
       - name: Remove private temporary files
         if: always()

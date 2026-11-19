@@ -55,14 +55,19 @@ jobs:
 
   gcp:
     needs: migration
-    if: needs.migration.outputs.migrated-attempt == github.run_attempt && vars.GCP_DEV_CD_ENABLED == 'true'
+    if: >-
+      !cancelled() && needs.migration.result == 'success' &&
+      needs.migration.outputs.migrated-attempt == github.run_attempt && vars.GCP_DEV_CD_ENABLED == 'true'
     uses: ./.github/workflows/cd-gcp.yml
     with:
       prepare: false
+      migrated-sha: ${{ needs.migration.outputs.migrated-sha }}
 
   cloudflare:
     needs: migration
-    if: needs.migration.outputs.migrated-attempt == github.run_attempt && vars.CLOUDFLARE_DEV_CD_ENABLED == 'true'
+    if: >-
+      !cancelled() && needs.migration.result == 'success' &&
+      needs.migration.outputs.migrated-attempt == github.run_attempt && vars.CLOUDFLARE_DEV_CD_ENABLED == 'true'
     uses: ./.github/workflows/cd-cloudflare.yml
     # 環境Secretの名前を明示的に渡し、値は受け側のcloudflare-dev環境で解決する。
     # requiredは指定の有無だけを検査し、非空の検証は配備スクリプトが行う。
