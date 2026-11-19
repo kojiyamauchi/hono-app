@@ -4,11 +4,11 @@
 
 ## 起動と成功条件
 
-`main` へのpushで`cd.yml` が共通 `ci.yml` を一度呼び出します。Terraform AWS/GCP/Cloudflareの3ジョブは独立した並列検査のままです。Cloudflare Runtime Testを含む全9ジョブ成功が、GCPとCloudflareの両CDの前提です。PRから配備しません。ESLintジョブでは固定版actionlintをネットワーク無効・checkout読み取り専用のコンテナで実行し、全workflowの構文・利用可能なコンテキストも検査します。
+`main` へのpushで `cd.yml` が共通 `ci.yml` を一度呼び出します。Terraform AWS/GCP/Cloudflareの3ジョブは独立した並列検査のままです。Cloudflare Runtime Testを含む全9ジョブ成功が、GCPとCloudflareの両CDの前提です。PRから配備しません。ESLintジョブでは固定版actionlintをネットワーク無効・checkout読み取り専用のコンテナで実行し、全workflowの構文・利用可能なコンテキストも検査します。
 
 Cloudflare配備は共有DBのmigration成功を待ちます。GCP CDが有効な場合はmigrationの前にGCPの事前検証を行い、migration成功後の両配備は並列です。Repository variable `CLOUDFLARE_DEV_CD_ENABLED=true` のときだけ `cd-cloudflare.yml` を呼び出します。Cloudflareだけを有効にする場合も共有DBのmigrationにGCPのWIF・migration用サービスアカウント・Secret Managerが必要です。
 
-`cloudflare-dev` Environmentを使い、配備から検証まで `cloudflare-dev-deployment` のconcurrency groupで直列化します。新しいpushは実行中の配備をキャンセルしません。待機順には依存せず、開始時とバンドル生成後にGitHubのmain SHAを確認し、古いSHAはクラウドを更新せず省略します。更新開始後にmainが進んだ場合は現在の配備・検証を終え、次の配備へ進みます。手動配備・復旧中は先にフラグをfalseにし、進行中の配備の終了を待ってください。
+共有リリースは `shared-dev-release` のconcurrency groupを取得してから最新のmain SHAを確認し、古ければDB変更前に省略します。同じリリースのmigration成功後は、mainが進んでもそのSHAでCloudflare配備・検証を完了します。Cloudflare配備ジョブは `cloudflare-dev` Environmentを使います。手動配備・復旧前は共有DBの自動変更と競合しないよう、[共有リリースの停止手順](deployment-gcp-cd.md#インフラ変更の手動適用)に従います。
 
 ## 管理境界と共有DB
 
