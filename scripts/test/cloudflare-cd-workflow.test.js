@@ -121,3 +121,17 @@ test('Cloudflare用の6件だけを呼び出し元から必須Secretとして渡
   }
   expect(callee.jobs.deploy.environment).toBe('cloudflare-dev')
 })
+
+test('GCPの暗号化用Secret名を準備と配備の両方へ明示的に渡す', async () => {
+  const entry = Bun.YAML.parse(await Bun.file('.github/workflows/cd.yml').text())
+  const shared = Bun.YAML.parse(await Bun.file('.github/workflows/cd-shared-dev.yml').text())
+  const gcp = Bun.YAML.parse(await Bun.file('.github/workflows/cd-gcp.yml').text())
+  const reference = '${{ secrets.GCP_CD_PLAN_KEY }}'
+  expect(entry.jobs['shared-dev'].secrets.GCP_CD_PLAN_KEY).toBe(reference)
+  for (const workflow of [shared, gcp]) expect(workflow.on.workflow_call.secrets.GCP_CD_PLAN_KEY).toEqual({ required: true })
+  for (const job of ['gcp-prepare', 'gcp']) expect(shared.jobs[job].secrets.GCP_CD_PLAN_KEY).toBe(reference)
+  for (const job of ['prepare', 'deploy']) {
+    expect(gcp.jobs[job].environment).toBe('gcp-dev')
+    expect(gcp.jobs[job].steps.filter((step) => step.env?.PLAN_KEY).map((step) => step.env.PLAN_KEY)).toEqual([reference])
+  }
+})

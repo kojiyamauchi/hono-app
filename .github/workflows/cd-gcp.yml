@@ -3,6 +3,9 @@ name: GCP dev CD
 
 on:
   workflow_call:
+    secrets:
+      GCP_CD_PLAN_KEY:
+        required: true
     inputs:
       prepare:
         type: boolean

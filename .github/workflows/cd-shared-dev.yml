@@ -3,6 +3,8 @@ name: Shared dev release
 on:
   workflow_call:
     secrets:
+      GCP_CD_PLAN_KEY:
+        required: true
       CLOUDFLARE_API_TOKEN:
         required: true
       CLOUDFLARE_CD_CONFIG:
@@ -42,6 +44,8 @@ jobs:
     uses: ./.github/workflows/cd-gcp.yml
     with:
       prepare: true
+    secrets:
+      GCP_CD_PLAN_KEY: ${{ secrets.GCP_CD_PLAN_KEY }}
 
   migration:
     needs: [current, gcp-prepare]
@@ -62,6 +66,8 @@ jobs:
     with:
       prepare: false
       migrated-sha: ${{ needs.migration.outputs.migrated-sha }}
+    secrets:
+      GCP_CD_PLAN_KEY: ${{ secrets.GCP_CD_PLAN_KEY }}
 
   cloudflare:
     needs: migration
