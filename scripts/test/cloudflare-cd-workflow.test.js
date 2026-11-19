@@ -8,6 +8,8 @@ function allowed(
     current = 'success',
     deploy = 'true',
     currentAttempt = '2',
+    migration = 'success',
+    migratedAttempt = '2',
     preparedAttempt = '2',
     gcp = 'success',
     gcpEnabled = 'true',
@@ -19,6 +21,8 @@ function allowed(
     .replaceAll('cancelled()', String(cancelled))
     .replaceAll('needs.current.outputs.attempt', JSON.stringify(currentAttempt))
     .replaceAll('needs.gcp-prepare.outputs.prepared-attempt', JSON.stringify(preparedAttempt))
+    .replaceAll('needs.migration.result', JSON.stringify(migration))
+    .replaceAll('needs.migration.outputs.migrated-attempt', JSON.stringify(migratedAttempt))
     .replaceAll('github.run_attempt', JSON.stringify('2'))
     .replaceAll('needs.current.result', JSON.stringify(current))
     .replaceAll('needs.current.outputs.deploy', JSON.stringify(deploy))
@@ -58,7 +62,12 @@ test('共通CI後にAWSと共有リリースへ分岐し、共有リリース内
     expect(allowed(migration.if, options)).toBe(false)
   for (const cloud of ['gcp', 'cloudflare']) {
     expect(shared.jobs[cloud].needs).toBe('migration')
-    expect(shared.jobs[cloud].if).toContain("!cancelled() && needs.migration.result == 'success'")
+    const condition = shared.jobs[cloud].if
+    expect(allowed(condition)).toBe(true)
+    expect(allowed(condition, { migration: 'failure' })).toBe(false)
+    expect(allowed(condition, { migratedAttempt: '1' })).toBe(false)
+    expect(allowed(condition, { cancelled: true })).toBe(false)
+    expect(allowed(condition, cloud === 'gcp' ? { gcpEnabled: '' } : { cloudflareEnabled: '' })).toBe(false)
   }
   const ci = Bun.YAML.parse(await Bun.file('.github/workflows/ci.yml').text())
   for (const name of ['terraform-aws', 'terraform-gcp', 'terraform-cloudflare']) expect(ci.jobs[name].needs).toBeUndefined()
