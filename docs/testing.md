@@ -311,7 +311,7 @@ bun run build
 
 通常のCIテストはDB非依存とし、Repositoryと外部サービスをmockします。
 
-PRでは検査専用の `ci.yml` を実行し、ChecksにCDジョブを含めません。mainへのpushでは `cd-gcp.yml` から同じ `ci.yml` を呼び出します。GCP devの配備は `ci.yml` 内の全ジョブ成功後、明示的に有効化された場合だけ動きます。配備前のコンテナ検証は通常のUnit Testとは分離し、使い捨てDBで行います。CDのplan許可範囲・migration失敗時の停止・IAP検証・イメージ保持は `scripts/test/gcp-cd*.test.js` とGCPのTerraformモックテストで確認します。[GCP devの自動配備](deployment-gcp-cd.md)
+PRでは検査専用の `ci.yml` を実行し、ChecksにCDジョブを含めません。mainへのpushでは `cd.yml` から同じ `ci.yml` を呼び出します。GCP devの配備は `ci.yml` 内の全ジョブ成功後、明示的に有効化された場合だけ動きます。配備前のコンテナ検証は通常のUnit Testとは分離し、使い捨てDBで行います。CDのplan許可範囲・migration失敗時の停止・IAP検証・イメージ保持は `scripts/test/gcp-cd*.test.js` とGCPのTerraformモックテストで確認します。[GCP devの自動配備](deployment-gcp-cd.md)
 
 GCPのCIは `init -backend=false -lockfile=readonly` の後にvalidate・モックテストを実行します。初期化時にlockfileへハッシュを自動追加して成功扱いにせず、Mac/ARM64とLinux/AMD64の両方が記録されていることを前提にします。platformやproviderを更新する手順は[lockfile管理](deployment-gcp-cd.md#providerのlockfile管理)を参照してください。
 
@@ -345,4 +345,4 @@ Cloudflare検証用のBunテストも通常のUnit Testへ含め、そのジョ�
 
 ## Cloudflare CDの検証
 
-本体CDの判定・API/HTTP境界・DB履歴照合・停止順序・checkout整合性・実workflow条件は `scripts/test/cloudflare-cd*.test.js` で確認します。`main` の既存 `cd-gcp.yml` から共通CIを一度だけ呼び、Cloudflare配備は全件成功と、有効な場合のGCP配備成功を待ちます。Terraformの3ジョブの並列構成を維持します。本体基盤は既定無効で、providerモックでURL無効の初回構築と検証Worker分離を確認します。PRのESLintジョブでも固定版actionlintで両CD workflowの構文とコンテキストを検査します。[構築・有効化・失敗時の手順](deployment-cloudflare-cd.md)
+本体CDの判定・API/HTTP境界・DB履歴照合・停止順序・checkout整合性・実workflow条件は `scripts/test/cloudflare-cd*.test.js` で確認します。`main` の `cd.yml` から共通CIを一度だけ呼び、Cloudflare配備は共通CIと共有DBのmigration成功を待ちます。GCPが有効な場合はmigrationの前にGCPの事前検証を行います。Terraformの3ジョブの並列構成を維持します。本体基盤は既定無効で、providerモックでURL無効の初回構築と検証Worker分離を確認します。PRのESLintジョブでも固定版actionlintで全workflowの構文とコンテキストを検査します。[構築・有効化・失敗時の手順](deployment-cloudflare-cd.md)

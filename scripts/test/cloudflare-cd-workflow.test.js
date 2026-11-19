@@ -1,39 +1,81 @@
 // cspell:words rhysd
 import { expect, test } from 'bun:test'
 
-/** 実際のworkflow式で、共通CI・GCP・フラグの組合せを評価する。 */
-function allowed(expression, ci, gcp, gcpEnabled, cloudflareEnabled, cancelled = false) {
+/** 実際のmigration条件を、GitHub Actionsのジョブ結果を使って評価する。 */
+function allowed(
+  expression,
+  {
+    current = 'success',
+    deploy = 'true',
+    currentAttempt = '2',
+    migration = 'success',
+    migratedAttempt = '2',
+    preparedAttempt = '2',
+    gcp = 'success',
+    gcpEnabled = 'true',
+    cloudflareEnabled = 'true',
+    cancelled = false,
+  } = {},
+) {
   const js = expression
-    .replaceAll('always()', 'true')
     .replaceAll('cancelled()', String(cancelled))
-    .replaceAll('needs.ci.result', JSON.stringify(ci))
-    .replaceAll('needs.deploy.result', JSON.stringify(gcp))
+    .replaceAll('needs.current.outputs.attempt', JSON.stringify(currentAttempt))
+    .replaceAll('needs.gcp-prepare.outputs.prepared-attempt', JSON.stringify(preparedAttempt))
+    .replaceAll('needs.migration.result', JSON.stringify(migration))
+    .replaceAll('needs.migration.outputs.migrated-attempt', JSON.stringify(migratedAttempt))
+    .replaceAll('github.run_attempt', JSON.stringify('2'))
+    .replaceAll('needs.current.result', JSON.stringify(current))
+    .replaceAll('needs.current.outputs.deploy', JSON.stringify(deploy))
+    .replaceAll('needs.gcp-prepare.result', JSON.stringify(gcp))
     .replaceAll('vars.GCP_DEV_CD_ENABLED', JSON.stringify(gcpEnabled))
     .replaceAll('vars.CLOUDFLARE_DEV_CD_ENABLED', JSON.stringify(cloudflareEnabled))
   return Function(`return (${js})`)()
 }
 
-test('共通CI全件を共有し、CI失敗・GCP失敗・キャンセル・未有効化を拒否する', async () => {
-  const workflow = Bun.YAML.parse(await Bun.file('.github/workflows/cd-gcp.yml').text())
+test('共通CI後にAWSと共有リリースへ分岐し、共有リリース内でmigration後に両配備を開始する', async () => {
+  const workflow = Bun.YAML.parse(await Bun.file('.github/workflows/cd.yml').text())
+  const shared = Bun.YAML.parse(await Bun.file('.github/workflows/cd-shared-dev.yml').text())
+  const aws = Bun.YAML.parse(await Bun.file('.github/workflows/cd-aws.yml').text())
   expect(workflow.on).toEqual({ push: { branches: ['main'] } })
   expect(workflow.jobs.ci.uses).toBe('./.github/workflows/ci.yml')
-  const job = workflow.jobs.cloudflare
-  expect(job.needs).toEqual(['ci', 'deploy'])
-  expect(job.uses).toBe('./.github/workflows/cd-cloudflare.yml')
-  expect(allowed(job.if, 'success', 'success', 'true', 'true')).toBe(true)
-  expect(allowed(job.if, 'success', 'skipped', '', 'true')).toBe(true)
-  for (const status of ['failure', 'cancelled', 'skipped']) expect(allowed(job.if, status, 'success', 'true', 'true')).toBe(false)
-  for (const status of ['failure', 'cancelled']) expect(allowed(job.if, 'success', status, '', 'true')).toBe(false)
-  expect(allowed(job.if, 'success', 'skipped', 'true', 'true')).toBe(false)
-  expect(allowed(job.if, 'success', 'success', 'true', '')).toBe(false)
-  expect(allowed(job.if, 'success', 'success', 'true', 'true', true)).toBe(false)
+  expect(workflow.jobs.aws.needs).toBe('ci')
+  expect(workflow.jobs['shared-dev'].needs).toBe('ci')
+  expect(Object.keys(aws.on).sort()).toEqual(['workflow_call', 'workflow_dispatch'])
+  expect(shared.concurrency).toEqual({ group: 'shared-dev-release', 'cancel-in-progress': false })
+  expect(shared.jobs['gcp-prepare'].needs).toBe('current')
+  const migration = shared.jobs.migration
+  expect(migration.needs).toEqual(['current', 'gcp-prepare'])
+  expect(allowed(migration.if)).toBe(true)
+  expect(allowed(migration.if, { cloudflareEnabled: '' })).toBe(true)
+  expect(allowed(migration.if, { gcpEnabled: '', gcp: 'skipped' })).toBe(true)
+  for (const options of [
+    { gcp: 'failure' },
+    { gcp: 'cancelled' },
+    { gcp: 'skipped' },
+    { gcpEnabled: '', gcp: 'skipped', cloudflareEnabled: '' },
+    { current: 'failure' },
+    { deploy: '' },
+    { currentAttempt: '1' },
+    { preparedAttempt: '1' },
+    { cancelled: true },
+  ])
+    expect(allowed(migration.if, options)).toBe(false)
+  for (const cloud of ['gcp', 'cloudflare']) {
+    expect(shared.jobs[cloud].needs).toBe('migration')
+    const condition = shared.jobs[cloud].if
+    expect(allowed(condition)).toBe(true)
+    expect(allowed(condition, { migration: 'failure' })).toBe(false)
+    expect(allowed(condition, { migratedAttempt: '1' })).toBe(false)
+    expect(allowed(condition, { cancelled: true })).toBe(false)
+    expect(allowed(condition, cloud === 'gcp' ? { gcpEnabled: '' } : { cloudflareEnabled: '' })).toBe(false)
+  }
   const ci = Bun.YAML.parse(await Bun.file('.github/workflows/ci.yml').text())
   for (const name of ['terraform-aws', 'terraform-gcp', 'terraform-cloudflare']) expect(ci.jobs[name].needs).toBeUndefined()
   expect(Object.keys(ci.jobs)).toContain('cloudflare-runtime')
   const syntax = ci.jobs.checks.steps.find((step) => step.name === 'Validate CD workflow syntax')
   expect(syntax.if).toBe("matrix.script == 'lint:check'")
   expect(syntax.run).toContain('rhysd/actionlint:1.7.12')
-  expect(syntax.run).toContain('.github/workflows/cd-gcp.yml .github/workflows/cd-cloudflare.yml')
+  expect(syntax.run).toContain('.github/workflows/*.yml')
 })
 
 test('PRから配備せず、環境の資格情報・固定依存・中断しない排他・削除を指定する', async () => {
@@ -57,7 +99,7 @@ test('PRから配備せず、環境の資格情報・固定依存・中断しな
 })
 
 test('Cloudflare用の6件だけを呼び出し元から必須Secretとして渡し、環境内の配備ステップへ接続する', async () => {
-  const caller = Bun.YAML.parse(await Bun.file('.github/workflows/cd-gcp.yml').text())
+  const caller = Bun.YAML.parse(await Bun.file('.github/workflows/cd-shared-dev.yml').text())
   const callee = Bun.YAML.parse(await Bun.file('.github/workflows/cd-cloudflare.yml').text())
   const names = [
     'CLOUDFLARE_API_TOKEN',

@@ -14,7 +14,7 @@ devでは2026-10-30に初回CDが成功し、mainへのマージ後の自動配�
 
 上記はメール・Supabaseの転送先や `ALLOWED_ORIGINS` と合わせた採用済みOriginです。Terraformの `service_url` が別形式の有効なOriginを返す場合があるため、その出力で案内URLを置き換えません。
 
-初回CDのSHA・workflow・revision・digestと検証範囲は[初回CDの検証記録](deployment-gcp-cd.md#初回cdの検証記録2026-10-30)を参照してください。最新の配備状況は [GCP dev CDのActions一覧](https://github.com/kojiyamauchi/hono-app/actions/workflows/cd-gcp.yml)で確認できます。認証付きhealthの成功は、ブラウザの全ユーザーフローやメール配達まで検証済みという意味ではありません。
+初回CDのSHA・workflow・revision・digestと検証範囲は[初回CDの検証記録](deployment-gcp-cd.md#初回cdの検証記録2026-10-30)を参照してください。最新の配備状況は [GCP dev CDのActions一覧](https://github.com/kojiyamauchi/hono-app/actions/workflows/cd.yml)で確認できます。認証付きhealthの成功は、ブラウザの全ユーザーフローやメール配達まで検証済みという意味ではありません。
 
 ## 管理範囲とアクセス制限
 
@@ -99,7 +99,7 @@ Cloud Monitoringには、メール通知チャネル単体へテスト送信す�
    httpRequest.status>=500
    ```
 
-3. 該当リクエストログの `resource.labels.revision_name` で、5xxを返したリビジョンを特定します。配備直後であれば、そのrevisionのdigestを[GCP dev CDのActions一覧](https://github.com/kojiyamauchi/hono-app/actions/workflows/cd-gcp.yml)の配備サマリーと照合します。
+3. 該当リクエストログの `resource.labels.revision_name` で、5xxを返したリビジョンを特定します。配備直後であれば、そのrevisionのdigestを[GCP dev CDのActions一覧](https://github.com/kojiyamauchi/hono-app/actions/workflows/cd.yml)の配備サマリーと照合します。
 4. 特定したリビジョンのアプリ側ログを確認します。Honoの `onError` が返す500は、リクエストログだけでは原因が分からないため、同じrevisionの標準出力・標準エラーを合わせて読みます。
 
    ```txt

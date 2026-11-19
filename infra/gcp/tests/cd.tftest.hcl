@@ -54,12 +54,14 @@ run "cd_scoped_to_main_and_dev" {
   assert {
     condition = (
       length(google_service_account.cd) == 3 &&
-      !strcontains(google_iam_workload_identity_pool_provider.github[0].attribute_condition, "job_workflow_ref") &&
       google_iam_workload_identity_pool_provider.github[0].oidc[0].issuer_uri == "https://token.actions.githubusercontent.com" &&
       alltrue([for condition in [
         "assertion.repository_id == '1234'", "assertion.repository_owner_id == '5678'",
         "assertion.ref == 'refs/heads/main'", "assertion.event_name == 'push'",
         "assertion.workflow_ref == 'owner/repository/.github/workflows/cd-gcp.yml@refs/heads/main'",
+        "assertion.workflow_ref == 'owner/repository/.github/workflows/cd.yml@refs/heads/main' &&",
+        "has(assertion.job_workflow_ref) && assertion.job_workflow_ref in [",
+        "'owner/repository/.github/workflows/cd-migration.yml@refs/heads/main'",
         "assertion.environment == 'gcp-dev'",
       ] : strcontains(google_iam_workload_identity_pool_provider.github[0].attribute_condition, condition)])
     )

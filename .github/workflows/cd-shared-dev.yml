@@ -1,0 +1,80 @@
+name: Shared dev release
+
+on:
+  workflow_call:
+    secrets:
+      CLOUDFLARE_API_TOKEN:
+        required: true
+      CLOUDFLARE_CD_CONFIG:
+        required: true
+      CLOUDFLARE_APP_SECRETS:
+        required: true
+      CLOUDFLARE_ACCESS_CLIENT_ID:
+        required: true
+      CLOUDFLARE_ACCESS_CLIENT_SECRET:
+        required: true
+      CLOUDFLARE_DATABASE_URL:
+        required: true
+
+concurrency:
+  group: shared-dev-release
+  cancel-in-progress: false
+
+jobs:
+  current:
+    runs-on: ubuntu-latest
+    outputs:
+      deploy: ${{ steps.sha.outputs.deploy }}
+      attempt: ${{ steps.sha.outputs.attempt }}
+    steps:
+      - name: Check current main
+        id: sha
+        run: |
+          main=$(git ls-remote --exit-code "https://github.com/$GITHUB_REPOSITORY.git" refs/heads/main)
+          if [ "${main%%[[:space:]]*}" = "$GITHUB_SHA" ]; then
+            echo 'deploy=true' >> "$GITHUB_OUTPUT"
+            echo "attempt=$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+          fi
+
+  gcp-prepare:
+    needs: current
+    if: needs.current.outputs.deploy == 'true' && needs.current.outputs.attempt == github.run_attempt && vars.GCP_DEV_CD_ENABLED == 'true'
+    uses: ./.github/workflows/cd-gcp.yml
+    with:
+      prepare: true
+
+  migration:
+    needs: [current, gcp-prepare]
+    if: >-
+      !cancelled() && needs.current.result == 'success' &&
+      needs.current.outputs.deploy == 'true' && needs.current.outputs.attempt == github.run_attempt &&
+      ((needs.gcp-prepare.result == 'success' && needs.gcp-prepare.outputs.prepared-attempt == github.run_attempt) ||
+       (vars.GCP_DEV_CD_ENABLED != 'true' && vars.CLOUDFLARE_DEV_CD_ENABLED == 'true' &&
+        needs.gcp-prepare.result == 'skipped'))
+    uses: ./.github/workflows/cd-migration.yml
+
+  gcp:
+    needs: migration
+    if: >-
+      !cancelled() && needs.migration.result == 'success' &&
+      needs.migration.outputs.migrated-attempt == github.run_attempt && vars.GCP_DEV_CD_ENABLED == 'true'
+    uses: ./.github/workflows/cd-gcp.yml
+    with:
+      prepare: false
+      migrated-sha: ${{ needs.migration.outputs.migrated-sha }}
+
+  cloudflare:
+    needs: migration
+    if: >-
+      !cancelled() && needs.migration.result == 'success' &&
+      needs.migration.outputs.migrated-attempt == github.run_attempt && vars.CLOUDFLARE_DEV_CD_ENABLED == 'true'
+    uses: ./.github/workflows/cd-cloudflare.yml
+    # 環境Secretの名前を明示的に渡し、値は受け側のcloudflare-dev環境で解決する。
+    # requiredは指定の有無だけを検査し、非空の検証は配備スクリプトが行う。
+    secrets:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_CD_CONFIG: ${{ secrets.CLOUDFLARE_CD_CONFIG }}
+      CLOUDFLARE_APP_SECRETS: ${{ secrets.CLOUDFLARE_APP_SECRETS }}
+      CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CLOUDFLARE_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+      CLOUDFLARE_DATABASE_URL: ${{ secrets.CLOUDFLARE_DATABASE_URL }}

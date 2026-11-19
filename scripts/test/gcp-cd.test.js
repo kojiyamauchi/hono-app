@@ -13,6 +13,7 @@ let originalEnvironment
 
 beforeEach(async () => {
   originalEnvironment = { ...process.env }
+  delete process.env.GCP_CD_MIGRATED_SHA
   directory = await mkdtemp(join(tmpdir(), 'hono-cd-test-'))
   Object.assign(process.env, {
     GITHUB_SHA: sha,
@@ -130,6 +131,23 @@ describe('dev配備の停止条件と実行順序', () => {
     await deployment.plan()
     await expect(deployment.apply()).rejects.toThrow()
     expect(calls.some(({ args }) => args.includes('apply'))).toBe(false)
+  })
+  test.each(['', '0'.repeat(40)])('共有migrationの成功SHAが一致しなければ適用しない（%j）', async (migratedSha) => {
+    const { run, calls } = fakeCommands()
+    const deployment = await createDeployment(run)
+    await deployment.plan()
+    process.env.GCP_CD_MIGRATED_SHA = migratedSha
+    await expect(deployment.apply()).rejects.toThrow('migration成功を確認できません。')
+    expect(calls.some(({ args }) => args.includes('apply'))).toBe(false)
+  })
+  test('共有migrationの成功SHAが一致すればローカルの成功印なしで適用する', async () => {
+    const { run, calls } = fakeCommands()
+    const deployment = await createDeployment(run)
+    await deployment.plan()
+    process.env.GCP_CD_MIGRATED_SHA = sha
+    expect(existsSync(join(directory, 'migration-ok'))).toBe(false)
+    await deployment.apply()
+    expect(calls.some(({ args }) => args.includes('apply'))).toBe(true)
   })
   test.each([
     ['migration失敗', { migrationFails: true }],

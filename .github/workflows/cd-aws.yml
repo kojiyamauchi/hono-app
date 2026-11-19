@@ -1,8 +1,9 @@
 name: AWS Image Build and Push
 on:
-  push:
-    branches:
-      - main
+  workflow_call:
+    secrets:
+      IAM_ARN_TO_PUSH_IMAGE:
+        required: true
   workflow_dispatch:
     inputs:
       environment:
