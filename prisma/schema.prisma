@@ -104,10 +104,40 @@ model Project {
   // 組織が削除されたときは、同じトランザクション内でプロジェクトも削除する（監査ログと同じくDBのcascadeに任せる）。
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
+  // タスクの親。プロジェクトが削除されたときは、タスクもDBのcascadeで同じトランザクション内に削除する。
+  tasks Task[]
+
   // 組織単位のプロジェクト一覧取得（新しい順）を支援する。
   // カーソル式ページネーションの行値比較（("createdAt", id) < (...)）の境界条件をIndex Condへ入れるため、idまで含める。
   // 並びはDESCだが、btreeの逆方向スキャンで満たせるためindexはASCのまま定義する。
   @@index([organizationId, createdAt, id])
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+model Task {
+  id          Int        @id @default(autoincrement())
+  projectId   Int
+  title       String
+  // 未設定はnull。空文字も有効な値として保存し、trimや空文字→nullの変換は行わない。
+  description String?
+  status      TaskStatus @default(TODO)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  // 所属組織は親Projectから確定するためorganizationIdは持たない。作成者への参照も持たない（作成者の脱退後も残す）。
+  // プロジェクト（および組織）が削除されたときは、DBのcascadeに任せてタスクも削除する。
+  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // プロジェクト単位のタスク一覧取得（新しい順）を支援する。状態未指定の一覧用。
+  // カーソル式ページネーションの行値比較（("createdAt", id) < (...)）の境界条件をIndex Condへ入れるため、idまで含める。
+  // 並びはDESCだが、btreeの逆方向スキャンで満たせるためindexはASCのまま定義する。
+  @@index([projectId, createdAt, id])
+  // 状態を指定した一覧用。statusの等価条件の後ろで同じ順序を満たす。
+  @@index([projectId, status, createdAt, id])
 }
 
 enum InvitationStatus {
