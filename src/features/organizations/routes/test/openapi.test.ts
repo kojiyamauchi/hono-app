@@ -538,4 +538,119 @@ describe('organizations routes OpenAPI定義', () => {
     expect(createBody.minProperties).toBeUndefined()
     expect(updateBody.properties.name.type).toBe('string')
   })
+
+  test('タスクAPIの5 endpointが認証・パスパラメータ・response付きで定義されている', async () => {
+    const doc = await fetchOpenApiDoc()
+
+    type Parameter = { name: string; in: string; required?: boolean; schema?: { maximum?: number; enum?: string[] } }
+    type Operation = {
+      tags?: string[]
+      security?: unknown[]
+      parameters?: Parameter[]
+      requestBody?: { required?: boolean; content: Record<string, { schema?: { $ref?: string } }> }
+      responses: Record<string, { content?: Record<string, { schema?: { $ref?: string } }> }>
+    }
+    const operation = (path: string, method: string): Operation => doc.paths?.[path]?.[method] as Operation
+    const errorRef = (op: Operation, status: string): string | undefined => op.responses[status].content?.['application/json'].schema?.$ref
+
+    const collectionPath = '/organizations/{id}/projects/{projectId}/tasks'
+    const itemPath = '/organizations/{id}/projects/{projectId}/tasks/{taskId}'
+    const list = operation(collectionPath, 'get')
+    const create = operation(collectionPath, 'post')
+    const get = operation(itemPath, 'get')
+    const update = operation(itemPath, 'patch')
+    const remove = operation(itemPath, 'delete')
+
+    for (const op of [list, create, get, update, remove]) {
+      expect(op.tags).toEqual(['Organization Project Tasks'])
+      expect(op.security).toEqual([{ bearerAuth: [] }])
+      expect(errorRef(op, '401')).toBe('#/components/schemas/ErrorResponse')
+      expect(errorRef(op, '400')).toBe('#/components/schemas/ErrorResponse')
+      expect(errorRef(op, '404')).toBe('#/components/schemas/ErrorResponse')
+      expect(errorRef(op, '500')).toBe('#/components/schemas/ErrorResponse')
+      for (const name of ['id', 'projectId']) {
+        const param = op.parameters?.find((p) => p.name === name)
+        expect(param?.in).toBe('path')
+        expect(param?.required).toBe(true)
+        expect(param?.schema?.maximum).toBe(2147483647)
+      }
+    }
+    for (const op of [get, update, remove]) {
+      const taskIdParam = op.parameters?.find((p) => p.name === 'taskId')
+      expect(taskIdParam?.in).toBe('path')
+      expect(taskIdParam?.required).toBe(true)
+      expect(taskIdParam?.schema?.maximum).toBe(2147483647)
+    }
+
+    expect(list.responses['200'].content?.['application/json'].schema?.$ref).toBe('#/components/schemas/TaskList')
+    // カーソル式: limit・cursor・statusのみ。statusは3状態のenum
+    expect(list.parameters?.filter((p) => p.in === 'query').map((p) => p.name)).toEqual(['limit', 'cursor', 'status'])
+    expect(list.parameters?.find((p) => p.name === 'status')?.schema?.enum).toEqual(['TODO', 'IN_PROGRESS', 'DONE'])
+    expect(list.parameters?.find((p) => p.name === 'status')?.required).toBeFalsy()
+    expect(create.responses['201'].content?.['application/json'].schema?.$ref).toBe('#/components/schemas/Task')
+    expect(get.responses['200'].content?.['application/json'].schema?.$ref).toBe('#/components/schemas/Task')
+    expect(update.responses['200'].content?.['application/json'].schema?.$ref).toBe('#/components/schemas/Task')
+    expect(remove.responses['204']).toBeDefined()
+    expect(remove.responses['204'].content).toBeUndefined()
+
+    // 書き込み系はbodyを必須とし、403は削除（MEMBERの拒否）だけに定義する
+    expect(create.requestBody?.required).toBe(true)
+    expect(create.requestBody?.content['application/json'].schema?.$ref).toBe('#/components/schemas/CreateTaskRequest')
+    expect(update.requestBody?.required).toBe(true)
+    expect(update.requestBody?.content['application/json'].schema?.$ref).toBe('#/components/schemas/UpdateTaskRequest')
+    expect(remove.requestBody).toBeUndefined()
+    expect(errorRef(remove, '403')).toBe('#/components/schemas/ErrorResponse')
+    for (const op of [list, create, get, update]) {
+      expect(op.responses['403']).toBeUndefined()
+    }
+  })
+
+  test('TaskのDTOは7項目を必須とし、descriptionはnullを許容する型・statusは3状態のenumで公開される', async () => {
+    const doc = await fetchOpenApiDoc()
+
+    type Property = { type?: string | string[]; nullable?: boolean; enum?: string[] }
+    const task = doc.components?.schemas?.Task as { properties: Record<string, Property>; required?: string[] }
+    const keys = ['createdAt', 'description', 'id', 'projectId', 'status', 'title', 'updatedAt']
+
+    expect(Object.keys(task.properties).sort()).toEqual(keys)
+    expect([...(task.required ?? [])].sort()).toEqual(keys)
+    expect(task.properties.description.type).toEqual(['string', 'null'])
+    expect(task.properties.description.nullable).toBeUndefined()
+    expect(task.properties.status.enum).toEqual(['TODO', 'IN_PROGRESS', 'DONE'])
+
+    const taskList = doc.components?.schemas?.TaskList as { required?: string[]; properties: Record<string, Property> }
+    expect([...(taskList.required ?? [])].sort()).toEqual(['items', 'nextCursor'])
+    expect(taskList.properties.nextCursor.type).toEqual(['string', 'null'])
+  })
+
+  test('タスクのrequest bodyは未知の項目を拒否し、title・statusのnullを許容せず、descriptionだけnullを許容する', async () => {
+    const doc = await fetchOpenApiDoc()
+
+    type BodySchema = {
+      additionalProperties?: boolean
+      minProperties?: number
+      required?: string[]
+      properties: Record<string, { type?: string | string[]; maxLength?: number; enum?: string[] }>
+    }
+    const createBody = doc.components?.schemas?.CreateTaskRequest as BodySchema
+    const updateBody = doc.components?.schemas?.UpdateTaskRequest as BodySchema
+
+    expect(createBody.additionalProperties).toBe(false)
+    expect(createBody.required).toEqual(['title'])
+    expect(Object.keys(createBody.properties).sort()).toEqual(['description', 'status', 'title'])
+    expect(createBody.properties.title.maxLength).toBe(200)
+    expect(createBody.minProperties).toBeUndefined()
+    expect(updateBody.additionalProperties).toBe(false)
+    expect(updateBody.required ?? []).toEqual([])
+    // 空のPATCH（{}）は400になるため、公開仕様にも少なくとも1項目必須として反映する
+    expect(updateBody.minProperties).toBe(1)
+    expect(Object.keys(updateBody.properties).sort()).toEqual(['description', 'status', 'title'])
+
+    for (const body of [createBody, updateBody]) {
+      expect(body.properties.title.type).toBe('string')
+      expect(body.properties.status.enum).toEqual(['TODO', 'IN_PROGRESS', 'DONE'])
+      expect(body.properties.description.type).toEqual(['string', 'null'])
+      expect(body.properties.description.maxLength).toBe(2000)
+    }
+  })
 })

@@ -9,6 +9,7 @@
 | カーソル式   | `GET /organizations/:id/members`    | `cursor`   | `nextCursor`                   |
 | カーソル式   | `GET /organizations/:id/audit-logs` | `cursor`   | `nextCursor`                   |
 | カーソル式   | `GET /organizations/:id/projects`   | `cursor`   | `nextCursor`                   |
+| カーソル式   | `GET /organizations/:id/projects/:projectId/tasks` | `cursor`   | `nextCursor`                   |
 | オフセット式 | `GET /organizations`                | `offset`   | `limit` / `offset` / `hasNext` |
 
 エンドポイントの一覧は [endpoints.md](endpoints.md) を参照してください。
@@ -49,6 +50,12 @@
   - 認証済みで不正な組織ID: 不正queryでも400
   - 有効な組織IDに対する非所属ユーザー: 不正queryでも404
   - 所属ユーザー（MEMBERを含む）で不正query（未対応の `offset` などの未知のquery、不正なlimit・cursorを含む）: 400
+- `GET /organizations/:id/projects/:projectId/tasks`（認証 → パスパラメータ検証（組織ID・プロジェクトID） → 組織への所属確認 → query・カーソル検証 → 親Projectの確認）
+  - 未認証: 不正queryでも401
+  - 認証済みで不正な組織ID・プロジェクトID: 不正queryでも400
+  - 有効な組織IDに対する非所属ユーザー: 不正queryでも404
+  - 所属ユーザー（MEMBERを含む）で不正query（未対応の `offset` などの未知のquery、空のstatus・不明なstatus、不正なlimit・cursor、発行条件と異なるカーソルを含む）: 400。親Projectが存在しなくても、query・カーソルの検証が先に確定して400
+  - 有効なqueryで親Projectが指定組織内に存在しない（別組織のIDを含む）: 404
 
 ## カーソル式: メンバー一覧
 
@@ -280,6 +287,87 @@ LIMIT $4
 ```
 
 index は `[organizationId, createdAt, id]` の複合index（`Project_organizationId_createdAt_id_idx`）で、btreeの逆方向スキャンで `DESC` の並びを満たします。
+
+## カーソル式: タスク一覧
+
+`GET /organizations/:id/projects/:projectId/tasks` は、対象組織の全メンバー（OWNER / ADMIN / MEMBER）が閲覧できます。タスクのAPI全体は [endpoints.md](endpoints.md#organization-project-tasks) を参照してください。
+
+### リクエスト
+
+| パラメータ | 必須 | 既定値   | 説明                                                                                      |
+| ---------- | ---- | -------- | ----------------------------------------------------------------------------------------- |
+| `limit`    | 任意 | 20       | 1〜100の整数                                                                              |
+| `cursor`   | 任意 | 先頭     | 前ページのレスポンスの `nextCursor` をそのまま指定する                                    |
+| `status`   | 任意 | 全状態   | `TODO` / `IN_PROGRESS` / `DONE` のいずれか1つ。空文字・不明な状態・複数指定は400          |
+
+並び順は `createdAt DESC, id DESC`（新しい順）です。`createdAt` が同一のタスクも `id` で一意に順序付けられます。受け付けるqueryは `limit` / `cursor` / `status` のみで、`offset` などの未知のqueryは400です。`status` は取得後の配列ではなく、同じSQLのWHEREで絞り込みます。
+
+```bash
+curl -H "Authorization: Bearer $ACCESS_TOKEN" \
+  'http://localhost:3000/organizations/1/projects/2/tasks?limit=2&status=TODO'
+```
+
+```json
+{
+  "items": [
+    {
+      "id": 31,
+      "projectId": 2,
+      "title": "仕様を確認する",
+      "description": null,
+      "status": "TODO",
+      "createdAt": "2026-02-02T09:00:00.000Z",
+      "updatedAt": "2026-02-02T09:00:00.000Z"
+    }
+  ],
+  "nextCursor": null
+}
+```
+
+親Projectが存在してタスクが0件（または最終ページ）の場合は `nextCursor: null` です。親Projectが指定組織内に存在しない（別組織のIDを含む）場合は、一覧でも404です。DBからは最大 `limit + 1` 件を取得し、`limit` 件を超えた場合だけ、返した最後のitemの境界から次のカーソルを生成します。
+
+### カーソルの扱い
+
+基本的な扱い（不透明な文字列、署名・暗号化なし、サーバーでの毎回の検証、境界値の日時の範囲検証、バージョン管理）は[メンバー一覧](#カーソルの扱い)・[監査ログ一覧](#カーソルの扱い-1)・[プロジェクト一覧](#カーソルの扱い-2)と同じです。タスクのカーソルには、次の違いがあります。
+
+- ペイロードは `kind: "tasks"`・`version: 1`・`organizationId`・`projectId`・`status`・`createdAt`・`id` です。`status` は状態フィルター未指定なら `null`、指定時はその状態です。
+- `kind`・`version`・組織ID・プロジェクトID・`status` のどれかが現在のリクエストと一致しないカーソルは400です。別API（メンバー一覧・監査ログ・プロジェクト一覧）、別組織、同一組織の別プロジェクト、異なる状態フィルターのカーソルを使い回せません。
+- 認可はカーソル内のIDを根拠にしません。毎回、認可済みのパスの組織・プロジェクトで取得条件を絞り込んだうえで、境界より古い行を取得します。タスクのカーソルをメンバー一覧へ渡した場合の挙動（既存仕様を変更しないため拒否の対象にしていません）も、既存の組織条件による認可の範囲に限られます。
+- カーソル内のID（組織・プロジェクト・境界のタスク）は1〜2147483647（PostgreSQL INTEGERの範囲）で、`createdAt` はISO datetimeかつUTC年が1以上です。範囲外はDBの整数・日時変換で500になるため、DBへ渡す前に400で返します。
+- 発行時と同じ正規のbase64url文字列以外は400です（不正な文字の付加や `=` パディングを含む）。
+
+カーソルは境界値としてのみ使うため、**基準になったタスクが削除されても、その行の存在に依存せず続きを取得できます。**
+
+### 追加・変更時の挙動
+
+- 次ページの境界は `(createdAt, id) < (境界createdAt, 境界id)` で絞り込みます。ページの取得間にタスクが追加・削除されても、すでに辿ったページの続きに重複や読み飛ばしは発生しません。
+- ページの取得間に追加された新しいタスクは、先頭ページを取り直すまで現れません。
+- ページの取得間に状態が変わったタスクは、状態フィルターの対象集合が変わるため、すでに辿った範囲と食い違うことがあります。最新の一覧は先頭ページを取り直して確認してください。ページをまたぐスナップショット一貫性は保証しません。
+- 前方向へのページ移動と、ページ位置への直接移動はできません。
+
+### クエリとindex
+
+```sql
+-- 状態未指定
+WHERE t."projectId" = $1 AND p."organizationId" = $2
+  AND (t."createdAt", t.id) < ($3, $4)
+ORDER BY t."createdAt" DESC, t.id DESC
+LIMIT $5
+
+-- 状態指定（status の等価条件を追加）
+WHERE t."projectId" = $1 AND p."organizationId" = $2
+  AND t."status" = $3::"TaskStatus"
+  AND (t."createdAt", t.id) < ($4, $5)
+ORDER BY t."createdAt" DESC, t.id DESC
+LIMIT $6
+```
+
+`Task` は `Project` へJOINし、組織条件を取得SQLに含めます（`Task` に `organizationId` は持ちません）。indexは次の2つの複合indexで、btreeの逆方向スキャンで `DESC` の並びを満たします。
+
+- `[projectId, createdAt, id]`（`Task_projectId_createdAt_id_idx`）: 状態未指定の一覧。
+- `[projectId, status, createdAt, id]`（`Task_projectId_status_createdAt_id_idx`）: 状態指定の一覧。
+
+`EXPLAIN (ANALYZE, BUFFERS)` で、対象Project（`projectId`）、状態指定時の `status`、行値境界が、それぞれ対応するindexの `Index Cond` に入ることを確認しています。
 
 ## オフセット式: 所属組織一覧
 

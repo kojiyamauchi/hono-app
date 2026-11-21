@@ -11,6 +11,7 @@ type MembersRepositoryModule = typeof import('@/features/organizations/repositor
 type TransferOwnershipRepositoryModule = typeof import('@/features/organizations/repositories/transferOwnership')
 type AuditLogsRepositoryModule = typeof import('@/features/organizations/repositories/auditLogs')
 type ProjectsRepositoryModule = typeof import('@/features/organizations/repositories/projects')
+type TasksRepositoryModule = typeof import('@/features/organizations/repositories/tasks')
 type OrganizationRepository = (typeof import('@/shared/organization/repositories'))['organizationRepository']
 type MembershipRepository = (typeof import('@/shared/membership/repositories'))['membershipRepository']
 type UserRepository = (typeof import('@/shared/user/repositories'))['userRepository']
@@ -295,6 +296,19 @@ const createProjectsRepositoryMock = (): MockSet<FunctionMocks<ProjectsRepositor
   return { mocks, reset: () => resetAll(mocks) }
 }
 
+/** タスクRepositoryのmock。 */
+const createTasksRepositoryMock = (): MockSet<FunctionMocks<TasksRepositoryModule['tasksRepository']>> => {
+  const mocks = {
+    projectExists: mock<TasksRepositoryModule['tasksRepository']['projectExists']>(),
+    list: mock<TasksRepositoryModule['tasksRepository']['list']>(),
+    getById: mock<TasksRepositoryModule['tasksRepository']['getById']>(),
+    create: mock<TasksRepositoryModule['tasksRepository']['create']>(),
+    update: mock<TasksRepositoryModule['tasksRepository']['update']>(),
+    remove: mock<TasksRepositoryModule['tasksRepository']['remove']>(),
+  }
+  return { mocks, reset: () => resetAll(mocks) }
+}
+
 /** 監査ログRepositoryのmock。 */
 const createAuditLogsRepositoryMock = (): MockSet<FunctionMocks<AuditLogsRepositoryModule['auditLogsRepository']>> => {
   const mocks = { findPage: mock<AuditLogsRepositoryModule['auditLogsRepository']['findPage']>() }
@@ -315,6 +329,7 @@ type RouteTestMocks = {
   transferOwnership: FunctionMocks<TransferOwnershipRepositoryModule['transferOwnershipRepository']>
   auditLogs: FunctionMocks<AuditLogsRepositoryModule['auditLogsRepository']>
   projects: FunctionMocks<ProjectsRepositoryModule['projectsRepository']>
+  tasks: FunctionMocks<TasksRepositoryModule['tasksRepository']>
 }
 
 export type RouteTestContext = {
@@ -346,6 +361,7 @@ export const createRouteTestContext = async (options: { boundaryOverrides?: Boun
     const transferOwnership = createTransferOwnershipRepositoryMock()
     const auditLogs = createAuditLogsRepositoryMock()
     const projects = createProjectsRepositoryMock()
+    const tasks = createTasksRepositoryMock()
 
     const membersModule = await import('@/features/organizations/repositories/members')
     await mock.module('@/features/organizations/repositories/members', () => ({ ...membersModule, membersRepository: members.mocks }))
@@ -357,6 +373,8 @@ export const createRouteTestContext = async (options: { boundaryOverrides?: Boun
     await mock.module('@/features/organizations/repositories/auditLogs', () => ({ auditLogsRepository: auditLogs.mocks }))
     const projectsModule = await import('@/features/organizations/repositories/projects')
     await mock.module('@/features/organizations/repositories/projects', () => ({ ...projectsModule, projectsRepository: projects.mocks }))
+    const tasksModule = await import('@/features/organizations/repositories/tasks')
+    await mock.module('@/features/organizations/repositories/tasks', () => ({ ...tasksModule, tasksRepository: tasks.mocks }))
     await mock.module('@/shared/organization/repositories', () => ({ organizationRepository: organizations.mocks }))
     await mock.module('@/shared/membership/repositories', () => ({ membershipRepository: memberships.mocks }))
     await mock.module('@/shared/user/repositories', () => ({ userRepository: users.mocks }))
@@ -371,7 +389,7 @@ export const createRouteTestContext = async (options: { boundaryOverrides?: Boun
     // 起動時の呼び出し記録をケース前のresetで消さないよう、import直後に検査する
     environment.assertNoUnexpectedCalls()
 
-    const resets = [organizations, memberships, users, invitations, invitationEmailResend, members, transferOwnership, auditLogs, projects]
+    const resets = [organizations, memberships, users, invitations, invitationEmailResend, members, transferOwnership, auditLogs, projects, tasks]
     return {
       app,
       mocks: {
@@ -384,6 +402,7 @@ export const createRouteTestContext = async (options: { boundaryOverrides?: Boun
         transferOwnership: transferOwnership.mocks,
         auditLogs: auditLogs.mocks,
         projects: projects.mocks,
+        tasks: tasks.mocks,
       },
       reset: () => {
         for (const set of resets) set.reset()

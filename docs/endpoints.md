@@ -100,6 +100,35 @@ GCPのdev環境では、以下を含む全エンドポイントへのアクセ�
 - 判定順は 401（認証）→ 400（パスパラメータ）→ 404（組織が存在しない、または未所属）→ 403（MEMBERによる書き込み。bodyの検証より先に確定する）→ 400（body / query）→ 404（対象プロジェクトなし。別組織のIDを含む。削除済みへの再削除も404）です。MEMBERの書き込みは対象の有無にかかわらず403です。
 - 作成・更新・削除は、トランザクション内でロック取得後の最新の所属・ロールで再判定します。組織または所属が消えていれば404、MEMBERへ降格していれば403、対象プロジェクトが消えていれば404です。
 - 作成・実変更・完全削除は、同じトランザクションで監査ログ（`PROJECT_CREATED` / `PROJECT_UPDATED` / `PROJECT_DELETED`）に記録します。記録に失敗した場合は作成・更新・削除も取り消され500です。同値のPATCH（名前・説明がすべて保存済みの値と同じ）は200で `updatedAt` を更新しますが、監査ログは作りません。詳細は[Organization Audit Logs](#organization-audit-logs)を参照してください。
+- プロジェクトを完全削除すると、配下のタスク（[Organization Project Tasks](#organization-project-tasks)）もDBの外部キーのcascadeで同じトランザクション内に削除されます。
+
+## Organization Project Tasks
+
+プロジェクト配下のタスクのCRUDです。すべてBearerアクセストークンが必要で、組織のメンバーシップを確認します。タスクはプロジェクトの資産として扱い、作成したユーザーの脱退・アカウント削除後も残ります（作成者は保存しません）。同じプロジェクト内の同名タスクも作成できます（IDで識別します）。
+
+| Method | Path                                                 | 認証 | 概要                                                                                                                                                                       |
+| ------ | ---------------------------------------------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/organizations/:id/projects/:projectId/tasks`         | 必要 | 組織の全メンバーがタスクを作成する（201、作成したTask）                                                                                                                    |
+| GET    | `/organizations/:id/projects/:projectId/tasks`         | 必要 | 組織の全メンバーがタスク一覧を新しい順にカーソル式ページネーションで取得する（`limit` / `cursor` / `status`、詳細は [pagination.md](pagination.md)）                         |
+| GET    | `/organizations/:id/projects/:projectId/tasks/:taskId` | 必要 | 組織の全メンバーがタスクを1件取得する                                                                                                                                      |
+| PATCH  | `/organizations/:id/projects/:projectId/tasks/:taskId` | 必要 | 組織の全メンバーがタスクを部分更新する（状態変更を含む。200、更新後のTask）                                                                                                |
+| DELETE | `/organizations/:id/projects/:projectId/tasks/:taskId` | 必要 | OWNERまたはADMINがタスクを完全削除する（204、本文なし。復元不可）                                                                                                          |
+
+仕様は次のとおりです。
+
+- Taskは `id` / `projectId` / `title` / `description` / `status` / `createdAt` / `updatedAt` の7項目です。`description` は未設定でも `null` で返し、日時はISO 8601文字列です。所属組織は親Projectから確定し、`organizationId` は持ちません。
+- `:id`・`:projectId`・`:taskId` は1〜2147483647の整数です。不正値は400です。
+- `status` は `TODO`（未着手）／`IN_PROGRESS`（進行中）／`DONE`（完了）で、3状態の間は自由に変更できます（完了から未着手へ戻す操作も可）。省略時の既定値は `TODO` です。
+- `title` は必須で、前後の空白を除去した後に1〜200文字です。`description` は省略可能かつnullableで、最大2000文字です（trimや空文字→nullの変換はせず、空文字も有効です）。POSTで省略した `description` は `null` として保存します。作成時に `IN_PROGRESS` や `DONE` を指定できます。
+- POST / PATCHはJSON bodyが必須です（Content-Typeなし・bodyなしでも検証を省略せず400）。未知の項目（`id`・`projectId`・`organizationId`・日時を含む）は400です。
+- PATCHは `title` / `description` / `status` のうち少なくとも1項目が必須で、指定した項目だけを更新します（省略した項目は維持、`description: null` は説明の削除、`title: null`・`status: null` は400）。同値の指定も200で、`updatedAt` は更新されます。同じ項目を同時に更新した場合は後にDBへ適用した値を採用し、異なる項目だけの更新は互いを上書きしません。
+- 一覧は `createdAt DESC, id DESC` の新しい順で、queryは `limit`（既定20、1〜100）・`cursor`・`status`（3状態のいずれか1つ。省略時は全状態）のみです。`offset` などの未知のqueryや空文字・不明な状態は400です。親Projectが存在してタスクが0件なら、200・`items: []`・`nextCursor: null` です。
+- 権限は、閲覧・作成・更新が OWNER / ADMIN / MEMBER、完全削除が OWNER / ADMIN のみです。
+- 判定順は 401（認証）→ 400（全パスパラメータ）→ 404（組織が存在しない、または未所属）→ 403（DELETEでMEMBER。親ProjectやTaskの有無にかかわらず確定する）→ 400（body / query / カーソル）→ 404（指定組織内に親Projectがない。別組織のIDを含む。一覧も同様）→ 404（指定プロジェクト内にTaskがない。別プロジェクトのIDや削除済みへの再削除を含む）です。
+- 作成・更新・削除は、トランザクション内でロック取得後の最新の所属・ロールで再判定します。組織または所属が消えていれば404、DELETEでMEMBERへ降格していれば403、親ProjectまたはTaskが消えていれば404です。POST / PATCHではMEMBERへの降格後も許可されます。同じ操作者・同じProject内の別Taskへの書き込みは互いに待たず、同じTaskの更新・削除だけが直列化されます。
+- 一覧・詳細は行ロックを取らない読み取りです。親確認後に親が削除された場合、一覧は200の空配列または404、詳細は404となることがあります。
+- タスクの操作では監査ログを記録しません（記録対象は[Organization Audit Logs](#organization-audit-logs)の6種類のままです）。
+- プロジェクトまたは組織を削除すると、配下のタスクもDBの外部キーのcascade（組織 → プロジェクト → タスク）で同じトランザクション内に削除されます。親の削除が失敗した場合は、タスクの削除も取り消されます。
 
 ## Organization Audit Logs
 

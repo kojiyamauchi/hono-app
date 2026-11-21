@@ -279,6 +279,7 @@ export const projectsRepository = {
   /**
    * Organization → 操作者のMembership → 対象Projectの順でロックし、最新ロールで認可したうえでプロジェクトを完全削除する。
    * 操作者がMEMBERなら対象の有無にかかわらず拒否する（認可を対象のロックより先に行う）。
+   * 配下のタスクはTaskからProjectへの外部キー（ON DELETE CASCADE）により同じトランザクション内で削除されるため、明示的には削除しない。
    */
   removeWithAuthorization: async <TRejection>(
     input: RemoveProjectInput,
